@@ -1,0 +1,341 @@
+---
+title: Sandboxing and Isolation
+quiz:
+- question: What is the primary advantage of using a git worktree for agent isolation?
+  options:
+  - It creates an isolated working copy so agent changes do not affect the main working directory
+  - It makes the agent run faster by reducing disk I/O
+  - It automatically backs up all files before the agent starts
+  - It prevents the agent from reading files outside the project
+  correctIndex: 0
+- question: Why is container-based isolation stronger than worktree isolation?
+  options:
+  - Containers use less memory than worktrees
+  - Containers run on faster hardware
+  - Containers isolate the entire execution environment including filesystem, network, and process space
+  - Containers automatically fix agent mistakes
+  correctIndex: 2
+- question: In the review-gate workflow, when does a human reviewer get involved?
+  options:
+  - Before every individual tool call the agent makes
+  - Only when the agent encounters an error
+  - Never -- the workflow is fully automated
+  - After the agent completes all changes in the isolated environment, before merging
+  correctIndex: 3
+- question: What is the 'disposable environment' principle in agent sandboxing?
+  options:
+  - Agents should delete all their files after each session
+  - The execution environment can be destroyed and recreated cheaply, making mistakes cost-free to reverse
+  - Developers should use temporary laptops for agent work
+  - Agent sessions should be limited to five minutes
+  correctIndex: 1
+---
+
+## Overview
+
+Permissions tell the agent what it can do. Hooks validate each action in context. But even with both layers in place, the question remains: what happens when something slips through? A well-crafted command might pass every check and still produce an unintended result. A valid edit might introduce a subtle bug that cascades through the codebase.
+
+**Sandboxing and isolation** solve this by ensuring that the agent works in a contained environment where mistakes are cheap to reverse. Instead of trying to prevent every possible error, you make errors recoverable. This is the third pillar of agent safety: not stopping all mistakes, but limiting their blast radius.
+
+## The Isolation Spectrum
+
+Isolation techniques range from lightweight to heavy, each offering a different trade-off between safety and overhead.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Light["Lightweight"]
+        W["Git Worktree"]
+        B["Git Branch"]
+    end
+    subgraph Medium["Medium"]
+        VM["Virtual Environment"]
+        NS["Namespace Isolation"]
+    end
+    subgraph Heavy["Heavy"]
+        D["Docker Container"]
+        SB["VM / Sandbox"]
+    end
+    Light -->|"More isolation"| Medium -->|"More isolation"| Heavy
+    style Light fill:#c6f6d5,stroke:#38a169
+    style Medium fill:#fef3c7,stroke:#d69e2e
+    style Heavy fill:#ebf8ff,stroke:#3182ce
+`} />
+
+For most development workflows, git worktrees provide the best balance of safety and convenience. Containers add stronger isolation for CI/CD and untrusted execution scenarios.
+
+## Git Worktrees: The Agent's Sandbox
+
+A **git worktree** creates a separate working directory linked to the same repository. The agent works in this isolated copy while your main working directory remains untouched. If the agent's changes are good, you merge them. If not, you delete the worktree and move on.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Repo["Git Repository"]
+        Main["Main Worktree<br/>(your working directory)<br/>branch: main"]
+        Agent["Agent Worktree<br/>(.claude/worktrees/feature-x)<br/>branch: agent/feature-x"]
+        Git[("Shared .git<br/>history")]
+        Main --- Git
+        Agent --- Git
+    end
+    Dev["Developer"] --> Main
+    AI["AI Agent"] --> Agent
+    Agent -->|"PR / Review"| Main
+    style Main fill:#c6f6d5,stroke:#38a169
+    style Agent fill:#ebf8ff,stroke:#3182ce
+    style Git fill:#fef3c7,stroke:#d69e2e
+`} />
+
+### Why Worktrees Work Well for Agents
+
+- **Shared history**: The worktree has access to the full git history, so the agent can reference commits, diffs, and branches
+- **Separate filesystem**: Files modified in the worktree do not appear in your main working directory
+- **Branch isolation**: The agent works on its own branch, so even if it commits, your branch is unaffected
+- **Cheap to create and destroy**: Creating a worktree takes milliseconds and uses minimal disk space (git uses hard links)
+- **Standard git workflow**: Merging from a worktree uses the same PR/review process as any other branch
+
+### Creating and Managing Worktrees
+
+<CodeBlock code={`# Create a worktree for agent work
+git worktree add .claude/worktrees/feature-auth agent/feature-auth
+
+# List active worktrees
+git worktree list
+
+# Remove a worktree when done
+git worktree remove .claude/worktrees/feature-auth
+
+# Force remove if there are changes you want to discard
+git worktree remove --force .claude/worktrees/feature-auth
+
+# Clean up stale worktree references
+git worktree prune
+`} language="bash" filename="worktree-commands.sh" />
+
+### The Worktree Workflow
+
+The standard agent-in-worktree workflow follows these steps:
+
+1. Create a worktree on a new branch
+2. Start the agent session pointing at the worktree directory
+3. Let the agent work autonomously within the isolated copy
+4. Review the agent's changes via `git diff` or a pull request
+5. Merge good changes, discard bad ones
+6. Remove the worktree
+
+<CodeBlock code={`#!/bin/bash
+# agent-worktree.sh
+# Script to set up an isolated agent session
+
+TASK_NAME="\${1:-agent-task}"
+BRANCH="agent/$TASK_NAME"
+WORKTREE_DIR=".claude/worktrees/$TASK_NAME"
+
+# Create a new branch from the current HEAD
+git branch "$BRANCH" HEAD 2>/dev/null
+
+# Create the worktree
+git worktree add "$WORKTREE_DIR" "$BRANCH"
+
+echo "Agent worktree ready at: $WORKTREE_DIR"
+echo "Branch: $BRANCH"
+echo ""
+echo "Start your agent session in this directory."
+echo "When done, review changes with:"
+echo "  cd $WORKTREE_DIR && git diff HEAD~"
+echo ""
+echo "Clean up with:"
+echo "  git worktree remove $WORKTREE_DIR"
+echo "  git branch -D $BRANCH  # if discarding"
+`} language="bash" filename="scripts/agent-worktree.sh" />
+
+## Container Isolation
+
+For stronger isolation, especially in CI/CD environments, **Docker containers** provide a fully sandboxed execution environment. The agent runs inside a container with controlled access to the filesystem, network, and system resources.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Host["Host Machine"]
+        subgraph Container["Docker Container"]
+            A["AI Agent"]
+            FS["Mounted Repo<br/>(read-write)"]
+            A --> FS
+        end
+        Repo["Git Repository<br/>(host)"]
+        Repo -->|"volume mount"| FS
+        Net["Network"]
+    end
+    Container -.->|"blocked"| Net
+    style Container fill:#ebf8ff,stroke:#3182ce
+    style Host fill:#f7fafc,stroke:#a0aec0
+    style Net fill:#fed7d7,stroke:#e53e3e
+`} />
+
+### Why Containers Add Safety
+
+- **Filesystem isolation**: The agent can only access mounted directories, not the full host filesystem
+- **Network control**: You can block or restrict network access, preventing the agent from reaching external services
+- **Process isolation**: Processes inside the container cannot affect host processes
+- **Resource limits**: CPU and memory caps prevent runaway processes
+- **Disposable**: Destroy the container after each session -- no state leaks between runs
+
+### A Container Configuration for Agent Work
+
+<CodeBlock code={`# Dockerfile.agent
+FROM node:20-slim
+
+# Install common development tools
+RUN apt-get update && apt-get install -y \\
+    git \\
+    jq \\
+    ripgrep \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user for the agent
+RUN useradd -m -s /bin/bash agent
+USER agent
+WORKDIR /workspace
+
+# Default command: start a shell for the agent
+CMD ["bash"]
+`} language="dockerfile" filename="Dockerfile.agent" />
+
+<CodeBlock code={`# docker-compose.agent.yml
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    # Block all network access
+    network_mode: "none"
+    # Limit resources
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+    # Read-only root filesystem (except workspace)
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Drop all capabilities
+    cap_drop:
+      - ALL
+    # Run as non-root
+    user: "1000:1000"
+`} language="yaml" filename="docker-compose.agent.yml" />
+
+Key security features in this configuration:
+
+- `network_mode: "none"` prevents all network access -- no calling external APIs, no installing packages from the internet
+- `cap_drop: ALL` removes Linux capabilities, preventing privilege escalation
+- `read_only: true` makes the root filesystem immutable -- only the mounted workspace is writable
+- Resource limits prevent the agent from consuming all host resources
+
+## Combining Worktrees and Containers
+
+The most robust isolation combines both approaches: the agent works in a git worktree (for branch isolation) mounted inside a Docker container (for system isolation).
+
+<MermaidDiagram chart={`graph TD
+    subgraph Host["Host Machine"]
+        Main["Main Worktree<br/>(developer workspace)"]
+        subgraph Container["Docker Container"]
+            subgraph Worktree["Git Worktree"]
+                Agent["AI Agent"]
+                Files["Project Files<br/>(isolated branch)"]
+                Agent --> Files
+            end
+        end
+    end
+    Files -->|"git push"| PR["Pull Request"]
+    PR -->|"review"| Main
+    style Main fill:#c6f6d5,stroke:#38a169
+    style Container fill:#ebf8ff,stroke:#3182ce
+    style Worktree fill:#fef3c7,stroke:#d69e2e
+    style PR fill:#e9d8fd,stroke:#805ad5
+`} />
+
+This double layer means:
+- **Git isolation**: Changes are on a separate branch; your main branch is untouched
+- **System isolation**: The agent cannot access host resources, network, or filesystem outside the mount
+- **Review gate**: Changes flow through a pull request before reaching the main branch
+
+## The Review-Gate Pattern
+
+Isolation is most effective when paired with a **review gate** -- a mandatory human review step between the agent's work and its integration into the main codebase.
+
+<MermaidDiagram chart={`flowchart LR
+    A["Agent works<br/>in isolation"] --> B["Agent commits<br/>to branch"]
+    B --> C["PR created<br/>automatically"]
+    C --> D{"Human review"}
+    D -->|"Approved"| E["Merge to main"]
+    D -->|"Changes requested"| F["Agent revises"]
+    F --> B
+    D -->|"Rejected"| G["Branch deleted"]
+    style A fill:#ebf8ff,stroke:#3182ce
+    style D fill:#fef3c7,stroke:#d69e2e
+    style E fill:#c6f6d5,stroke:#38a169
+    style G fill:#fed7d7,stroke:#e53e3e
+`} />
+
+The review gate is what makes isolation practical for teams. The agent works with full autonomy inside its sandbox, maximizing speed and throughput. But no changes reach the main branch without a human looking at them.
+
+## Choosing Your Isolation Strategy
+
+The right isolation strategy depends on your risk tolerance and workflow.
+
+**Worktree only** -- best for trusted local development. The agent works on a separate branch in a worktree. Changes are reviewed via diff or PR. Good for teams that trust the agent but want an easy undo path.
+
+**Container only** -- best for CI/CD pipelines and batch operations. The agent runs in a disposable container with controlled resources and no network. Changes are committed and pushed from within the container.
+
+**Worktree plus container** -- best for high-security environments and untrusted tasks. Maximum isolation with a standard review workflow. Use this when the agent is working with sensitive code or when mistakes are expensive.
+
+**No isolation** -- appropriate only when permissions and hooks are robust, the agent is in default (ask-first) mode, and the developer is actively watching the session. Even then, working on a feature branch is recommended.
+
+> **Principle**: The more autonomous the agent, the stronger the isolation should be. If you reduce human oversight, compensate with stronger containment.
+
+## Practical Considerations
+
+### Worktree Cleanup
+
+Worktrees accumulate if not cleaned up. Add a script or hook to remove stale worktrees.
+
+<CodeBlock code={`#!/bin/bash
+# cleanup-worktrees.sh
+# Remove worktrees older than 7 days
+
+WORKTREE_BASE=".claude/worktrees"
+
+if [ ! -d "$WORKTREE_BASE" ]; then
+  exit 0
+fi
+
+find "$WORKTREE_BASE" -maxdepth 1 -mindepth 1 -type d -mtime +7 | while read dir; do
+  BRANCH=$(git -C "$dir" branch --show-current 2>/dev/null)
+  echo "Removing stale worktree: $dir (branch: $BRANCH)"
+  git worktree remove --force "$dir" 2>/dev/null
+  if [ -n "$BRANCH" ]; then
+    git branch -D "$BRANCH" 2>/dev/null
+  fi
+done
+
+git worktree prune
+`} language="bash" filename="scripts/cleanup-worktrees.sh" />
+
+### Container Performance
+
+Running an agent inside a container adds overhead for file I/O due to volume mounting. Mitigate this by:
+
+- Using named volumes instead of bind mounts on Linux
+- Keeping the mounted workspace as small as possible (mount only the project, not the entire home directory)
+- Using the `:delegated` mount flag on macOS for write-heavy workloads
+
+### Credential Management
+
+When using containers, the agent may need credentials (for git, for package registries). Never bake credentials into images. Instead:
+
+- Mount credentials as read-only files
+- Use short-lived tokens that expire after the session
+- Inject credentials via environment variables at runtime, not at build time
+
+## Summary
+
+**Sandboxing and isolation** are the third pillar of agent safety, complementing permissions and hooks. **Git worktrees** provide lightweight branch isolation where the agent works on a separate copy of the codebase. **Docker containers** add system-level isolation by controlling filesystem, network, and process access. The most robust approach combines both: a worktree inside a container with a mandatory **review gate** before any changes reach the main branch. The core principle is the **disposable environment** -- make the agent's workspace cheap to create and destroy so that mistakes are always recoverable. In the final lesson of this module, we will bring all three pillars together into a complete safety framework configuration.

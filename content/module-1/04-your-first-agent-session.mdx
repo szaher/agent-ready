@@ -1,0 +1,256 @@
+---
+title: "Your First Agent Session"
+---
+
+## Overview
+
+Theory only takes you so far. In this lesson, we will get hands-on by installing an AI coding agent, running it on a real repository, and observing how it behaves with and without agent-ready preparation. By the end, you will have run your first agent session and seen firsthand how project context shapes agent performance.
+
+## What You Will Need
+
+Before we begin, make sure you have the following:
+
+- A terminal (macOS Terminal, iTerm2, Windows Terminal, or any Linux terminal)
+- **Node.js** 18 or later installed
+- **Git** installed
+- A code editor (VS Code, Neovim, or your preference)
+- An Anthropic API key or a Claude Pro/Max subscription (for Claude Code)
+
+> If you do not have a Claude subscription, you can still follow along by reading the session transcripts included in this lesson. The principles apply to any AI coding agent.
+
+## Installing Claude Code
+
+**Claude Code** is Anthropic's CLI-based AI coding agent. It runs in your terminal and operates directly on your filesystem -- reading files, writing code, running commands, and iterating on its work.
+
+Install it globally with npm:
+
+<CodeBlock code={`# Install Claude Code globally
+npm install -g @anthropic-ai/claude-code
+
+# Verify the installation
+claude --version
+`} language="bash" filename="terminal" />
+
+Once installed, authenticate by running `claude` for the first time. It will walk you through connecting your Anthropic account.
+
+<CodeBlock code={`# Start Claude Code (it will prompt for authentication on first run)
+claude
+`} language="bash" filename="terminal" />
+
+## Setting Up a Sample Repository
+
+For this exercise, we will create a small repository to experiment with. This gives us a controlled environment to observe agent behavior.
+
+<CodeBlock code={`# Create a sample project
+mkdir agent-ready-demo && cd agent-ready-demo
+git init
+
+# Initialize a basic Node.js project
+npm init -y
+
+# Create a simple source file
+mkdir src
+`} language="bash" filename="terminal" />
+
+Now let us add a simple application file that the agent can work with:
+
+<CodeBlock code={`// src/calculator.js
+
+function add(a, b) {
+  return a + b;
+}
+
+function subtract(a, b) {
+  return a - b;
+}
+
+function multiply(a, b) {
+  return a * b;
+}
+
+function divide(a, b) {
+  if (b === 0) {
+    throw new Error("Division by zero");
+  }
+  return a / b;
+}
+
+module.exports = { add, subtract, multiply, divide };
+`} language="javascript" filename="src/calculator.js" />
+
+## Experiment 1: Agent Without Context
+
+First, let us see what happens when you run an agent on a repository with no agent-ready preparation. Open Claude Code in the project directory and give it a task:
+
+<CodeBlock code={`# Navigate to your project
+cd agent-ready-demo
+
+# Start Claude Code
+claude
+
+# Then type this prompt:
+# "Add a power function and write tests for all calculator functions"
+`} language="bash" filename="terminal" />
+
+Watch what the agent does. Without any project instructions, it will:
+
+1. Scan the repository to understand its structure
+2. Read the existing code
+3. Make assumptions about your testing framework
+4. Make assumptions about your code style
+5. Write the implementation and tests based on those guesses
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Dev as Developer
+    participant Agent as Claude Code
+    participant Repo as Repository
+
+    Dev->>Agent: "Add power function and write tests"
+    Agent->>Repo: Read directory structure
+    Repo-->>Agent: src/calculator.js, package.json
+    Agent->>Repo: Read calculator.js
+    Repo-->>Agent: (source code)
+    Agent->>Repo: Read package.json
+    Repo-->>Agent: (no test framework configured)
+    Note over Agent: Guesses: use Jest? Mocha? Vitest?
+    Agent->>Repo: Write src/calculator.js (add power)
+    Agent->>Repo: Write tests (guessed framework)
+    Agent->>Repo: Run npm test
+    Repo-->>Agent: Error: test command not configured
+    Note over Agent: Tries to fix package.json
+    Agent->>Repo: Install test framework
+    Agent->>Repo: Run npm test again
+    Repo-->>Agent: Tests pass (maybe)
+`} />
+
+Notice the guesswork. The agent had to decide which test framework to use, where to put the test files, and how to configure the test runner. It might choose Jest when your team uses Vitest. It might put tests in a `__tests__` folder when you prefer co-located `.test.js` files. Every guess is a potential mismatch with your team's preferences.
+
+## Experiment 2: Agent With Context
+
+Now let us add minimal agent-ready preparation and repeat the same task. Create a CLAUDE.md file in the project root:
+
+<CodeBlock code={`# Agent-Ready Demo
+
+A simple calculator library for demonstrating agent-ready principles.
+
+## Build and Test
+
+- Install: \`npm install\`
+- Test: \`npx vitest run\`
+- Lint: \`npx eslint src/\`
+
+## Conventions
+
+- Use Vitest for all tests
+- Test files go next to source files: \`src/calculator.test.js\`
+- Use descriptive test names: \`it("should return the sum of two numbers")\`
+- Use CommonJS modules (\`require\`/\`module.exports\`), not ES modules
+- All math functions should validate their inputs are numbers
+- Throw descriptive Error messages for invalid inputs
+
+## Project Structure
+
+\`\`\`
+src/
+  calculator.js       <- Math utility functions
+  calculator.test.js  <- Tests (co-located)
+\`\`\`
+`} language="markdown" filename="CLAUDE.md" />
+
+Also install Vitest so the agent has a working feedback loop:
+
+<CodeBlock code={`# Install the test framework specified in CLAUDE.md
+npm install --save-dev vitest
+`} language="bash" filename="terminal" />
+
+Now run the same task again:
+
+<CodeBlock code={`# Start a new Claude Code session
+claude
+
+# Same prompt as before:
+# "Add a power function and write tests for all calculator functions"
+`} language="bash" filename="terminal" />
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Dev as Developer
+    participant Agent as Claude Code
+    participant Repo as Repository
+
+    Dev->>Agent: "Add power function and write tests"
+    Agent->>Repo: Read CLAUDE.md
+    Repo-->>Agent: Project context, conventions, commands
+    Note over Agent: Knows: Vitest, co-located tests,<br/>CommonJS, input validation
+    Agent->>Repo: Read src/calculator.js
+    Repo-->>Agent: (source code)
+    Agent->>Repo: Write src/calculator.js (add power + validation)
+    Agent->>Repo: Write src/calculator.test.js
+    Agent->>Repo: Run npx vitest run
+    Repo-->>Agent: All tests pass
+    Note over Agent: Done -- matches conventions
+`} />
+
+The difference is dramatic. With a CLAUDE.md in place, the agent:
+
+- **Uses Vitest** instead of guessing the test framework
+- **Co-locates the test file** next to the source as the conventions specify
+- **Uses CommonJS** syntax because the conventions say so
+- **Adds input validation** because the conventions require it
+- **Runs the right test command** because it was documented
+
+No guesswork. No wasted iterations. The task completes faster and the output matches your team's expectations.
+
+## What to Observe During a Session
+
+When running an agent session, pay attention to these signals:
+
+- **How long does it take the agent to start writing code?** Long setup time means the agent is struggling to understand the project
+- **Does the agent ask clarifying questions?** Good agents will ask when they lack context, but having to ask about basic conventions is a sign of poor preparation
+- **How many iterations does the agent need?** If tests fail and the agent retries multiple times, the feedback loop may be too slow or the conventions too unclear
+- **Does the output match your team's style?** Compare the agent's code to existing code. Mismatches indicate missing convention documentation
+
+## Trying It With Your Own Repository
+
+Once you are comfortable with the sample project, try running Claude Code on one of your real repositories:
+
+<CodeBlock code={`# Navigate to your actual project
+cd /path/to/your/project
+
+# Start Claude Code
+claude
+
+# Give it a small, well-defined task:
+# "Add input validation to the createUser function in src/services/user.js"
+`} language="bash" filename="terminal" />
+
+Start with small, focused tasks. As you saw in the maturity model from the previous lesson, effectiveness improves incrementally. A small task on a real repo will immediately reveal where your project's agent readiness gaps are.
+
+> Start with a task you already know the correct answer to. That way you can evaluate the agent's output against your own expectations and identify where preparation is lacking.
+
+## Common First-Session Pitfalls
+
+Here are the most common issues developers encounter in their first agent session and how to address them:
+
+- **Agent installs the wrong dependencies** -- Add a "Dependencies" section to your CLAUDE.md specifying approved packages
+- **Agent uses the wrong code style** -- Document your style conventions explicitly; do not assume the agent will infer them from existing code
+- **Agent modifies files it should not touch** -- Add a "Do Not Modify" section listing protected files and directories
+- **Agent's tests do not match your patterns** -- Include an example test file path in your conventions
+- **Agent cannot run the build** -- Ensure your setup instructions work from a clean clone
+
+## Anatomy of a Successful Agent Session
+
+After running several sessions, you will notice a pattern in successful interactions:
+
+1. **Agent reads the instruction file** -- it orients itself to the project
+2. **Agent reads relevant source files** -- it understands the existing code
+3. **Agent plans its approach** -- it decides what to change and in what order
+4. **Agent implements the changes** -- it writes code following the documented conventions
+5. **Agent runs verification** -- it uses the documented test and lint commands
+6. **Agent fixes any issues** -- if tests fail, it reads the errors and adjusts
+7. **Agent presents the result** -- it summarizes what it did and why
+
+When this flow is smooth and fast, your codebase is agent-ready. When it stalls at any step, that step is where preparation is needed.
+
+## Summary
+
+In this lesson, you installed Claude Code and ran your first agent sessions. You saw the stark difference between an agent operating in a bare repository versus one with a CLAUDE.md providing context, conventions, and commands. The key takeaway is practical: even a minimal instruction file dramatically improves agent performance. In the next lesson, we will learn how to measure this improvement systematically so you can track your codebase's agent readiness over time.

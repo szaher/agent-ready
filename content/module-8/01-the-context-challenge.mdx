@@ -1,0 +1,185 @@
+---
+title: The Context Challenge
+quiz:
+- question: What is the 'context window' in the context of AI coding agents?
+  options:
+  - The total amount of text an agent can see and reason about at one time
+  - The IDE panel where you view files side by side
+  - The number of files in a repository
+  - The amount of RAM available to the agent process
+  correctIndex: 0
+- question: Why can't an agent read an entire large codebase at once?
+  options:
+  - Agents are not allowed to read more than one file at a time
+  - File systems prevent batch reading of multiple files
+  - The codebase exceeds the agent's context window, which has a hard token limit
+  - Agents can read entire codebases -- there is no practical limit
+  correctIndex: 2
+- question: What is the primary consequence of filling the context window with irrelevant information?
+  options:
+  - The agent crashes and the session must be restarted
+  - The agent runs more slowly but produces the same quality output
+  - The agent automatically summarizes the irrelevant content into a shorter form
+  - The agent loses the ability to focus on what matters, leading to worse decisions and missed details
+  correctIndex: 3
+---
+
+## Overview
+
+Every AI coding agent operates under a constraint that most developers underestimate: the **context window**. This is the total amount of text -- code, instructions, conversation history, tool output -- that the agent can see and reason about at any given moment. It is not a soft limit. It is a hard wall. When an agent hits it, information gets dropped, earlier context gets compressed, and the quality of the agent's work degrades. This lesson explains why context is the single biggest bottleneck for agent performance, how it shapes every decision the agent makes, and what it means for how you structure your codebase.
+
+## What Is Context, Exactly?
+
+In everyday language, "context" means background information. For an AI coding agent, **context** has a precise technical meaning: it is everything inside the agent's working memory during a session. This includes:
+
+- **System instructions** -- CLAUDE.md, project rules, and behavior guidelines
+- **Conversation history** -- every message between you and the agent in the current session
+- **File contents** -- every file the agent has read or been shown
+- **Tool output** -- results from running commands, search results, test output
+- **The agent's own reasoning** -- its plans, observations, and intermediate thoughts
+
+All of this competes for space inside one fixed-size container.
+
+<MermaidDiagram chart={`graph TD
+    subgraph CW["Context Window (~200K tokens)"]
+        A["System Instructions\n(CLAUDE.md, rules)"]
+        B["Conversation History\n(messages so far)"]
+        C["File Contents\n(code read by agent)"]
+        D["Tool Output\n(test results, searches)"]
+        E["Agent Reasoning\n(plans, thoughts)"]
+    end
+    F["Everything Outside\nthe Window"] -.->|"invisible to agent"| CW
+    style CW fill:#ebf8ff,stroke:#3182ce
+    style F fill:#fed7d7,stroke:#e53e3e
+`} />
+
+The crucial insight is that everything outside the context window is **invisible** to the agent. It does not exist from the agent's perspective. A function defined in a file the agent has not read might as well not exist. A convention you mentioned twenty messages ago that has been compressed out of the window is forgotten.
+
+## The Scale Mismatch
+
+Here is the core problem. A modern context window is roughly 200,000 tokens -- about 150,000 words or 500 pages of text. That sounds enormous. But consider what it is up against:
+
+<MermaidDiagram chart={`graph LR
+    subgraph Repo["Typical Codebase"]
+        R1["Small project\n50 files\n~50K tokens"]
+        R2["Medium project\n500 files\n~500K tokens"]
+        R3["Large project\n5,000 files\n~5M tokens"]
+        R4["Monorepo\n50,000+ files\n~50M+ tokens"]
+    end
+    subgraph Window["Context Window"]
+        W1["~200K tokens"]
+    end
+    R2 -.->|"2.5x too large"| W1
+    R3 -.->|"25x too large"| W1
+    R4 -.->|"250x too large"| W1
+    style Repo fill:#fefcbf,stroke:#d69e2e
+    style Window fill:#ebf8ff,stroke:#3182ce
+`} />
+
+Even a medium-sized project with 500 files exceeds the context window. A large monorepo can be 250 times larger than what the agent can hold in memory. The agent cannot "just read everything." It must be selective.
+
+This mismatch is not a temporary limitation waiting to be solved by bigger models. Even as context windows grow, codebases grow faster. And there is a deeper problem: attention quality degrades with window size. An agent with 200K tokens of densely packed code performs worse than the same agent with 50K tokens of carefully curated, relevant code.
+
+> Context is not just about capacity. It is about signal-to-noise ratio. More is not always better.
+
+## How Agents Currently Navigate Context
+
+Given that agents cannot read everything, they use several strategies to work within their context budget:
+
+**Selective reading.** The agent reads files on demand rather than loading the entire codebase. It uses tools like file search, grep, and directory listing to find what it needs. Each file it reads consumes context, so it tries to read only what is relevant.
+
+**Summarization.** As a conversation grows long, older messages get compressed. The agent or the platform automatically summarizes earlier exchanges to free up space for new information. This means details from early in a session can be lost.
+
+**Search-first approaches.** Instead of reading files linearly, agents search for specific symbols, patterns, or filenames. This lets them jump directly to relevant code without reading everything in between.
+
+**Context pruning.** Some platforms automatically remove tool output, long file contents, or repetitive information from the context as the session progresses.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Developer Request"] --> B["Agent Plans Approach"]
+    B --> C{"What information\nis needed?"}
+    C --> D["Search for files"]
+    C --> E["Read specific file"]
+    C --> F["Run a command"]
+    D --> G{"Relevant?"}
+    E --> G
+    F --> G
+    G -->|"Yes"| H["Keep in context"]
+    G -->|"No"| I["Discard / skip"]
+    H --> J["Use for task"]
+    I --> C
+    J --> K{"Task complete?"}
+    K -->|"No"| C
+    K -->|"Yes"| L["Deliver result"]
+    style H fill:#c6f6d5,stroke:#276749
+    style I fill:#fed7d7,stroke:#c53030
+`} />
+
+Every one of these strategies is a trade-off. Selective reading risks missing important context. Summarization loses detail. Search can miss files that are relevant but do not match the search terms. The agent is constantly making judgment calls about what to keep and what to discard.
+
+## The Two Failure Modes
+
+Context problems manifest in two opposite ways, and both are equally harmful:
+
+**Too little context.** The agent does not have enough information to do the job correctly. It misses a helper function that already exists and writes a duplicate. It does not know about a convention and violates it. It is unaware of a constraint and introduces a breaking change. This is the **starvation** failure.
+
+**Too much context.** The agent's window is full of information, but most of it is irrelevant. A 500-line CLAUDE.md stuffed with rarely-needed details dilutes the signal. Twenty files read "just in case" push out the three files that actually matter. The agent has everything but cannot focus on anything. This is the **drowning** failure.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Starved["Context Starvation"]
+        S1["Agent missing key info"] --> S2["Wrong assumptions"]
+        S2 --> S3["Incorrect code"]
+        S3 --> S4["Failed builds, broken conventions"]
+    end
+    subgraph Optimal["Optimal Context"]
+        O1["Right info, right time"] --> O2["Informed decisions"]
+        O2 --> O3["Correct code"]
+        O3 --> O4["Passes tests, follows patterns"]
+    end
+    subgraph Drowned["Context Drowning"]
+        D1["Too much irrelevant info"] --> D2["Attention diluted"]
+        D2 --> D3["Missed details"]
+        D3 --> D4["Subtle bugs, inconsistencies"]
+    end
+    style Starved fill:#fed7d7,stroke:#e53e3e
+    style Optimal fill:#c6f6d5,stroke:#38a169
+    style Drowned fill:#fefcbf,stroke:#d69e2e
+`} />
+
+The goal is to hit the sweet spot: the agent has exactly the information it needs, and nothing more. This is harder than it sounds.
+
+## Why This Matters for Your Codebase
+
+If context is the bottleneck, then the way you organize and document your codebase directly controls how effectively agents can use their limited context budget. Every decision you make affects the agent's signal-to-noise ratio:
+
+- **A bloated CLAUDE.md** with 500 lines of instructions consumes thousands of tokens on every session, whether those instructions are relevant to the current task or not
+- **Missing documentation** forces the agent to read extra files trying to discover what you could have told it in one sentence
+- **Poorly organized code** means the agent has to read more files to understand what a well-structured codebase would communicate with fewer
+- **Unclear naming conventions** require the agent to read implementations to understand what a good name would have communicated instantly
+
+> Every byte of your project documentation uses context budget. Treat context like a precious resource -- because for the agent, it is.
+
+## The Human Analogy
+
+Think of context like a physical desk. You can only spread out so many papers before you start losing track of things. A well-organized worker keeps only the relevant documents in front of them and files the rest where it can be found when needed. A disorganized worker piles everything on the desk and spends half their time searching through the pile.
+
+The agent's context window is its desk. Your job as a codebase author is to make sure the right papers are easy to find and the desk is not pre-cluttered with things the agent does not need for the current task.
+
+## What We Will Cover in This Module
+
+Context management is a skill that spans several techniques, each building on the last:
+
+- **Context files and kits** -- structured files that describe parts of your codebase so agents can load context on demand, not all at once
+- **Memory and persistence** -- systems that carry what the agent learned about your project across sessions, so it does not re-learn the same things every time
+- **Optimizing context budget** -- practical techniques for keeping your CLAUDE.md lean, your documentation high-signal, and your codebase self-describing
+- **Context at scale** -- strategies for large codebases where hierarchical context, search-first approaches, and automated context selection become essential
+
+Each of these is a lever you can pull to move your codebase from context-hostile to context-friendly.
+
+## Summary
+
+- The **context window** is a hard limit on everything an agent can see at once -- typically around 200K tokens
+- Even medium-sized codebases exceed the context window, forcing agents to be selective about what they read
+- Context problems manifest as **starvation** (too little information, leading to wrong assumptions) or **drowning** (too much irrelevant information, diluting attention)
+- Every byte of documentation, every file read, and every tool output consumes context budget
+- The way you structure and document your codebase directly determines how effectively agents can use their limited context
+- Context management is not about making the window bigger -- it is about making every token inside the window count

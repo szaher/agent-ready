@@ -1,0 +1,318 @@
+---
+title: Security Audit for Agent-Ready Repos
+quiz:
+- question: Why is a .env file committed to a repository especially dangerous when agents have write access?
+  options:
+  - Agents might accidentally reference the secrets in generated code, logs, or error messages
+  - It makes the repository larger
+  - The .env file slows down the agent's file search
+  - It violates the repository's naming conventions
+  correctIndex: 0
+- question: What is the purpose of a pre-push hook in an agent-ready repository?
+  options:
+  - To format the agent's code before pushing
+  - To count the number of files the agent changed
+  - To act as a final gate that prevents dangerous changes from reaching the remote, such as pushes to main or secret leaks
+  - To speed up the push operation
+  correctIndex: 2
+- question: Which approach best secures MCP server connections?
+  options:
+  - Run all MCP servers on localhost without authentication
+  - Use a single shared API key across all MCP servers
+  - Disable MCP entirely to avoid the risk
+  - Authenticate each MCP connection, scope permissions per server, and audit access logs
+  correctIndex: 3
+---
+
+## Overview
+
+Giving an AI agent write access to your codebase is a powerful capability -- and a significant trust decision. An agent that can create files, run commands, and open pull requests operates with a level of access that most human contributors earn over weeks or months. This lesson provides a structured security audit for repositories where agents work, covering the specific risks that agent access introduces and the controls that mitigate them. Whether you are preparing for your first agent deployment or hardening an existing setup, this checklist ensures you have not overlooked the threats that are unique to agent-assisted development.
+
+## Why Agent Security Is Different
+
+Traditional code security focuses on what humans might do -- accidentally commit secrets, introduce vulnerabilities, or misconfigure access controls. Agent security adds a new dimension: an automated system that reads, writes, and executes at machine speed, often without a human watching every action in real time.
+
+<MermaidDiagram chart={`graph TD
+    subgraph HumanRisk["Human Developer Risks"]
+        H1["Commits secrets accidentally"]
+        H2["Introduces vulnerabilities"]
+        H3["Misconfigures access"]
+    end
+    subgraph AgentRisk["Additional Agent Risks"]
+        A1["Leaks secrets into\ngenerated code or logs"]
+        A2["Executes arbitrary\ncommands at scale"]
+        A3["Bypasses review if\nnot properly gated"]
+        A4["Reads sensitive files\nand includes content\nin API calls"]
+    end
+    subgraph Overlap["Shared Controls"]
+        C1["Secret scanning"]
+        C2["Branch protection"]
+        C3["Code review"]
+        C4["Least privilege"]
+    end
+    HumanRisk --> Overlap
+    AgentRisk --> Overlap
+    style HumanRisk fill:#fefcbf,stroke:#d69e2e
+    style AgentRisk fill:#fed7d7,stroke:#e53e3e
+    style Overlap fill:#c6f6d5,stroke:#38a169
+`} />
+
+The key differences are:
+
+- **Speed and volume** -- an agent can modify dozens of files in seconds. A human reviewer's attention is the bottleneck
+- **Context leakage** -- every file the agent reads may be sent to an API endpoint. Sensitive data in the codebase becomes sensitive data in transit
+- **Command execution** -- agents with shell access can run arbitrary commands. Without sandboxing, this includes network requests, file system modifications outside the project, and process management
+- **Implicit trust escalation** -- if an agent can push to a branch that triggers a deployment pipeline, the agent effectively has deployment access
+
+## The Security Audit Checklist
+
+This audit covers six domains. Work through each one systematically.
+
+### Domain 1: Secrets Management
+
+Secrets -- API keys, database credentials, tokens, private keys -- are the highest-severity risk. An agent that reads a `.env` file might include the secret in generated code, reference it in a commit message, or send it to an external API as part of the model context.
+
+**Audit steps:**
+
+- Verify `.env`, `.env.local`, and all secret files are in `.gitignore`
+- Run a secret scanner against the full repository history, not just the current state
+- Check that the CLAUDE.md explicitly tells the agent not to read or reference secret files
+- Confirm that environment variables are injected at runtime, not stored in configuration files
+
+<CodeBlock code={`# .gitignore -- secrets section
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# CLAUDE.md -- secrets section
+## Secrets (CRITICAL)
+- NEVER read .env or any file matching .env.*
+- NEVER include API keys, tokens, or credentials in code
+- Use environment variables via process.env -- never hardcode values
+- If you need a secret value for testing, use a placeholder:
+  API_KEY=test-placeholder-not-real
+`} language="markdown" filename="Secrets configuration" />
+
+<CodeBlock code={`# Run a secret scan against the full git history
+# Using gitleaks (install: brew install gitleaks)
+gitleaks detect --source . --verbose
+
+# Using trufflehog
+trufflehog git file://. --only-verified
+
+# Check for any .env files that slipped through
+git log --all --diff-filter=A -- '*.env' '.env.*'
+`} language="bash" filename="secret-scanning.sh" />
+
+### Domain 2: Branch Protection and Push Controls
+
+An agent that can push directly to `main` bypasses every review process your team has built. Even if the agent's code is correct, unreviewed pushes violate the principle that all changes go through human review.
+
+**Audit steps:**
+
+- Confirm that the default branch (`main` or `master`) has branch protection rules enabled
+- Require pull request reviews before merging -- no direct pushes
+- Require status checks (CI) to pass before merging
+- Set up a pre-push hook as a local safety net
+
+<CodeBlock code={`#!/bin/bash
+# .git/hooks/pre-push
+# Prevents pushing directly to main or master
+
+protected_branches=("main" "master" "production")
+current_branch=$(git symbolic-ref --short HEAD)
+
+for branch in "\${protected_branches[@]}"; do
+    if [ "$current_branch" = "$branch" ]; then
+        echo "ERROR: Direct push to $branch is blocked."
+        echo "Create a feature branch and open a pull request."
+        exit 1
+    fi
+done
+
+# Check for potential secret patterns in the diff
+if git diff --cached --diff-filter=ACM | grep -qiE '(api_key|secret|password|token)\s*[=:]\s*["\x27][^\s]+'; then
+    echo "WARNING: Potential secret detected in staged changes."
+    echo "Review your changes before pushing."
+    exit 1
+fi
+
+exit 0
+`} language="bash" filename=".git/hooks/pre-push" />
+
+### Domain 3: Agent Permissions and Sandboxing
+
+The **principle of least privilege** is the foundation of agent security. Every agent should have only the permissions it needs for its specific task -- nothing more.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Broad["Overprivileged Agent"]
+        B1["Read all files"]
+        B2["Write anywhere"]
+        B3["Execute any command"]
+        B4["Network access"]
+    end
+    subgraph Scoped["Properly Scoped Agent"]
+        S1["Read: src/ and tests/"]
+        S2["Write: src/services/"]
+        S3["Execute: npm test only"]
+        S4["No network access"]
+    end
+    Broad -.->|"reduce"| Scoped
+    style Broad fill:#fed7d7,stroke:#e53e3e
+    style Scoped fill:#c6f6d5,stroke:#38a169
+`} />
+
+**Audit steps:**
+
+- Review the agent's permission configuration. Can it run arbitrary bash commands? If so, restrict to a specific allowlist
+- Verify file system sandboxing -- the agent should only access the project directory, not the home directory or system files
+- Check whether the agent can make network requests. If not needed, disable network access
+- For specialized agents (reviewers, linters), confirm they have read-only access -- no write permissions
+
+<CodeBlock code={`# Example: Claude Code settings for a review-only agent
+# .claude/settings.json
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(npm test:*)"
+    ],
+    "deny": [
+      "Write",
+      "Edit",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)"
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json" />
+
+### Domain 4: Hook Coverage
+
+Hooks are your automated safety net -- the controls that run automatically before or after agent actions. Incomplete hook coverage means some agent actions go unchecked.
+
+**Audit steps:**
+
+- Inventory all hooks (pre-commit, pre-push, CI checks) and map them to agent actions
+- Verify that hooks cannot be bypassed with `--no-verify` flags
+- Check that hooks run in the agent's execution environment (not just the developer's local machine)
+- Test each hook by intentionally triggering the condition it guards against
+
+| Hook | What It Guards | Agent Action It Covers |
+|------|---------------|----------------------|
+| pre-commit | Secret patterns, lint errors, large files | Every commit the agent creates |
+| pre-push | Protected branches, unsigned commits | Agent pushing to remote |
+| CI lint check | Code style, import rules | Agent PR quality |
+| CI test suite | Functional correctness | Agent code behavior |
+| CI security scan | Known vulnerabilities, license issues | Agent dependency changes |
+
+### Domain 5: MCP Server Security
+
+If your agents use **MCP (Model Context Protocol)** servers -- for database access, API integrations, or external tool connections -- each server is a potential attack surface.
+
+**Audit steps:**
+
+- List all MCP servers the agent can access. Is each one necessary?
+- Verify authentication on each MCP connection -- no unauthenticated servers
+- Check that MCP servers use scoped permissions (read-only database access, not admin)
+- Review MCP server logs for unexpected access patterns
+- Confirm that MCP server credentials are not stored in the repository
+
+<CodeBlock code={`# Audit your MCP server configuration
+# Check which servers are configured
+
+# List all MCP configurations in the project
+find . -name "*.json" -exec grep -l "mcpServers" {} \;
+
+# For each server, verify:
+# 1. Authentication is configured (not just localhost)
+# 2. Permissions are scoped (read-only where possible)
+# 3. Credentials reference environment variables, not hardcoded values
+
+# Example of a SECURE MCP configuration:
+# {
+#   "mcpServers": {
+#     "database": {
+#       "command": "mcp-server-postgres",
+#       "args": ["--connection-string", "$DATABASE_READ_URL"],
+#       "env": {
+#         "DATABASE_READ_URL": "from-environment"
+#       }
+#     }
+#   }
+# }
+#
+# Note: Uses read-only connection string, not admin credentials
+`} language="bash" filename="mcp-audit.sh" />
+
+### Domain 6: Audit Trail and Monitoring
+
+Security is not just prevention -- it is detection. If something goes wrong, you need to know what happened and when.
+
+**Audit steps:**
+
+- Verify that all agent sessions are logged with timestamps, actions, and outcomes
+- Check that agent-generated commits are identifiable (distinct author or co-author tag)
+- Set up alerts for unusual agent activity: large numbers of file changes, changes to sensitive directories, or failed permission checks
+- Retain agent transcripts for at least 30 days for forensic review
+
+<MermaidDiagram chart={`graph TD
+    subgraph AuditTrail["Audit Trail Components"]
+        L1["Session Logs\nTimestamps, actions,\nfile changes"]
+        L2["Commit Attribution\nAgent co-author tags\nin git history"]
+        L3["Access Logs\nMCP server access\nFile read/write events"]
+        L4["Alert System\nUnusual patterns\nPolicy violations"]
+    end
+    L1 --> R["Forensic Review\nCapability"]
+    L2 --> R
+    L3 --> R
+    L4 --> I["Immediate\nResponse"]
+    style AuditTrail fill:#ebf8ff,stroke:#3182ce
+    style R fill:#c6f6d5,stroke:#38a169
+    style I fill:#fefcbf,stroke:#d69e2e
+`} />
+
+## The Quick Security Checklist
+
+For teams that want a rapid pass before deeper auditing, here is the essential checklist:
+
+- [ ] `.env` and secret files are in `.gitignore` and never committed
+- [ ] CLAUDE.md explicitly forbids reading or referencing secrets
+- [ ] Branch protection prevents direct pushes to main
+- [ ] Pre-commit hook scans for secret patterns
+- [ ] Agent permissions follow least privilege -- no unnecessary write or execute access
+- [ ] Agent file system access is limited to the project directory
+- [ ] MCP servers are authenticated and use scoped permissions
+- [ ] Agent-generated commits are identifiable in git history
+- [ ] CI runs the same checks on agent PRs as human PRs
+- [ ] Agent session transcripts are retained for review
+
+## Ongoing Security Maintenance
+
+A security audit is not a one-time event. As your codebase evolves and agent capabilities expand, the security posture must evolve with them.
+
+**Monthly reviews:**
+
+- Review agent access logs for anomalies
+- Update the secret scanning patterns to cover new secret types
+- Verify that new MCP server integrations follow the security standards
+- Check that new team members' agent configurations follow the org-wide security policy
+
+**Triggered reviews:**
+
+- Any new MCP server integration triggers a security review
+- Any change to agent permissions triggers a review
+- Any security incident (even minor) triggers a retrospective that updates the checklist
+
+> Security is not a gate that blocks adoption -- it is a foundation that enables confident adoption. Teams that address security early adopt agents more aggressively because they trust the guardrails.
+
+## Summary
+
+Securing an agent-ready repository requires auditing six domains: secrets management, branch protection, agent permissions, hook coverage, MCP server security, and audit trails. The risks agents introduce -- context leakage, command execution at scale, and implicit trust escalation -- are distinct from traditional developer risks and require specific controls. Use the quick checklist for an initial pass, then work through the detailed audit for each domain. Treat security as an ongoing practice, not a one-time gate. In the next lesson, we shift from safety to efficiency: optimizing agents for speed, accuracy, and cost.

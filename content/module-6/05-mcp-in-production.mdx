@@ -1,0 +1,472 @@
+---
+title: "MCP in Production"
+quiz:
+  - question: "What is the most important security principle when deploying MCP servers in production?"
+    options:
+      - "Use the fastest transport mechanism available"
+      - "Grant servers the minimum permissions needed and validate all inputs"
+      - "Give agents full administrative access so they can handle any request"
+      - "Disable logging to reduce disk usage"
+    correctIndex: 1
+  - question: "Why should MCP servers implement rate limiting?"
+    options:
+      - "To make the agent wait and think more carefully before each tool call"
+      - "Because the MCP specification requires it"
+      - "To limit the number of users who can access the agent"
+      - "To prevent runaway agents from exhausting API quotas or overwhelming downstream services"
+    correctIndex: 3
+  - question: "What is the recommended approach for MCP server authentication in production?"
+    options:
+      - "Hardcode API keys in the server source code for reliability"
+      - "Disable authentication on internal networks since they are trusted"
+      - "Use OAuth 2.0 or short-lived tokens injected via environment variables, never committed to source control"
+      - "Share a single API key across all team members"
+    correctIndex: 2
+---
+
+## Overview
+
+An MCP server running on a developer's laptop during a coding session is one thing. An MCP server handling production data, authenticating against real services, and serving multiple agents simultaneously is another. This lesson covers the security, authentication, performance, and deployment concerns you must address before your MCP servers are production-ready. The goal is not to make things complicated -- it is to make things safe, reliable, and observable.
+
+## The Security Surface
+
+Every MCP server is a bridge between an AI agent and an external system. That bridge is a security surface. The agent can send arbitrary tool calls, and the server executes them against real services. If the server is not careful, an agent could:
+
+- Exfiltrate sensitive data through overly permissive queries
+- Modify production data through unvalidated write operations
+- Exhaust API quotas through unbounded tool calls
+- Access resources outside its intended scope
+
+<MermaidDiagram chart={`graph TD
+    subgraph Threats["Security Threats"]
+        T1["Data Exfiltration\nOverly broad queries"]
+        T2["Unauthorized Writes\nMissing validation"]
+        T3["Resource Exhaustion\nNo rate limits"]
+        T4["Scope Creep\nExcessive permissions"]
+    end
+    subgraph Defenses["Defenses"]
+        D1["Input Validation\nSchema + business rules"]
+        D2["Least Privilege\nMinimal permissions"]
+        D3["Rate Limiting\nPer-tool quotas"]
+        D4["Audit Logging\nEvery tool call recorded"]
+    end
+    T1 -.->|"mitigated by"| D1
+    T2 -.->|"mitigated by"| D2
+    T3 -.->|"mitigated by"| D3
+    T4 -.->|"mitigated by"| D4
+    style Threats fill:#fed7d7,stroke:#e53e3e
+    style Defenses fill:#c6f6d5,stroke:#38a169
+`} />
+
+The defense is defense in depth: validate inputs, limit permissions, restrict rates, and log everything.
+
+## Authentication and Credential Management
+
+MCP servers often need credentials to access downstream services -- API tokens, database passwords, OAuth secrets. How you manage these credentials determines your security posture.
+
+### The Golden Rules
+
+- **Never hardcode credentials** in server source code or configuration files that are committed to version control
+- **Use environment variables** for injecting credentials at runtime
+- **Prefer short-lived tokens** (OAuth access tokens, temporary credentials) over long-lived API keys
+- **Scope credentials minimally** -- a server that only reads issues should not have write access to the repository
+
+### Environment Variable Pattern
+
+<CodeBlock code={`// src/config.ts — Validate credentials at startup
+
+interface ServerConfig {
+  githubToken: string;
+  databaseUrl: string;
+  allowedOperations: Set<string>;
+}
+
+function loadConfig(): ServerConfig {
+  const githubToken = process.env.GITHUB_TOKEN;
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (!githubToken) {
+    console.error("FATAL: GITHUB_TOKEN environment variable is required");
+    process.exit(1);
+  }
+
+  if (!databaseUrl) {
+    console.error("FATAL: DATABASE_URL environment variable is required");
+    process.exit(1);
+  }
+
+  // Restrict which operations this server can perform
+  const allowedOps = (process.env.ALLOWED_OPERATIONS || "read")
+    .split(",")
+    .map((op) => op.trim().toLowerCase());
+
+  return {
+    githubToken,
+    databaseUrl,
+    allowedOperations: new Set(allowedOps),
+  };
+}
+
+export const config = loadConfig();`} language="typescript" filename="src/config.ts" />
+
+### OAuth 2.0 for Remote Servers
+
+For SSE-based servers that run as shared services, implement OAuth 2.0 authentication. The MCP specification includes support for OAuth flows, allowing clients to authenticate before accessing server capabilities:
+
+<CodeBlock code={`// Middleware to validate OAuth tokens on incoming requests
+async function validateToken(token: string): Promise<{
+  valid: boolean;
+  scopes: string[];
+  userId: string;
+}> {
+  const response = await fetch("https://auth.example.com/introspect", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: \`Bearer \${process.env.AUTH_SERVICE_TOKEN}\`,
+    },
+    body: \`token=\${encodeURIComponent(token)}\`,
+  });
+
+  const result = await response.json();
+
+  return {
+    valid: result.active === true,
+    scopes: result.scope?.split(" ") || [],
+    userId: result.sub || "unknown",
+  };
+}`} language="typescript" filename="src/auth.ts" />
+
+## Input Validation
+
+Zod schemas handle structural validation -- ensuring the right fields are present with the right types. But production servers need **business rule validation** too.
+
+<CodeBlock code={`import { z } from "zod";
+import { config } from "./config.js";
+
+server.tool(
+  "run_query",
+  "Execute a read-only SQL query against the project database",
+  {
+    query: z.string().describe("SQL query to execute (SELECT only)"),
+    limit: z.number().max(1000).default(100).describe("Maximum rows to return"),
+  },
+  async ({ query, limit }) => {
+    // Business rule: only allow SELECT statements
+    const normalized = query.trim().toUpperCase();
+    if (!normalized.startsWith("SELECT")) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "Error: Only SELECT queries are allowed. This server is read-only.",
+        }],
+        isError: true,
+      };
+    }
+
+    // Business rule: block dangerous patterns
+    const dangerous = ["DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE"];
+    if (dangerous.some((keyword) => normalized.includes(keyword))) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "Error: Query contains a disallowed keyword. Only read operations are permitted.",
+        }],
+        isError: true,
+      };
+    }
+
+    // Business rule: enforce row limit
+    const safeQuery = query.includes("LIMIT")
+      ? query
+      : \`\${query} LIMIT \${limit}\`;
+
+    try {
+      const result = await executeQuery(safeQuery);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: \`Query error: \${error instanceof Error ? error.message : "Unknown error"}\`,
+        }],
+        isError: true,
+      };
+    }
+  }
+);`} language="typescript" filename="src/tools/database.ts" />
+
+> **Principle of least privilege:** Give each MCP server only the permissions it needs. A database server for exploration should use read-only credentials. A GitHub server for reading PRs should use a token scoped to `read:repo` only. Minimizing permissions limits the blast radius if something goes wrong.
+
+## Rate Limiting
+
+Agents can be persistent. If a tool call fails, the agent might retry immediately. If an agent enters a loop, it could call the same tool hundreds of times in seconds. Without rate limiting, this can exhaust API quotas, overwhelm databases, or trigger abuse detection on downstream services.
+
+<CodeBlock code={`// Simple in-memory rate limiter
+class RateLimiter {
+  private calls: Map<string, number[]> = new Map();
+
+  constructor(
+    private maxCalls: number,
+    private windowMs: number
+  ) {}
+
+  check(toolName: string): boolean {
+    const now = Date.now();
+    const calls = this.calls.get(toolName) || [];
+
+    // Remove calls outside the window
+    const recent = calls.filter((t) => now - t < this.windowMs);
+
+    if (recent.length >= this.maxCalls) {
+      return false; // Rate limited
+    }
+
+    recent.push(now);
+    this.calls.set(toolName, recent);
+    return true;
+  }
+}
+
+const limiter = new RateLimiter(30, 60_000); // 30 calls per minute
+
+// Use in tool handlers
+server.tool(
+  "search_issues",
+  "Search for issues in the project tracker",
+  { query: z.string().describe("Search query") },
+  async ({ query }) => {
+    if (!limiter.check("search_issues")) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "Rate limit exceeded. Please wait before retrying. Maximum 30 calls per minute.",
+        }],
+        isError: true,
+      };
+    }
+
+    // ... actual implementation
+    return { content: [{ type: "text" as const, text: "results here" }] };
+  }
+);`} language="typescript" filename="src/middleware/rate-limit.ts" />
+
+Different tools warrant different limits. A read-only search might allow 60 calls per minute. A tool that creates issues might allow only 10. A deployment tool might allow just 1 per 5 minutes.
+
+## Structured Logging
+
+In production, you need to know what tools are being called, by whom, with what arguments, and whether they succeeded or failed. Structured logging makes this observable:
+
+<CodeBlock code={`function logToolCall(
+  toolName: string,
+  args: Record<string, unknown>,
+  result: { success: boolean; durationMs: number; error?: string }
+): void {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    level: result.success ? "info" : "error",
+    event: "tool_call",
+    tool: toolName,
+    args,
+    success: result.success,
+    durationMs: result.durationMs,
+    ...(result.error && { error: result.error }),
+  };
+
+  // Write to stderr (stdout is reserved for MCP messages)
+  console.error(JSON.stringify(entry));
+}
+
+// Wrapper for tool handlers
+function withLogging<T extends Record<string, unknown>>(
+  toolName: string,
+  handler: (args: T) => Promise<{ content: Array<{ type: string; text: string }> }>
+) {
+  return async (args: T) => {
+    const start = Date.now();
+    try {
+      const result = await handler(args);
+      logToolCall(toolName, args, {
+        success: true,
+        durationMs: Date.now() - start,
+      });
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logToolCall(toolName, args, {
+        success: false,
+        durationMs: Date.now() - start,
+        error: message,
+      });
+      throw error;
+    }
+  };
+}`} language="typescript" filename="src/middleware/logging.ts" />
+
+> **Critical reminder:** MCP servers must write logs to **stderr**, never to stdout. The stdout stream is exclusively for JSON-RPC protocol messages. Mixing log output into stdout will corrupt the protocol stream and crash the connection.
+
+## Error Handling
+
+Production MCP servers must handle errors gracefully. An unhandled exception in a tool handler can crash the server process, killing all active connections. Defensive error handling keeps the server running even when individual tool calls fail:
+
+<CodeBlock code={`server.tool(
+  "fetch_metrics",
+  "Fetch performance metrics for a service",
+  {
+    service: z.string().describe("Service name"),
+    period: z.enum(["1h", "24h", "7d"]).default("24h").describe("Time period"),
+  },
+  async ({ service, period }) => {
+    try {
+      const metrics = await fetchFromMonitoring(service, period);
+      return {
+        content: [{
+          type: "text" as const,
+          text: formatMetrics(metrics),
+        }],
+      };
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: "Authentication failed. The monitoring API credentials may have expired.",
+          }],
+          isError: true,
+        };
+      }
+
+      if (error instanceof TimeoutError) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: \`Request timed out after \${error.timeoutMs}ms. The monitoring service may be under heavy load.\`,
+          }],
+          isError: true,
+        };
+      }
+
+      // Unknown errors — return a safe message, don't leak internals
+      return {
+        content: [{
+          type: "text" as const,
+          text: "An internal error occurred while fetching metrics. Check server logs for details.",
+        }],
+        isError: true,
+      };
+    }
+  }
+);`} language="typescript" filename="src/tools/metrics.ts" />
+
+Key error handling principles:
+
+- **Always return a content response**, even on errors -- do not throw from tool handlers
+- **Set `isError: true`** so the agent knows the call failed
+- **Do not leak internal details** like stack traces, connection strings, or internal hostnames in error messages
+- **Log the full error** to stderr for debugging, but return a sanitized message to the agent
+
+## Deployment Patterns
+
+### Containerized Deployment
+
+For SSE-based servers that serve multiple users or run remotely, containerize the server:
+
+<CodeBlock code={`FROM node:20-slim
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production
+COPY dist/ ./dist/
+
+# Non-root user for security
+RUN adduser --disabled-password --gecos "" mcpuser
+USER mcpuser
+
+EXPOSE 3100
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD curl -f http://localhost:3100/health || exit 1
+
+CMD ["node", "dist/index.js"]`} language="dockerfile" filename="Dockerfile" />
+
+### Architecture for Shared Servers
+
+When multiple agents or users need to access the same MCP server, deploy it as a shared service with proper isolation:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Agents["Agent Instances"]
+        A1["Developer A\nClaude Code"]
+        A2["Developer B\nClaude Code"]
+        A3["CI Pipeline\nCustom Agent"]
+    end
+    subgraph Gateway["API Gateway"]
+        Auth["Authentication\nOAuth / API Key"]
+        RL["Rate Limiting\nPer-user quotas"]
+        Log["Access Logging"]
+    end
+    subgraph Servers["MCP Server Cluster"]
+        S1["MCP Server\nInstance 1"]
+        S2["MCP Server\nInstance 2"]
+    end
+    subgraph Services["Downstream Services"]
+        DB["Database"]
+        API["Internal APIs"]
+        PM["Project Mgmt"]
+    end
+    A1 -->|"SSE"| Auth
+    A2 -->|"SSE"| Auth
+    A3 -->|"SSE"| Auth
+    Auth --> RL
+    RL --> Log
+    Log --> S1
+    Log --> S2
+    S1 --> DB
+    S1 --> API
+    S2 --> PM
+    S2 --> API
+    style Agents fill:#ebf8ff,stroke:#3182ce
+    style Gateway fill:#fefcbf,stroke:#d69e2e
+    style Servers fill:#c6f6d5,stroke:#38a169
+    style Services fill:#e9d8fd,stroke:#805ad5
+`} />
+
+### Local vs. Remote: Decision Framework
+
+<MermaidDiagram chart={`flowchart TD
+    Start["New MCP Server"] --> Q1{"Single user\nor team?"}
+    Q1 -->|"Single user"| Q2{"Sensitive data?"}
+    Q1 -->|"Team"| Q3{"Same network?"}
+    Q2 -->|"No"| Local["Local stdio\nSimplest setup"]
+    Q2 -->|"Yes"| LocalAuth["Local stdio\n+ credential rotation"]
+    Q3 -->|"Yes"| Internal["Internal SSE\n+ API gateway"]
+    Q3 -->|"No"| Remote["Remote SSE\n+ OAuth + TLS"]
+    style Start fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style Local fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style LocalAuth fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style Internal fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style Remote fill:#fed7d7,stroke:#e53e3e,color:#1a202c
+`} />
+
+Start with the simplest deployment that meets your needs. Most teams begin with local stdio servers and only move to remote SSE deployments when they need shared access or centralized management.
+
+## Production Checklist
+
+Before deploying an MCP server to production, verify each of these items:
+
+- **Authentication** -- credentials are injected via environment variables, never hardcoded
+- **Authorization** -- the server enforces which operations are allowed, not just which are available
+- **Input validation** -- both schema validation (Zod) and business rule validation are in place
+- **Rate limiting** -- per-tool call limits prevent runaway agents from exhausting resources
+- **Error handling** -- tool handlers never throw; they return `isError: true` responses with sanitized messages
+- **Logging** -- every tool call is logged to stderr with timestamp, tool name, arguments, result, and duration
+- **Least privilege** -- downstream credentials are scoped to the minimum required permissions
+- **Timeout handling** -- API calls have timeouts; the server does not hang on unresponsive downstream services
+- **Health checks** -- for containerized deployments, a health endpoint confirms the server is responsive
+- **Documentation** -- CLAUDE.md describes what each MCP server does and when agents should use it
+
+## Summary
+
+Running MCP servers in production requires attention to security, reliability, and observability. The core principles are **least privilege** (minimal credentials and permissions), **defense in depth** (input validation, rate limiting, and error handling at every layer), and **observability** (structured logging for every tool call). Deploy with the simplest architecture that meets your needs -- local stdio for single-user development, remote SSE with authentication for team-wide shared servers. The production checklist at the end of this lesson serves as your pre-deployment gate. With these patterns in place, your MCP servers become a reliable extension of your agent infrastructure -- trusted components that safely bridge AI reasoning and real-world systems.

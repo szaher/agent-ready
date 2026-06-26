@@ -1,0 +1,53 @@
+{
+  "id": 5,
+  "title": "Project Structure for Agents",
+  "description": "Organize your codebase so agents can navigate, understand, and modify it effectively",
+  "color": "#ed8936",
+  "lessons": [
+    {
+      "slug": "01-why-structure-matters",
+      "title": "Why Structure Matters for Agents",
+      "description": "How project layout directly impacts agent comprehension and success rate",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["comparison", "architecture"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-file-organization-patterns",
+      "title": "File Organization Patterns",
+      "description": "Directory layouts, colocation strategies, and barrel files that help agents find code",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-naming-conventions",
+      "title": "Naming Conventions That Help Agents",
+      "description": "File names, function names, and variable names that reduce agent confusion",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-documentation-as-context",
+      "title": "Documentation as Context",
+      "description": "READMEs, type annotations, and inline docs that serve as agent navigation aids",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-monorepo-and-large-codebases",
+      "title": "Monorepos and Large Codebases",
+      "description": "Agent-ready patterns for monorepos, microservices, and codebases with 1000+ files",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    }
+  ]
+}

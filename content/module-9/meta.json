@@ -1,0 +1,53 @@
+{
+  "id": 9,
+  "title": "Workflows and CI/CD Integration",
+  "description": "Embed agents into your development lifecycle with automated workflows, code review, and CI pipelines",
+  "color": "#4fd1c5",
+  "lessons": [
+    {
+      "slug": "01-agent-workflows",
+      "title": "Agent Workflows",
+      "description": "Defining repeatable multi-step workflows that agents execute deterministically",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "sequence"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-ci-cd-integration",
+      "title": "CI/CD Integration",
+      "description": "Running agents in GitHub Actions, GitLab CI, and other CI/CD pipelines",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "sequence"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-automated-code-review",
+      "title": "Automated Code Review",
+      "description": "Setting up agent-powered code review that catches real bugs, not just lint",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["sequence", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-test-driven-agent-development",
+      "title": "Test-Driven Agent Development",
+      "description": "Using TDD workflows to guide agents toward correct implementations",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "sequence"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-continuous-agent-improvement",
+      "title": "Continuous Agent Improvement",
+      "description": "Iterating on CLAUDE.md, hooks, and context based on agent session feedback",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart"],
+      "hasCode": false,
+      "hasQuiz": true
+    }
+  ]
+}

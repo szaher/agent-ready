@@ -1,0 +1,229 @@
+---
+title: Agent Workflows
+quiz:
+- question: What is the key advantage of a defined agent workflow over ad-hoc prompting?
+  options:
+  - It provides repeatability, auditability, and consistent results across runs
+  - It uses fewer API tokens
+  - It eliminates the need for CLAUDE.md files
+  - It guarantees the agent will never make mistakes
+  correctIndex: 0
+- question: In a fan-out workflow, what happens after parallel tasks complete?
+  options:
+  - Each task is deployed independently with no further processing
+  - The workflow restarts from the beginning
+  - Results are gathered and merged in a synthesis step
+  - The developer must manually review each output before continuing
+  correctIndex: 2
+- question: Which workflow pattern is most appropriate for a multi-dimensional code review?
+  options:
+  - Sequential pipeline -- each reviewer sees the previous reviewer's comments
+  - Recursive -- the agent reviews its own review
+  - Single-pass -- one agent reviews everything at once
+  - Fan-out -- parallel reviewers for security, performance, correctness, then synthesis
+  correctIndex: 3
+- question: Why should workflow scripts call the agent with specific, scoped prompts rather than broad instructions?
+  options:
+  - Broad instructions cost more tokens
+  - Specific prompts reduce ambiguity, keep the agent focused, and produce more consistent outputs
+  - The CLI rejects prompts longer than 100 words
+  - Broad instructions cause the agent to modify files outside the repository
+  correctIndex: 1
+---
+
+## Overview
+
+Ad-hoc prompting gets you started with AI agents, but it does not scale. When a task involves multiple steps -- reviewing code across dimensions, migrating files to a new pattern, generating tests for an entire module -- you need something structured. **Agent workflows** are repeatable, multi-step orchestrations that chain agent invocations together with deterministic logic. This lesson covers why workflows matter, the patterns that make them effective, and how to build them as executable scripts.
+
+## Why Workflows Beat Ad-Hoc Prompting
+
+Consider a developer who asks an agent to "review this PR." The agent might focus on style one time and security the next. It might miss performance issues entirely. There is no consistency, no guarantee of coverage, and no way to compare results across runs.
+
+Now consider the same task defined as a workflow:
+
+1. Read the diff
+2. Review for correctness bugs
+3. Review for security vulnerabilities
+4. Review for performance regressions
+5. Synthesize findings into a single review
+
+Each step has a defined scope. The workflow runs the same way every time. Results are auditable. This is the difference between **improvisation** and **orchestration**.
+
+> Workflows turn agent capabilities into team processes. An ad-hoc prompt is a conversation; a workflow is a procedure.
+
+## Workflow Patterns
+
+Three fundamental patterns cover most agent orchestration needs. Knowing which one to apply is the first decision in workflow design.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Sequential["Sequential Pipeline"]
+        S1["Step 1"] --> S2["Step 2"]
+        S2 --> S3["Step 3"]
+    end
+    subgraph FanOut["Fan-Out / Fan-In"]
+        F0["Dispatch"] --> F1["Task A"]
+        F0 --> F2["Task B"]
+        F0 --> F3["Task C"]
+        F1 --> FM["Merge"]
+        F2 --> FM
+        F3 --> FM
+    end
+    subgraph Iterative["Iterative Loop"]
+        I1["Attempt"] --> I2["Validate"]
+        I2 -->|"fail"| I3["Fix"]
+        I3 --> I1
+        I2 -->|"pass"| I4["Done"]
+    end
+    style Sequential fill:#ebf8ff,stroke:#3182ce
+    style FanOut fill:#c6f6d5,stroke:#38a169
+    style Iterative fill:#fefcbf,stroke:#d69e2e
+`} />
+
+**Sequential pipeline** runs steps in order, where each step's output feeds the next. Use this when steps have dependencies -- for example, "generate types, then generate API client from types, then generate tests for the client."
+
+**Fan-out / fan-in** dispatches independent tasks in parallel, then merges results. Use this when the same input needs to be analyzed from multiple angles -- like reviewing a PR for bugs, security, and performance simultaneously.
+
+**Iterative loop** repeats an attempt-validate-fix cycle until a success condition is met. This is the pattern behind test-driven development with agents: write code, run tests, fix failures, repeat.
+
+## Anatomy of a Workflow Script
+
+A workflow script is an executable file that orchestrates agent invocations using your CLI tool. It is not a prompt -- it is code. The agent handles the LLM reasoning; the script handles the control flow.
+
+<CodeBlock code={`#!/bin/bash
+# workflow: multi-dimensional-review.sh
+# Runs parallel code reviews across different dimensions
+
+set -euo pipefail
+
+PR_DIFF=$(git diff origin/main...HEAD)
+
+# Fan-out: run reviews in parallel
+claude -p "Review this diff for correctness bugs only. Focus on logic errors, 
+off-by-one mistakes, null handling, and incorrect assumptions. 
+Diff: $PR_DIFF" > /tmp/review-correctness.md &
+
+claude -p "Review this diff for security vulnerabilities only. Focus on injection, 
+auth bypass, data exposure, and input validation. 
+Diff: $PR_DIFF" > /tmp/review-security.md &
+
+claude -p "Review this diff for performance issues only. Focus on N+1 queries, 
+unnecessary allocations, missing indexes, and O(n^2) algorithms. 
+Diff: $PR_DIFF" > /tmp/review-performance.md &
+
+# Fan-in: wait for all reviews
+wait
+
+# Synthesis: merge findings
+claude -p "You are given three code review reports covering correctness, security, 
+and performance. Synthesize them into a single prioritized review. Remove duplicates. 
+Rank by severity (critical > high > medium > low).
+
+Correctness: $(cat /tmp/review-correctness.md)
+Security: $(cat /tmp/review-security.md)  
+Performance: $(cat /tmp/review-performance.md)" > review-summary.md
+
+echo "Review complete: review-summary.md"
+`} language="bash" filename="workflows/multi-dimensional-review.sh" />
+
+This script uses the **fan-out / fan-in** pattern. Three reviews run concurrently, then a synthesis step merges them. The developer gets one consolidated report instead of three fragmented ones.
+
+## Workflow Execution Flow
+
+Here is how a typical workflow executes from trigger to output:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant D as Developer
+    participant W as Workflow Script
+    participant A1 as Agent (Review 1)
+    participant A2 as Agent (Review 2)
+    participant A3 as Agent (Review 3)
+    participant AS as Agent (Synthesis)
+
+    D->>W: trigger workflow
+    W->>A1: "review for correctness"
+    W->>A2: "review for security"
+    W->>A3: "review for performance"
+    A1-->>W: correctness findings
+    A2-->>W: security findings
+    A3-->>W: performance findings
+    W->>AS: "synthesize all findings"
+    AS-->>W: consolidated review
+    W-->>D: review-summary.md
+`} />
+
+Notice how the workflow script acts as an orchestrator -- it decides what runs, when, and in what order. The agents handle the reasoning within each step.
+
+## Common Workflow Use Cases
+
+The patterns above apply to a wide range of development tasks. Here are the most impactful ones:
+
+- **Multi-dimensional code review** -- fan-out reviews for bugs, security, performance, style, then synthesize
+- **Migration scripts** -- sequential pipeline that identifies files to migrate, transforms them one by one, then validates the result
+- **Test generation** -- fan-out to generate unit tests, integration tests, and edge case tests in parallel
+- **Documentation updates** -- iterative loop that generates docs, validates them against the code, and fixes inconsistencies
+- **Refactoring** -- sequential pipeline that analyzes dependencies, plans the refactor, executes it, and runs the test suite
+
+## Building a Sequential Pipeline
+
+Here is a sequential workflow for migrating files from one pattern to another:
+
+<CodeBlock code={`#!/bin/bash
+# workflow: migrate-to-new-pattern.sh
+# Migrates API handlers from Express-style to the new router pattern
+
+set -euo pipefail
+
+# Step 1: Identify files to migrate
+claude -p "List all files in src/handlers/ that use the old Express-style 
+pattern (req, res) => { ... }. Output only file paths, one per line." \
+  > /tmp/migration-targets.txt
+
+echo "Found $(wc -l < /tmp/migration-targets.txt) files to migrate"
+
+# Step 2: Migrate each file sequentially 
+while IFS= read -r file; do
+  echo "Migrating: $file"
+  claude -p "Migrate $file from the Express-style handler pattern to the new 
+router pattern. Follow the examples in src/handlers/users.ts as reference. 
+Keep all business logic intact. Only change the handler signature and routing setup."
+done < /tmp/migration-targets.txt
+
+# Step 3: Validate
+echo "Running tests to validate migration..."
+pnpm test
+
+echo "Migration complete."
+`} language="bash" filename="workflows/migrate-to-new-pattern.sh" />
+
+Each step depends on the previous one. The file list feeds the migration loop, and the test run validates everything at the end.
+
+## Designing Effective Prompts for Workflow Steps
+
+The quality of a workflow depends on the quality of each step's prompt. Follow these principles:
+
+- **Scope narrowly** -- each step should have one job. "Review for security issues" is better than "review this code."
+- **Provide context** -- include the relevant input (diff, file contents, previous step output) directly in the prompt.
+- **Specify format** -- tell the agent what the output should look like. "Output a markdown list of findings with severity labels" produces more usable results than "tell me what you find."
+- **Set constraints** -- tell the agent what not to do. "Do not suggest style changes" keeps a correctness reviewer focused.
+
+> Each workflow step should read like a task assignment to a specialist. Vague delegation produces vague results.
+
+## When Not to Use Workflows
+
+Workflows add structure, but not every task needs structure. Use ad-hoc prompting when:
+
+- The task is exploratory ("help me understand this module")
+- The task is a one-off ("rename this variable across the codebase")
+- You are still figuring out the right approach
+- The overhead of defining a workflow exceeds the benefit
+
+Use workflows when:
+
+- The task recurs (weekly reviews, release prep, migration batches)
+- The task has multiple independent dimensions (multi-reviewer patterns)
+- Consistency matters (compliance checks, audit trails)
+- The task is delegated to CI (no human in the loop)
+
+## Summary
+
+**Agent workflows** transform ad-hoc agent usage into repeatable, auditable development processes. The three core patterns -- **sequential pipeline**, **fan-out / fan-in**, and **iterative loop** -- cover the vast majority of multi-step agent tasks. Workflows are executable scripts, not prompts. They use the agent CLI in headless mode, chain steps with deterministic logic, and produce consistent results across runs. The key to effective workflows is scoping each step narrowly with specific prompts that include the right context, format expectations, and constraints. In the next lesson, we will embed these workflows into CI/CD pipelines so they run automatically on every push and pull request.

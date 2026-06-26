@@ -1,0 +1,256 @@
+---
+title: Automated Code Review
+quiz:
+- question: What can an agent-powered code reviewer catch that a traditional linter cannot?
+  options:
+  - Logic bugs, incorrect assumptions, and misuse of domain-specific APIs
+  - Missing semicolons and indentation errors
+  - Syntax errors in any programming language
+  - Merge conflicts between branches
+  correctIndex: 0
+- question: Why is dimensional separation important in automated code review?
+  options:
+  - It reduces the number of API calls needed
+  - GitHub Actions requires separate jobs for each review type
+  - Each dimension (security, correctness, performance) requires different expertise and focus, producing better results than a single pass
+  - It allows the reviews to be written in different programming languages
+  correctIndex: 2
+- question: What is the biggest risk of a noisy automated code reviewer?
+  options:
+  - It costs too much money
+  - It violates open source licensing
+  - It slows down the CI pipeline
+  - Developers learn to ignore its output, missing real issues buried in false positives
+  correctIndex: 3
+---
+
+## Overview
+
+Linters catch formatting errors. Type checkers catch type mismatches. But what catches the logic bug where a developer checks for `user.isAdmin` when the field is actually `user.role === 'admin'`? What flags the SQL query that works in testing but returns wrong results when the production database has null values? **Automated code review** powered by AI agents operates at a level traditional static analysis cannot reach -- it understands intent, context, and the subtle ways code can be correct syntactically but wrong semantically. This lesson covers how to build review workflows that catch real bugs, not just lint.
+
+## Beyond Linting: What Agents Can Review
+
+Traditional tools and agent-powered review occupy different layers of the quality stack:
+
+| Layer | Traditional Tools | Agent Review |
+|-------|------------------|--------------|
+| Formatting | Prettier, Black | Not needed |
+| Syntax | Compiler, ESLint rules | Not needed |
+| Types | TypeScript, mypy | Not needed |
+| Patterns | ESLint custom rules, Semgrep | Overlaps |
+| Logic | Manual code review | **Primary value** |
+| Intent | Manual code review | **Primary value** |
+| Architecture | Manual code review | **Primary value** |
+
+The agent reviewer is not a replacement for linters -- it covers the gap between what machines have traditionally caught and what only humans could evaluate. The value is in **understanding what the code is trying to do** and spotting where it fails to do it correctly.
+
+## The Review Workflow
+
+An effective automated review follows a clear sequence from trigger to posted comments:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant PR as Pull Request
+    participant CI as CI Runner
+    participant Agent as Review Agent
+    participant GH as GitHub API
+
+    PR->>CI: PR opened / updated
+    CI->>CI: Checkout & compute diff
+    CI->>Agent: "Review this diff for correctness"
+    Agent->>Agent: Read diff + CLAUDE.md
+    Agent->>Agent: Analyze logic, data flow, edge cases
+    Agent-->>CI: Findings (markdown)
+    CI->>Agent: "Review this diff for security"
+    Agent-->>CI: Security findings
+    CI->>Agent: "Synthesize and prioritize"
+    Agent-->>CI: Consolidated review
+    CI->>GH: Post review comment on PR
+`} />
+
+The critical design choice here is **dimensional separation** -- running distinct review passes for correctness, security, and performance rather than asking one agent to cover everything in a single pass.
+
+## Why Dimensional Separation Works
+
+When you ask an agent to "review this code," it produces a grab-bag of findings: some about naming, some about logic, some about style. The signal-to-noise ratio is poor. Dimensional separation solves this by giving each review pass a **single focus area**:
+
+<MermaidDiagram chart={`graph TD
+    D["PR Diff"] --> R1["Correctness Review"]
+    D --> R2["Security Review"]
+    D --> R3["Performance Review"]
+    
+    R1 --> S["Synthesis"]
+    R2 --> S
+    R3 --> S
+    
+    S --> O["Prioritized Findings"]
+    
+    style R1 fill:#bee3f8,stroke:#3182ce
+    style R2 fill:#fed7d7,stroke:#e53e3e
+    style R3 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style S fill:#c6f6d5,stroke:#38a169
+`} />
+
+Each reviewer is a specialist. The correctness reviewer looks for logic bugs, off-by-one errors, null pointer risks, and incorrect assumptions. The security reviewer focuses on injection vectors, authentication gaps, and data exposure. The performance reviewer hunts for N+1 queries, unnecessary allocations, and algorithmic complexity issues.
+
+> A focused reviewer with a narrow scope outperforms a generalist asked to find everything. This is as true for agents as it is for humans.
+
+## Building a Correctness Review Prompt
+
+The quality of the review depends entirely on the quality of the prompt. Here is a correctness review prompt that produces actionable findings:
+
+<CodeBlock code={`claude -p "You are a senior engineer reviewing a pull request for correctness bugs.
+
+FOCUS AREAS:
+- Logic errors: incorrect conditions, wrong comparisons, inverted booleans
+- Edge cases: null/undefined handling, empty arrays, boundary values
+- Data flow: variables used before assignment, stale closures, race conditions
+- API misuse: wrong method signatures, incorrect parameter types, missing error handling
+- Off-by-one: loop bounds, array indexing, pagination offsets
+
+RULES:
+- Only report genuine bugs, not style preferences or nitpicks
+- Each finding must include: file path, line context, what is wrong, and why it matters
+- If you are uncertain whether something is a bug, say so explicitly
+- Do not suggest refactoring unless it fixes a correctness issue
+- Rate each finding: CRITICAL, HIGH, MEDIUM, or LOW
+
+DIFF:
+$(git diff origin/main...HEAD)
+
+CONTEXT:
+This project uses $(cat CLAUDE.md | head -20)
+"
+`} language="bash" filename="workflows/correctness-review.sh" />
+
+Notice the structure: focus areas define what to look for, rules define how to report it, and context from CLAUDE.md gives the agent project-specific knowledge.
+
+## Building a Security Review Prompt
+
+Security review requires different focus and expertise:
+
+<CodeBlock code={`claude -p "You are a security engineer reviewing a pull request.
+
+FOCUS AREAS:
+- Injection: SQL injection, command injection, XSS, template injection
+- Authentication: missing auth checks, privilege escalation, session handling
+- Data exposure: secrets in code, PII in logs, overly broad API responses  
+- Input validation: unvalidated user input, missing sanitization
+- Cryptography: weak algorithms, hardcoded keys, insecure random
+
+RULES:
+- Only report issues with security impact, not general code quality
+- For each finding, describe the attack scenario: who could exploit this and how
+- Rate severity using CVSS-style categories: CRITICAL, HIGH, MEDIUM, LOW
+- If a finding requires specific conditions to exploit, note those conditions
+- False positives are worse than missed findings -- only report what you are confident about
+
+DIFF:
+$(git diff origin/main...HEAD)
+"
+`} language="bash" filename="workflows/security-review.sh" />
+
+The key difference from the correctness prompt: the security reviewer must describe **attack scenarios**, not just point out code smells. "This input is not sanitized" is not useful. "An attacker could inject SQL via the search parameter because the input is concatenated directly into the query" is actionable.
+
+## The Synthesis Step
+
+After dimensional reviews complete, a synthesis agent merges the findings:
+
+<CodeBlock code={`claude -p "You are a lead engineer synthesizing three code review reports.
+
+TASK:
+1. Combine the findings from all three reviews
+2. Remove any duplicates (same issue reported by multiple reviewers)
+3. Sort by severity: CRITICAL first, then HIGH, MEDIUM, LOW
+4. For each finding, preserve the original file path and line context
+5. Add a summary section at the top with counts by severity
+
+FORMAT:
+## Review Summary
+- Critical: N findings
+- High: N findings  
+- Medium: N findings
+- Low: N findings
+
+## Critical Findings
+### [Finding title]
+**File:** path/to/file.ts
+**Issue:** Description
+**Impact:** Why this matters
+**Suggestion:** How to fix it
+
+REVIEWS:
+Correctness: $(cat /tmp/correctness.md)
+Security: $(cat /tmp/security.md)
+Performance: $(cat /tmp/performance.md)
+"
+`} language="bash" filename="workflows/synthesize-review.sh" />
+
+## Managing False Positives
+
+The fastest way to kill an automated review system is to flood developers with false positives. When every PR gets a wall of non-issues, developers learn to ignore the output -- and then miss the one critical finding buried in the noise.
+
+Strategies to control false positive rate:
+
+- **Raise the confidence bar** -- tell the agent "only report findings you are confident about" and "if uncertain, skip it"
+- **Use CLAUDE.md for context** -- many false positives come from the agent not understanding project conventions; CLAUDE.md eliminates these
+- **Filter by severity** -- only post CRITICAL and HIGH findings as blocking comments; collect MEDIUM and LOW in a summary
+- **Track and tune** -- when a finding is a false positive, note the pattern and add it to the review prompt as "do not flag X"
+- **Separate concerns** -- style comments and genuine bugs should never be in the same review pass
+
+<MermaidDiagram chart={`flowchart TD
+    F["Agent Finding"] --> C{"Is it a real bug?"}
+    C -->|"Yes"| P["Post to PR"]
+    C -->|"No - false positive"| A["Analyze why"]
+    A --> U["Update review prompt"]
+    U --> R["Better prompt next time"]
+    P --> D["Developer reviews"]
+    D --> Fix["Fix or dismiss"]
+    Fix --> FB["Feedback improves prompt"]
+    FB --> U
+    
+    style P fill:#c6f6d5,stroke:#38a169
+    style A fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style U fill:#bee3f8,stroke:#3182ce
+`} />
+
+> An automated reviewer with a 90% precision rate is far more valuable than one that catches everything but is right only 50% of the time. Developers trust precision; they ignore recall.
+
+## Posting Results to Pull Requests
+
+The final step is getting the review output where developers will actually see it -- on the PR itself. Use the GitHub CLI or API to post comments:
+
+<CodeBlock code={`# Post as a PR comment
+gh pr comment "$PR_NUMBER" --body "$(cat review-summary.md)"
+
+# Or post as a formal PR review
+gh api repos/{owner}/{repo}/pulls/{pr}/reviews \
+  --method POST \
+  --field body="$(cat review-summary.md)" \
+  --field event="COMMENT"
+`} language="bash" filename="workflows/post-review.sh" />
+
+For richer integration, you can post **inline comments** on specific lines of the diff. This requires parsing the agent's output to extract file paths and line numbers, then using the GitHub review comments API to attach findings to the exact code they reference.
+
+## What Good Automated Review Looks Like
+
+A well-tuned automated reviewer produces output like this:
+
+> **CRITICAL -- Possible SQL injection in search handler**
+> `src/handlers/search.ts:42` -- The search query parameter is concatenated directly into the SQL string. An attacker could inject arbitrary SQL. Use parameterized queries instead.
+
+> **HIGH -- Missing null check on user profile**
+> `src/services/profile.ts:18` -- `user.profile.displayName` will throw if `profile` is null. The database schema allows null profiles for newly created users.
+
+It does **not** produce output like this:
+
+> Consider renaming `x` to something more descriptive.
+
+> You could use `Array.map()` instead of a for loop here.
+
+> This function is 40 lines long, consider breaking it up.
+
+The first set catches bugs that would reach production. The second set is noise that wastes developer attention.
+
+## Summary
+
+**Automated code review** with AI agents covers the quality layer that linters and type checkers cannot reach: logic bugs, security vulnerabilities, and architectural mistakes. The key to making it effective is **dimensional separation** (focused review passes for correctness, security, and performance), **high-quality prompts** that specify exactly what to look for and how to report it, and **aggressive false positive management** to maintain developer trust. A synthesis step merges findings into a prioritized report posted directly on the pull request. In the next lesson, we will explore how test-driven development gives agents something even better than review -- an unambiguous, machine-verifiable definition of success.

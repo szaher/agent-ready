@@ -1,0 +1,205 @@
+---
+title: The Agent-Ready Maturity Model
+quiz:
+- question: A repository has good test coverage and a README, but no CLAUDE.md or documented conventions. What maturity level best describes it?
+  options:
+  - Level 1 -- Foundational
+  - Level 0 -- Unaware
+  - Level 2 -- Structured
+  - Level 3 -- Optimized
+  correctIndex: 0
+- question: What is the primary difference between Level 2 (Structured) and Level 3 (Optimized)?
+  options:
+  - Level 3 uses more advanced AI models
+  - Level 2 has documentation while Level 3 has tests
+  - Level 3 incorporates agent-specific workflow integration and continuous refinement based on agent performance data
+  - Level 2 is for small projects and Level 3 is for large ones
+  correctIndex: 2
+- question: Why does the maturity model emphasize progression over perfection?
+  options:
+  - Because perfection is impossible in software development
+  - Because the model is designed for marketing purposes rather than practical use
+  - Because AI agents only need Level 1 to function properly
+  - Because each level builds on the previous one, and even small improvements at any level yield measurable gains in agent effectiveness
+  correctIndex: 3
+---
+
+## Overview
+
+As we discussed in the previous lesson, agent readiness is not a binary state -- it is a spectrum. But how do you know where you stand on that spectrum? And more importantly, how do you chart a path forward? This lesson introduces the **Agent-Ready Maturity Model**, a five-level framework that helps you assess your current state, prioritize improvements, and track progress over time.
+
+## Why a Maturity Model?
+
+Every codebase is different. A startup's MVP has different needs than a decade-old enterprise monolith. A maturity model gives you:
+
+- **A shared vocabulary** -- instead of debating whether your repo is "good enough" for agents, you can say "we are at Level 1 and targeting Level 2 this quarter"
+- **Prioritized action** -- each level identifies the specific improvements that yield the highest impact at that stage
+- **Measurable progress** -- you can track your movement along the model and celebrate wins
+
+> The goal is not to reach Level 4 overnight. The goal is to know where you are and take the next meaningful step.
+
+## The Five Levels
+
+<MermaidDiagram chart={`graph LR
+    L0["Level 0\nUnaware"] --> L1["Level 1\nFoundational"]
+    L1 --> L2["Level 2\nStructured"]
+    L2 --> L3["Level 3\nOptimized"]
+    L3 --> L4["Level 4\nAutonomous"]
+    style L0 fill:#fed7d7,stroke:#e53e3e,color:#1a202c
+    style L1 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style L2 fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style L3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style L4 fill:#e9d8fd,stroke:#805ad5,color:#1a202c
+`} />
+
+### Level 0: Unaware
+
+At **Level 0**, the codebase has no preparation for AI agents. This is the default state of most repositories today.
+
+**Characteristics:**
+
+- No agent instruction file (no CLAUDE.md, .cursorrules, or AGENTS.md)
+- Minimal or outdated README
+- No documented conventions -- patterns exist only in team members' heads
+- Tests may exist but are not reliably runnable with a single command
+- Build steps require tribal knowledge ("ask Sarah how to set up the dev database")
+
+**Agent experience at Level 0:** The agent spends most of its effort trying to understand the project. It guesses at conventions, frequently produces code that does not match team patterns, and cannot verify its own work. Developers spend more time correcting agent output than they would have spent writing the code themselves.
+
+### Level 1: Foundational
+
+**Level 1** represents the minimum viable preparation. The codebase has the basics in place for both humans and agents to get oriented.
+
+**Characteristics:**
+
+- A README with accurate setup instructions
+- A working build command (`pnpm build`, `cargo build`, `go build`)
+- A test suite that runs with a single command (`pnpm test`, `pytest`)
+- Basic linting or formatting configured (ESLint, Prettier, ruff, gofmt)
+- Some inline code comments explaining non-obvious decisions
+
+**What to add to reach Level 1:**
+
+- Write a README that includes: project purpose, setup steps, build command, test command
+- Ensure `pnpm install && pnpm build && pnpm test` (or equivalent) works from a clean clone
+- Add a linter if you do not have one
+
+**Agent experience at Level 1:** The agent can build and test the project, which gives it a basic feedback loop. It still guesses at conventions, but at least it can tell when something is broken. Task completion rates improve significantly over Level 0.
+
+### Level 2: Structured
+
+**Level 2** is where agent-specific preparation begins. The codebase explicitly communicates its structure, conventions, and constraints to AI agents.
+
+**Characteristics:**
+
+- An **agent instruction file** (CLAUDE.md or equivalent) covering:
+  - Project overview and architecture
+  - Build, test, and lint commands
+  - Code conventions and patterns
+  - Files and areas that should not be modified
+- Consistent directory structure with clear naming patterns
+- Type checking enabled (TypeScript strict mode, mypy, Go's type system)
+- Tests cover the critical paths, and new code is expected to include tests
+- Pre-commit hooks or CI checks that enforce conventions
+
+**What to add to reach Level 2:**
+
+- Write a CLAUDE.md (we cover this in detail in Module 2)
+- Document your top 10 coding conventions explicitly
+- Enable strict type checking if your language supports it
+- Add pre-commit hooks for linting and formatting
+
+**Agent experience at Level 2:** The agent reads the instruction file and immediately understands the project context. It follows documented conventions, respects stated constraints, and uses the test suite to verify its work. Most straightforward tasks complete successfully on the first attempt.
+
+### Level 3: Optimized
+
+**Level 3** codebases have refined their agent integration based on real-world usage. They actively optimize for agent workflows and address common failure modes.
+
+**Characteristics:**
+
+- **Hierarchical instruction files** -- a root CLAUDE.md plus subdirectory-specific instruction files for complex areas
+- **Exemplar patterns** -- documented reference implementations that the agent can copy from
+- **Task-specific guidance** -- common workflows documented step-by-step ("to add a new API endpoint, follow these steps...")
+- **Fast feedback loops** -- tests run in under 2 minutes, with unit tests completing in seconds
+- **Error messages** that are actionable, not cryptic
+- **Regular instruction file updates** -- the team reviews and refines agent instructions based on observed failures
+
+**What to add to reach Level 3:**
+
+- Add subdirectory CLAUDE.md files for complex modules
+- Document the 5 most common development tasks as step-by-step workflows
+- Identify and fix the top 3 things agents get wrong repeatedly
+- Speed up your test suite
+
+**Agent experience at Level 3:** The agent handles complex, multi-step tasks reliably. It knows where to find examples, follows established workflows, and rarely needs human correction for tasks within its documented scope. Developers trust the agent enough to review its output rather than rewrite it.
+
+### Level 4: Autonomous
+
+**Level 4** represents the frontier -- codebases where agents can handle entire features, from design through implementation and testing, with minimal human oversight.
+
+**Characteristics:**
+
+- **End-to-end task documentation** -- feature development workflows that agents can follow from spec to PR
+- **Automated review gates** -- CI pipelines that validate not just correctness but convention adherence, performance, and security
+- **Agent performance tracking** -- metrics on task completion rates, iteration counts, and human intervention frequency
+- **Self-healing instructions** -- when agent failures are detected, the team updates instructions proactively
+- **Integration with project management** -- agents can read issue descriptions and understand requirements directly
+
+**Agent experience at Level 4:** The agent operates as a junior team member. Given a well-written issue, it can produce a complete implementation that passes all automated checks and requires only a final human review for architectural decisions and business logic correctness.
+
+## Comparing the Levels
+
+<MermaidDiagram chart={`graph TD
+    subgraph Capabilities["Agent Capabilities by Level"]
+        L0C["Level 0: Can read code\nbut guesses everything"]
+        L1C["Level 1: Can build and test\nbut guesses conventions"]
+        L2C["Level 2: Follows conventions\nand verifies work"]
+        L3C["Level 3: Handles complex tasks\nwith documented workflows"]
+        L4C["Level 4: Drives features\nend-to-end autonomously"]
+    end
+    L0C --> L1C
+    L1C --> L2C
+    L2C --> L3C
+    L3C --> L4C
+    style Capabilities fill:#f7fafc,stroke:#a0aec0
+    style L0C fill:#fed7d7,stroke:#e53e3e,color:#1a202c
+    style L1C fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style L2C fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style L3C fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style L4C fill:#e9d8fd,stroke:#805ad5,color:#1a202c
+`} />
+
+| Aspect | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 |
+|--------|---------|---------|---------|---------|---------|
+| Agent instruction file | None | None | Basic | Hierarchical | Comprehensive |
+| Build/test reliability | Unreliable | Works | Fast | Very fast | Automated gates |
+| Convention docs | None | Minimal | Explicit | With examples | Self-updating |
+| Task completion rate | ~20% | ~40% | ~65% | ~80% | ~90%+ |
+| Human correction needed | Always | Usually | Sometimes | Rarely | Review only |
+
+## Where to Start
+
+If your codebase is at Level 0, do not try to jump to Level 3. Each level builds on the one before it. Here is a practical starting sequence:
+
+1. **Today** -- ensure your build and test commands work reliably (Level 1)
+2. **This week** -- write a basic CLAUDE.md with project overview and key commands (Level 2)
+3. **This month** -- document your top conventions and add them to the instruction file (Level 2)
+4. **This quarter** -- refine based on actual agent usage, add exemplar patterns (Level 3)
+
+> Every improvement to your agent readiness is an improvement to your overall engineering practices. There is no wasted effort here.
+
+## Assessing Your Own Codebase
+
+Run through this quick checklist to estimate your current level:
+
+- Can someone clone your repo and run tests with a single command? (Level 1)
+- Do you have an agent instruction file? (Level 2)
+- Are your coding conventions documented explicitly? (Level 2)
+- Do you have step-by-step guides for common development tasks? (Level 3)
+- Do you track how often agents succeed vs. fail on tasks? (Level 4)
+
+The highest level where you can answer "yes" to all questions is approximately where your codebase sits. The first "no" tells you what to work on next.
+
+## Summary
+
+The **Agent-Ready Maturity Model** provides a five-level framework for assessing and improving your codebase's readiness for AI agents. From Level 0 (Unaware) to Level 4 (Autonomous), each level represents a meaningful improvement in how effectively agents can work in your repository. The model emphasizes progression over perfection -- even moving from Level 0 to Level 1 can double an agent's task completion rate. In the next lesson, we will get hands-on by running an AI coding agent on a real repository and observing these principles in action.

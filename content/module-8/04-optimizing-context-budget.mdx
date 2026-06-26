@@ -1,0 +1,291 @@
+---
+title: Optimizing Context Budget
+quiz:
+- question: What is the biggest anti-pattern when writing CLAUDE.md in terms of context budget?
+  options:
+  - Stuffing every possible convention, rule, and example into one massive file
+  - Using markdown formatting instead of plain text
+  - Not including the project name in the file
+  - Writing it in a language other than English
+  correctIndex: 0
+- question: Why does a self-describing codebase consume less context budget?
+  options:
+  - Because self-describing code compiles to fewer bytes
+  - Because agents skip reading files that have good names
+  - Because good names, types, and structure communicate intent without the agent needing to read external documentation
+  - Because the context window automatically expands for well-organized projects
+  correctIndex: 2
+- question: What is context compression, and why should developers be aware of it?
+  options:
+  - It is a file compression algorithm that reduces repository size on disk
+  - It is a premium feature that doubles the context window size
+  - It is a technique for writing shorter CLAUDE.md files
+  - It is the process where agents or platforms summarize earlier conversation to free context space, which means early details can be lost
+  correctIndex: 3
+---
+
+## Overview
+
+You now understand that context is finite and that tools like .ctx files and memory help distribute and persist it. But there is a more fundamental optimization: making every token inside the context window work harder. This lesson covers practical techniques for keeping your CLAUDE.md lean, making your codebase self-describing, working with context compression, and structuring agent interactions so the agent gets maximum value from minimum context.
+
+## The Lean CLAUDE.md
+
+The most common context budget mistake is a bloated CLAUDE.md. Teams add rules and examples over time without removing anything, and the file grows from a focused 30-line guide to a 500-line manual that covers every edge case.
+
+The problem is not the content itself -- each line was probably added for a good reason. The problem is that every line is loaded into every session, whether it is relevant or not.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Bloated["Bloated CLAUDE.md (500 lines)"]
+        B1["Build commands"]
+        B2["Test commands"]
+        B3["20 code style rules"]
+        B4["API design patterns"]
+        B5["Database conventions"]
+        B6["Frontend patterns"]
+        B7["Deploy procedures"]
+        B8["Security guidelines"]
+        B9["10 code examples"]
+        B10["Edge case handling"]
+    end
+    subgraph Lean["Lean CLAUDE.md (50 lines)"]
+        L1["Build + Test + Lint"]
+        L2["Top 5 critical rules"]
+        L3["Architecture overview\n(3 sentences)"]
+        L4["Pointers to .ctx files\nfor details"]
+    end
+    Bloated -->|"~8,000 tokens\nevery session"| Cost1["High cost,\nlow relevance"]
+    Lean -->|"~800 tokens\nevery session"| Cost2["Low cost,\nhigh relevance"]
+    style Bloated fill:#fed7d7,stroke:#e53e3e
+    style Lean fill:#c6f6d5,stroke:#276749
+    style Cost1 fill:#fed7d7,stroke:#e53e3e
+    style Cost2 fill:#c6f6d5,stroke:#276749
+`} />
+
+The fix is to apply the **80/20 rule**: identify the 20% of instructions that prevent 80% of agent mistakes, and keep only those in CLAUDE.md. Everything else goes into .ctx files, where it is loaded on demand.
+
+Here is a practical comparison:
+
+<CodeBlock code={`# BEFORE: Bloated CLAUDE.md (abbreviated -- imagine 500 lines)
+
+## Build
+Run \`pnpm build\` to build the project. Make sure Node 20+
+is installed. Use pnpm, not npm or yarn. The build output
+goes to dist/. Do not commit the dist/ directory...
+[50 more lines about build]
+
+## Code Style
+Use 2-space indentation. Use single quotes for strings.
+Always use semicolons. Prefer const over let. Never use var.
+Use arrow functions for callbacks. Use function declarations
+for top-level functions. Prefer template literals over
+string concatenation...
+[100 more lines about style]
+
+## API Patterns
+[100 lines about API design]
+
+## Database
+[80 lines about database conventions]
+
+## Frontend
+[70 lines about React patterns]
+`} language="markdown" filename="CLAUDE.md (before)" />
+
+<CodeBlock code={`# AFTER: Lean CLAUDE.md
+
+## Commands
+- Build: \`pnpm build\`
+- Test: \`pnpm vitest run\`
+- Lint: \`pnpm eslint . --fix\`
+- Single test: \`pnpm vitest run path/to/test\`
+
+## Critical Rules
+- Use pnpm, never npm or yarn
+- Named exports only, no default exports
+- All API errors must use AppError from src/errors.ts
+- Run the full test suite before considering a task done
+- Never modify files in src/generated/
+
+## Architecture
+Three-layer architecture: API (src/api/) -> Services
+(src/services/) -> Database (src/database/).
+Each layer has a .ctx file with detailed patterns.
+`} language="markdown" filename="CLAUDE.md (after)" />
+
+The "after" version is roughly 200 tokens. The "before" was over 6,000. The agent gets the critical information it needs for every session, and detailed patterns are available on demand through .ctx files when the agent is actually working in that area.
+
+## Making Your Codebase Self-Describing
+
+The best way to reduce context consumption is to make the code communicate its own intent. A **self-describing codebase** uses names, types, and structure so clear that the agent rarely needs to consult external documentation.
+
+**Good names eliminate documentation.** Compare these two approaches:
+
+<CodeBlock code={`# This needs documentation to explain
+def proc(d, f):
+    r = []
+    for i in d:
+        if f(i):
+            r.append(i)
+    return r
+
+# This is self-documenting
+def filter_active_users(
+    users: list[User],
+    is_active: Callable[[User], bool]
+) -> list[User]:
+    return [user for user in users if is_active(user)]
+`} language="python" filename="naming-comparison.py" />
+
+The first function requires the agent to read its callers, its tests, and possibly a comment to understand what it does. That is three file reads, potentially thousands of tokens. The second function communicates everything through its signature: zero extra context needed.
+
+**Types carry context for free.** In typed languages, every type annotation is a piece of context that the agent gets without reading any documentation:
+
+<CodeBlock code={`// Without types: agent must infer behavior from usage
+function processOrder(order, payment, options) {
+  // What is order? What fields does it have?
+  // What is payment? A string? An object?
+  // What are the valid options?
+}
+
+// With types: agent knows exactly what to expect
+function processOrder(
+  order: Order,
+  payment: PaymentMethod,
+  options: ProcessingOptions
+): Promise<OrderResult> {
+  // Types tell the agent everything
+}
+`} language="typescript" filename="types-as-context.ts" />
+
+**Directory structure communicates architecture.** When directories are named clearly and organized logically, the agent can infer the architecture from the file tree without reading a single file:
+
+<CodeBlock code={`# Opaque structure: agent must read files to understand
+src/
+  lib/
+  utils/
+  core/
+  helpers/
+  common/
+
+# Self-describing structure: architecture is visible
+src/
+  api/           # HTTP layer
+  services/      # Business logic
+  database/      # Data access
+  workers/       # Background jobs
+  auth/          # Authentication
+`} language="text" filename="directory-comparison" />
+
+> Every improvement to your code's self-description pays a double dividend: it helps human developers *and* it reduces agent context consumption.
+
+## Working with Context Compression
+
+As conversations grow long, a process called **context compression** kicks in. The agent platform automatically summarizes earlier messages to free up space for new content. This is invisible to the developer but has real consequences.
+
+What gets compressed:
+
+- **Early messages** in the conversation are summarized first
+- **Tool output** (file contents, command results) is often heavily compressed
+- **Repetitive exchanges** (multiple rounds of similar edits) get collapsed
+
+What survives compression:
+
+- **Recent messages** retain full detail
+- **Key decisions** and corrections tend to persist
+- **System instructions** (CLAUDE.md) are protected from compression
+
+<MermaidDiagram chart={`flowchart TD
+    A["Session Start\n(Full detail)"] --> B["Mid Session\n(Earlier messages summarized)"]
+    B --> C["Late Session\n(Only recent messages\nat full detail)"]
+
+    subgraph Early["Messages 1-20"]
+        E1["Full conversation"] -->|"compressed"| E2["Summary:\n'Discussed API design,\ndecided on REST'"]
+    end
+
+    subgraph Mid["Messages 20-40"]
+        M1["Full detail of\nrecent exchanges"]
+    end
+
+    subgraph Late["Messages 40+"]
+        L1["Current context is\nmostly recent work"]
+    end
+
+    style Early fill:#fefcbf,stroke:#d69e2e
+    style Mid fill:#ebf8ff,stroke:#3182ce
+    style Late fill:#c6f6d5,stroke:#276749
+`} />
+
+The practical implication: **do not rely on the agent remembering details from early in a long session**. If you made an important decision in message 5 and you are now on message 40, the agent may only have a vague summary of that decision.
+
+Strategies for working with compression:
+
+- **Keep sessions focused.** One task per session reduces the need for the agent to recall distant context.
+- **Restate important constraints.** If a decision from early in the session matters for current work, restate it rather than assuming the agent remembers.
+- **Use CLAUDE.md for persistent rules.** Rules in CLAUDE.md survive compression. Rules mentioned in conversation do not.
+
+## The Discovery vs. Pre-load Trade-off
+
+A key context budget decision is what the agent should know before starting versus what it should discover as needed. **Pre-loading** means putting information in CLAUDE.md or memory so the agent has it immediately. **Discovery** means letting the agent find it by reading files or searching the codebase.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Preload["Pre-load (CLAUDE.md, Memory)"]
+        P1["Always available"]
+        P2["Costs tokens every session"]
+        P3["Best for: universal rules,\nbuild commands, critical constraints"]
+    end
+    subgraph Discover["Discover (Search, Read)"]
+        D1["Loaded only when needed"]
+        D2["Costs tokens only when relevant"]
+        D3["Best for: implementation details,\nmodule-specific patterns, examples"]
+    end
+    style Preload fill:#ebf8ff,stroke:#3182ce
+    style Discover fill:#c6f6d5,stroke:#276749
+`} />
+
+The rule of thumb: **pre-load things the agent needs in every session, and let it discover things it only needs sometimes.**
+
+| Information | Pre-load or Discover? | Why |
+|---|---|---|
+| Build and test commands | Pre-load | Needed in almost every session |
+| Top 5 code conventions | Pre-load | Prevents the most common mistakes |
+| Module-specific patterns | Discover | Only relevant when working in that module |
+| API endpoint examples | Discover | Only needed when building API routes |
+| Full type definitions | Discover | Agent can read the type files directly |
+| Security constraints | Pre-load | Too costly to miss |
+
+## Token Counting Intuition
+
+Developers benefit from building an intuition for how many tokens different kinds of content consume. This helps you make informed trade-offs about what to include.
+
+Rough guidelines:
+- **1 line of code** is approximately 10-15 tokens
+- **1 line of English prose** is approximately 15-25 tokens
+- **A typical function** (10-30 lines) is 150-400 tokens
+- **A typical file** (100-300 lines) is 1,500-4,500 tokens
+- **A lean CLAUDE.md** (30-50 lines) is 500-800 tokens
+- **A bloated CLAUDE.md** (300+ lines) is 5,000-10,000 tokens
+
+In a 200K token context window, a bloated CLAUDE.md consumes 5% of the total budget before the agent does anything. That is 5% less space for actual code, test output, and reasoning.
+
+> Every line in your CLAUDE.md should earn its place. Ask: "Does this line prevent a common mistake in most sessions?" If not, it belongs in a .ctx file or nowhere.
+
+## Practical Optimization Checklist
+
+Use this checklist to audit your context budget:
+
+- **CLAUDE.md under 60 lines?** If not, move low-frequency rules to .ctx files
+- **Every CLAUDE.md line earns its place?** Remove anything that duplicates the linter, the types, or the compiler
+- **Code uses descriptive names?** Every `x`, `tmp`, and `data` costs future context for the agent to understand
+- **Types are explicit?** Implicit types force the agent to trace through code to determine types
+- **Directory structure is clear?** Ambiguous directory names like `utils/` and `helpers/` force the agent to read files just to understand organization
+- **Sessions are focused?** Long, multi-topic sessions suffer from compression; break them into focused tasks
+- **Important decisions restated?** In long sessions, restate critical constraints near the point where they matter
+
+## Summary
+
+- A bloated CLAUDE.md is the biggest context budget anti-pattern -- keep it under 60 lines and move details to .ctx files
+- **Self-describing code** (good names, explicit types, clear structure) reduces context consumption because the agent infers intent from the code itself
+- **Context compression** summarizes earlier messages in long sessions -- do not rely on the agent remembering early conversation details
+- **Pre-load** universal rules and build commands; let agents **discover** module-specific patterns and examples on demand
+- Build intuition for token costs: a bloated CLAUDE.md can consume 5% of the context window before the agent starts working
+- Every line of documentation should earn its place by preventing a common mistake in most sessions

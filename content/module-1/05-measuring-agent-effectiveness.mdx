@@ -1,0 +1,229 @@
+---
+title: Measuring Agent Effectiveness
+quiz:
+- question: Which metric most directly measures whether an agent can complete tasks without human help?
+  options:
+  - Task completion rate
+  - Lines of code generated per session
+  - Number of files read by the agent
+  - Time to first token
+  correctIndex: 0
+- question: An agent completes a task but requires 7 iterations to pass all tests. What does this most likely indicate?
+  options:
+  - The agent is poorly trained and should be replaced
+  - The test suite is too strict
+  - The codebase may have unclear conventions or slow feedback loops, causing repeated trial-and-error
+  - Seven iterations is a normal and expected number
+  correctIndex: 2
+- question: What is the purpose of establishing a baseline measurement before making agent-readiness improvements?
+  options:
+  - To prove that agents are ineffective so management approves budget
+  - Baselines are only needed for compliance reporting
+  - To determine which AI model to use
+  - To create a reference point that lets you quantify the impact of each improvement you make
+  correctIndex: 3
+---
+
+## Overview
+
+As we discussed in the previous lesson, running an agent session reveals qualitative differences between prepared and unprepared repositories. But feelings and impressions are not enough to guide systematic improvement. This lesson introduces concrete metrics for measuring **agent effectiveness** -- giving you the tools to quantify how agent-friendly your codebase is and track improvements over time.
+
+## Why Measurement Matters
+
+Without measurement, agent readiness becomes a matter of opinion. One developer thinks the codebase works great with agents; another finds it frustrating. Measurement resolves these disagreements with data.
+
+More importantly, measurement tells you where to invest. If your agent's task completion rate is already 85%, spending a week improving documentation might yield marginal gains. But if your **iteration count** (how many tries the agent needs) is high, speeding up your test suite could have outsized impact.
+
+> What gets measured gets improved. Track your agent's performance the same way you track your test coverage or deployment frequency.
+
+## The Core Metrics
+
+There are five metrics that together paint a complete picture of agent effectiveness in your codebase:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Metrics["Agent Effectiveness Metrics"]
+        M1["Task Completion Rate\nDoes the agent finish the job?"]
+        M2["Iteration Count\nHow many tries does it take?"]
+        M3["Human Intervention Rate\nHow often must a human step in?"]
+        M4["Convention Adherence\nDoes the output match team standards?"]
+        M5["Time to Completion\nHow long does the full cycle take?"]
+    end
+    style Metrics fill:#ebf8ff,stroke:#3182ce
+    style M1 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style M2 fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style M3 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style M4 fill:#e9d8fd,stroke:#805ad5,color:#1a202c
+    style M5 fill:#fed7d7,stroke:#e53e3e,color:#1a202c
+`} />
+
+### Metric 1: Task Completion Rate
+
+**Task completion rate** is the most fundamental metric. It answers: what percentage of tasks does the agent complete successfully without human rework?
+
+A "successful completion" means:
+
+- The code works (tests pass, no runtime errors)
+- The code matches the intent of the request
+- The code does not introduce regressions
+
+**How to track it:** After each agent session, record whether the task was completed, partially completed, or failed. Over time, calculate the ratio of completed tasks to total tasks attempted.
+
+**Benchmarks by maturity level:**
+
+| Maturity Level | Typical Completion Rate |
+|---------------|------------------------|
+| Level 0 (Unaware) | 10-25% |
+| Level 1 (Foundational) | 30-50% |
+| Level 2 (Structured) | 55-75% |
+| Level 3 (Optimized) | 75-90% |
+| Level 4 (Autonomous) | 85-95% |
+
+### Metric 2: Iteration Count
+
+**Iteration count** measures how many attempts the agent needs to complete a task. An iteration is one cycle of the plan-execute-observe-adjust loop we discussed in the first lesson.
+
+Low iteration counts indicate:
+
+- Clear conventions that the agent follows correctly on the first attempt
+- Fast feedback loops that quickly surface issues
+- Well-structured code that the agent can navigate efficiently
+
+High iteration counts indicate:
+
+- Ambiguous conventions that lead to trial-and-error
+- Slow test suites that delay the feedback loop
+- Complex or undocumented architecture that confuses the agent
+
+**How to track it:** Most agent tools show you the agent's actions in real time. Count the number of times the agent writes code, runs tests, and revises. A single successful write-test cycle is 1 iteration. A write-test-fail-fix-test cycle is 2 iterations.
+
+**Target:** Well-prepared codebases see most tasks complete in 1-3 iterations.
+
+### Metric 3: Human Intervention Rate
+
+**Human intervention rate** measures how often a human must step in during or after an agent session. Interventions include:
+
+- **Mid-task corrections** -- "No, use the other database client"
+- **Post-task fixes** -- manually adjusting code the agent produced
+- **Clarification requests** -- the agent asks a question that a good instruction file would have answered
+- **Outright rejections** -- discarding the agent's output and writing the code manually
+
+**How to track it:** For each task, note whether you intervened and classify the type of intervention. Over time, categorize the interventions to identify patterns.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Interventions["Common Intervention Categories"]
+        I1["Convention\nMismatch"]
+        I2["Missing\nContext"]
+        I3["Wrong\nApproach"]
+        I4["Scope\nCreep"]
+    end
+    I1 --> F1["Fix: Document conventions\nin CLAUDE.md"]
+    I2 --> F2["Fix: Add architecture\noverview"]
+    I3 --> F3["Fix: Add task-specific\nworkflow guides"]
+    I4 --> F4["Fix: Add constraints\nand boundaries"]
+    style Interventions fill:#fefcbf,stroke:#d69e2e
+    style F1 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style F2 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style F3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style F4 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+`} />
+
+The intervention categories directly map to agent-readiness improvements. Each category of intervention tells you exactly what to fix in your preparation.
+
+### Metric 4: Convention Adherence
+
+**Convention adherence** measures whether the agent's output matches your team's coding standards. This is more nuanced than "does it work" -- code can be functionally correct but stylistically wrong.
+
+Check for:
+
+- **Naming conventions** -- does the agent use camelCase, snake_case, or PascalCase where your team expects it?
+- **File organization** -- does the agent put new files in the right directories?
+- **Error handling patterns** -- does the agent use your team's error handling approach?
+- **Test structure** -- do the agent's tests follow your team's testing patterns?
+
+**How to track it:** During code review, note convention violations separately from functional issues. Track the ratio of "convention-conforming" reviews to total reviews.
+
+### Metric 5: Time to Completion
+
+**Time to completion** measures the wall-clock time from when you give the agent a task to when the task is done and verified. This encompasses:
+
+- Time the agent spends reading and understanding the codebase
+- Time spent writing code
+- Time waiting for tests and builds to complete
+- Time spent iterating on failures
+
+**Why it matters:** An agent that completes a task in 2 minutes saves your team time. An agent that takes 20 minutes on a task you could have done in 5 is a net negative.
+
+**How to track it:** Time your agent sessions. Most agent tools provide session duration in their output.
+
+## Building a Measurement Practice
+
+You do not need a complex tracking system to start measuring. Here is a lightweight approach:
+
+**Step 1: Create a simple log.** After each agent session, jot down:
+
+- Task description
+- Completion status (completed / partial / failed)
+- Number of iterations
+- Whether you intervened (and why)
+- Time taken
+
+**Step 2: Establish a baseline.** Run 10-15 tasks across different areas of your codebase before making any agent-readiness improvements. This baseline tells you where you are starting from.
+
+**Step 3: Make one improvement and remeasure.** Add a CLAUDE.md, document your conventions, or speed up your tests. Then run another 10-15 tasks and compare against your baseline.
+
+**Step 4: Iterate.** Identify the metric that improved the least and target your next improvement there.
+
+## The Effectiveness Dashboard
+
+As you collect data, visualize it to spot trends and communicate progress to your team. A simple dashboard tracks the five metrics over time:
+
+<MermaidDiagram chart={`graph LR
+    subgraph Dashboard["Agent Effectiveness Dashboard"]
+        subgraph Current["Current Period"]
+            C1["Completion: 68%"]
+            C2["Avg Iterations: 2.4"]
+            C3["Intervention: 35%"]
+            C4["Convention: 78%"]
+            C5["Avg Time: 4.2 min"]
+        end
+        subgraph Previous["Previous Period"]
+            P1["Completion: 42%"]
+            P2["Avg Iterations: 4.1"]
+            P3["Intervention: 62%"]
+            P4["Convention: 51%"]
+            P5["Avg Time: 8.7 min"]
+        end
+    end
+    style Dashboard fill:#f7fafc,stroke:#a0aec0
+    style Current fill:#c6f6d5,stroke:#38a169
+    style Previous fill:#fefcbf,stroke:#d69e2e
+`} />
+
+This example shows a team that added a CLAUDE.md and documented their conventions between the two measurement periods. Every metric improved -- completion rate up 26 points, iterations nearly halved, intervention rate cut by nearly half, convention adherence up 27 points, and average time cut in half.
+
+## What Good Looks Like
+
+Here are practical targets to aim for as you improve your codebase's agent readiness:
+
+- **Task completion rate above 70%** -- the agent successfully handles the majority of routine tasks
+- **Average iteration count under 3** -- the agent gets it right quickly, without excessive trial-and-error
+- **Human intervention rate below 30%** -- you step in for complex judgment calls, not for routine guidance
+- **Convention adherence above 85%** -- the agent's code passes your style review without changes
+- **Time to completion consistently under 5 minutes** for standard tasks
+
+> These are targets for routine development tasks (adding features, fixing bugs, writing tests). Complex architectural decisions and novel feature design will always require more human involvement.
+
+## Connecting Metrics to the Maturity Model
+
+As we covered in the maturity model lesson, each maturity level corresponds to a range of agent effectiveness. Use your metrics to validate your self-assessment:
+
+- If your completion rate is below 30%, you are likely at Level 0 or early Level 1
+- If your completion rate is 50-70% but convention adherence is low, you are at Level 1 heading toward Level 2
+- If both completion and convention adherence are above 70%, you are solidly at Level 2 or Level 3
+- If all five metrics are consistently strong, you are approaching Level 4
+
+The metrics do not just tell you where you are -- they tell you what to improve next. Low completion rate? Focus on feedback loops and test reliability. High completion but low convention adherence? Invest in documenting your standards.
+
+## Summary
+
+Measuring **agent effectiveness** transforms agent readiness from a subjective impression into a data-driven practice. The five core metrics -- task completion rate, iteration count, human intervention rate, convention adherence, and time to completion -- give you a complete picture of how well your codebase supports AI agents. By establishing a baseline, making targeted improvements, and remeasuring, you create a virtuous cycle that continuously improves both agent performance and overall codebase quality. With this foundation, you are ready to move into Module 2, where we will build the most important artifact for agent readiness: the project instruction file.

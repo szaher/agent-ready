@@ -1,0 +1,319 @@
+---
+title: CI/CD Integration
+quiz:
+- question: Why must agents running in CI use headless mode with pre-configured permissions?
+  options:
+  - CI environments have no human to approve permission prompts, so the agent must run non-interactively
+  - Interactive prompts would make the CI logs too verbose
+  - Headless mode is faster because it skips the language model
+  - CI runners do not support terminal emulation
+  correctIndex: 0
+- question: What is the primary role of CLAUDE.md in a CI pipeline?
+  options:
+  - It replaces the need for a build script
+  - It stores the API key for authentication
+  - It provides the agent with project context, conventions, and constraints so it can act correctly without human guidance
+  - It defines the CI trigger events
+  correctIndex: 2
+- question: Which GitHub Actions event trigger is most appropriate for running an agent-powered code review?
+  options:
+  - push to main
+  - workflow_dispatch
+  - schedule (cron)
+  - pull_request (opened or synchronize)
+  correctIndex: 3
+- question: What should you do if an agent CI step fails due to insufficient permissions?
+  options:
+  - Add --dangerously-skip-permissions to the CLI flags
+  - Update the .claude/settings.json allowlist to include the specific commands the agent needs
+  - Disable all CI checks until the issue is resolved
+  - Switch to a different AI provider
+  correctIndex: 1
+---
+
+## Overview
+
+An agent workflow is only as valuable as how often it runs. If it requires a developer to remember to trigger it, it will be forgotten. The real power emerges when agent workflows run **automatically** -- triggered by git pushes, pull requests, and scheduled events, just like your tests and linters. This lesson covers how to embed AI agents into **CI/CD pipelines**, with a focus on GitHub Actions, headless execution, and the configuration that makes it reliable.
+
+## Why CI/CD Changes the Game
+
+Running agents locally is useful. Running agents in CI is transformative. Here is the difference:
+
+- **Local** -- one developer remembers to run the review script before submitting a PR
+- **CI** -- every PR is automatically reviewed, every migration is validated, every documentation gap is flagged
+
+<MermaidDiagram chart={`graph TD
+    subgraph CI["CI/CD Pipeline"]
+        T["Trigger: PR Opened"] --> B["Build & Test"]
+        B --> AR["Agent Review"]
+        AR --> SG["Security Gate"]
+        SG --> D["Deploy Preview"]
+    end
+    subgraph Local["Local Only"]
+        L1["Developer remembers"] --> L2["Runs script manually"]
+        L2 --> L3["Maybe forgets next time"]
+    end
+    style CI fill:#c6f6d5,stroke:#38a169
+    style Local fill:#fed7d7,stroke:#e53e3e
+`} />
+
+CI integration turns agent workflows from optional developer habits into **mandatory quality gates**. No PR merges without the agent review. No deployment without the security scan.
+
+## The Headless Challenge
+
+Agents in CI face a constraint that local usage does not: there is no human at the keyboard. This means:
+
+- **No interactive prompts** -- the agent cannot ask "should I modify this file?" There is nobody to answer.
+- **No permission approvals** -- file writes, command execution, and network access must be pre-authorized.
+- **No course correction** -- if the agent goes off-track, there is no human to redirect it.
+
+**Headless mode** solves this by running the agent with pre-configured permissions and a well-defined task. The agent executes its prompt, produces output, and exits. The key ingredients are:
+
+1. A clear, scoped prompt passed via `-p` flag
+2. A `.claude/settings.json` with the right permission allowlist
+3. A `CLAUDE.md` file that provides all the context the agent needs
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant GH as GitHub Actions
+    participant R as Runner
+    participant C as Claude CLI
+    participant Repo as Repository
+
+    GH->>R: Trigger on PR event
+    R->>R: Checkout code
+    R->>R: Install Claude CLI
+    R->>C: claude -p "review this PR"
+    C->>Repo: Read CLAUDE.md
+    C->>Repo: Read .claude/settings.json
+    C->>Repo: Read diff, source files
+    C->>C: Analyze and generate review
+    C-->>R: Output review markdown
+    R->>GH: Post review comment
+`} />
+
+## GitHub Actions Setup
+
+Here is a complete GitHub Actions workflow that runs an agent-powered code review on every pull request:
+
+<CodeBlock code={`name: Agent Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  agent-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate diffs
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run agent review
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          DIFF=$(git diff origin/main...HEAD)
+          claude -p "You are a code reviewer. Review the following diff for:
+          1. Correctness bugs (logic errors, null handling, edge cases)
+          2. Security issues (injection, auth, data exposure)
+          3. Performance concerns (N+1 queries, unnecessary work)
+          
+          Be specific. Reference file names and line numbers.
+          Only report genuine issues, not style preferences.
+          
+          Diff:
+          $DIFF" --output-format json > review.json
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.json', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '## Agent Review\\n\\n' + review
+            });
+`} language="yaml" filename=".github/workflows/agent-review.yml" />
+
+Key decisions in this workflow:
+
+- **`fetch-depth: 0`** gives the agent full git history for accurate diffs
+- **`timeout-minutes: 10`** prevents runaway agent sessions from blocking CI
+- **`--output-format json`** produces structured output that downstream steps can parse
+- The API key is stored as a **GitHub secret**, never hardcoded
+
+## Permission Configuration for CI
+
+In headless mode, the agent needs pre-authorized permissions. Without them, it will hit permission prompts and stall. Configure `.claude/settings.json` with the minimum permissions the agent needs:
+
+<CodeBlock code={`{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm lint*)",
+      "Bash(pnpm build*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(curl*)",
+      "Bash(wget*)"
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json" />
+
+The **principle of least privilege** applies here. Allow the agent to read files, run git commands, and execute your test suite. Deny destructive operations, network access, and anything that modifies remote state.
+
+> Treat CI agent permissions like you treat IAM roles: grant only what is necessary, deny everything else explicitly.
+
+## The Role of CLAUDE.md in CI
+
+When an agent runs in CI, it cannot ask a developer "what framework does this project use?" or "what is the test command?" It relies entirely on `CLAUDE.md` for that context. A CI-optimized CLAUDE.md should include:
+
+- **Project overview** -- what the codebase does, what language and framework it uses
+- **Architecture** -- where key directories are and what they contain
+- **Conventions** -- coding patterns, naming conventions, error handling approaches
+- **Test commands** -- exactly how to run tests, lint, and build
+- **Constraints** -- files or directories that must not be modified
+- **Review guidelines** -- what constitutes a real issue versus a style preference
+
+Without this file, the CI agent is flying blind. With it, the agent has the same context a senior team member would bring to a review.
+
+## Multi-Step CI Workflows
+
+Simple review is just the beginning. You can chain multiple agent steps in a single CI workflow:
+
+<CodeBlock code={`name: Agent Quality Pipeline
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  agent-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Step 1 - Correctness review
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Review the diff for correctness bugs only. 
+          $(git diff origin/main...HEAD)" > correctness.md
+
+      - name: Step 2 - Security review
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Review the diff for security vulnerabilities only.
+          $(git diff origin/main...HEAD)" > security.md
+
+      - name: Step 3 - Test coverage check
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Analyze the diff and identify any new code paths 
+          that lack test coverage. Suggest specific test cases.
+          $(git diff origin/main...HEAD)" > coverage-gaps.md
+
+      - name: Synthesize and post
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Combine these three review reports into a single 
+          summary. Deduplicate findings. Rank by severity.
+          
+          Correctness: $(cat correctness.md)
+          Security: $(cat security.md)
+          Coverage: $(cat coverage-gaps.md)" > summary.md
+
+          # Post to PR (using gh CLI)
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "$(cat summary.md)"
+`} language="yaml" filename=".github/workflows/agent-quality-pipeline.yml" />
+
+This is the **fan-out pattern from the previous lesson**, implemented as CI steps. Each review dimension runs independently, then a synthesis step merges the results.
+
+## Architecture of an Agent-Integrated Pipeline
+
+Here is how agents fit into a complete CI/CD architecture:
+
+<MermaidDiagram chart={`graph TD
+    PR["Pull Request"] --> CI["CI Pipeline"]
+    
+    subgraph CI
+        Build["Build"] --> Test["Test Suite"]
+        Test --> Lint["Linter"]
+        Lint --> Agent["Agent Review"]
+        Agent --> Gate["Quality Gate"]
+    end
+    
+    Gate -->|"pass"| Preview["Deploy Preview"]
+    Gate -->|"fail"| Block["Block Merge"]
+    
+    subgraph Agent
+        A1["Correctness"] 
+        A2["Security"]
+        A3["Coverage"]
+    end
+    
+    style CI fill:#ebf8ff,stroke:#3182ce
+    style Agent fill:#c6f6d5,stroke:#38a169
+    style Block fill:#fed7d7,stroke:#e53e3e
+    style Preview fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+`} />
+
+The agent review step sits alongside traditional checks -- build, test, lint -- and its output feeds into the quality gate. A critical finding from the agent can block a merge just like a failing test would.
+
+## Cost and Performance Considerations
+
+Running agents in CI costs real money and wall-clock time. Manage both:
+
+- **Scope the prompt** -- do not ask the agent to "review everything." Focus on the diff, not the entire repo.
+- **Set timeouts** -- a `timeout-minutes` value prevents runaway sessions from consuming resources.
+- **Cache dependencies** -- install the agent CLI once and cache it across runs.
+- **Trigger selectively** -- run the full agent pipeline on PRs to main, not on every push to every branch.
+- **Use token budgets** -- the `--max-turns` flag limits how many iterations the agent can perform.
+
+> Start with a single agent step in CI. Measure the cost and duration. Add more steps only when the value justifies the expense.
+
+## Troubleshooting CI Agent Failures
+
+When an agent step fails in CI, the most common causes are:
+
+- **Missing API key** -- verify the secret is set and the environment variable name matches
+- **Permission denied** -- the agent tried to run a command not in the allowlist; update `.claude/settings.json`
+- **Timeout** -- the prompt was too broad or the agent entered an iteration loop; narrow the scope
+- **Empty diff** -- the workflow triggered on a PR with no code changes; add a guard condition
+- **Context overflow** -- the diff was too large for the context window; split the review by file or directory
+
+## Summary
+
+Integrating agents into **CI/CD pipelines** transforms them from developer tools into team infrastructure. The key requirements are **headless mode** with pre-configured permissions, a comprehensive **CLAUDE.md** for context, and scoped prompts that give the agent a clear, bounded task. GitHub Actions provides a natural integration point -- trigger on PR events, run the agent CLI, and post results back to the PR. Start with a single review step, measure cost and latency, and expand to multi-step pipelines as you build confidence. In the next lesson, we will dive deep into the most impactful CI use case: automated code review that catches bugs linters miss.

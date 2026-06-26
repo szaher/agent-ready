@@ -1,0 +1,53 @@
+{
+  "id": 8,
+  "title": "Context Management",
+  "description": "Master the art of feeding agents the right information at the right time",
+  "color": "#68d391",
+  "lessons": [
+    {
+      "slug": "01-the-context-challenge",
+      "title": "The Context Challenge",
+      "description": "Why context is the number one bottleneck for agent performance",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-context-files-and-kits",
+      "title": "Context Files and Kits",
+      "description": "Using .ctx files, context packs, and structured context delivery for agents",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-memory-and-persistence",
+      "title": "Memory and Persistence",
+      "description": "Persistent memory systems that carry context across agent sessions",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "sequence"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-optimizing-context-budget",
+      "title": "Optimizing Context Budget",
+      "description": "Techniques for maximizing what agents can accomplish within a finite context window",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["comparison", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-context-at-scale",
+      "title": "Context at Scale",
+      "description": "Managing context in large codebases with thousands of files and multiple teams",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    }
+  ]
+}

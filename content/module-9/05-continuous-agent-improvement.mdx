@@ -1,0 +1,178 @@
+---
+title: Continuous Agent Improvement
+quiz:
+- question: What is the primary source of data for improving agent configuration?
+  options:
+  - Agent session transcripts that reveal where the agent struggled, guessed, or made errors
+  - The AI provider's documentation and release notes
+  - Automated benchmarks run against standardized coding problems
+  - Developer satisfaction surveys collected quarterly
+  correctIndex: 0
+- question: When you notice the agent repeatedly asks about the test command, what should you update?
+  options:
+  - The CI pipeline to run tests automatically
+  - The agent's model version to a newer release
+  - The CLAUDE.md file to include the exact test commands
+  - The .gitignore to exclude test files
+  correctIndex: 2
+- question: What does a healthy agent improvement feedback loop look like?
+  options:
+  - Replace the agent tool every quarter with the newest option
+  - Hire a prompt engineer to rewrite all prompts monthly
+  - Run the agent once, review its output, then switch to manual coding if it fails
+  - Agent struggles with a task, team analyzes the transcript, updates CLAUDE.md or hooks, agent succeeds next time
+  correctIndex: 3
+---
+
+## Overview
+
+Your agent configuration is never finished. The first version of your CLAUDE.md, your permission settings, and your workflow scripts will get the agent 70% of the way there. The remaining 30% comes from **observing how the agent actually performs** and iterating on the configuration based on real results. This lesson covers the feedback loop that turns a decent agent setup into a great one: how to identify failure patterns, what to update, and how to build a culture of continuous agent improvement.
+
+## The Feedback Loop
+
+Agent improvement is not a one-time project. It is an ongoing cycle:
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent performs task"] --> B["Review session transcript"]
+    B --> C{"Did it struggle?"}
+    C -->|"Yes"| D["Analyze failure pattern"]
+    D --> E["Update configuration"]
+    E --> A
+    C -->|"No"| F["Note what worked well"]
+    F --> G["Document the pattern"]
+    G --> A
+    
+    style A fill:#bee3f8,stroke:#3182ce
+    style D fill:#fed7d7,stroke:#e53e3e
+    style E fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style F fill:#c6f6d5,stroke:#38a169
+    style G fill:#c6f6d5,stroke:#38a169
+`} />
+
+Every agent session produces data. The session transcript shows what the agent did, what it tried, where it got stuck, and how it recovered (or failed to). This transcript is the raw material for improvement.
+
+## Reading Session Transcripts
+
+The most valuable skill in agent improvement is learning to read **session transcripts** with a diagnostic eye. You are not reading for the final output -- you are reading for the process. Look for these signals:
+
+- **Hesitation patterns** -- the agent asks clarifying questions or hedges its approach. This means the CLAUDE.md did not provide enough context.
+- **Wrong-first-try** -- the agent tries one approach, fails, then tries another. This means conventions or patterns were not documented.
+- **Repeated tool calls** -- the agent reads the same file multiple times or searches for the same term. This means the project structure was unclear.
+- **Incorrect assumptions** -- the agent assumes a framework, pattern, or convention that your project does not use. This means CLAUDE.md needs explicit guidance.
+- **Permission blocks** -- the agent tries to run a command and gets blocked. This means `.claude/settings.json` needs updating.
+
+> Every agent struggle is a documentation gap in disguise. The transcript tells you exactly where the gap is.
+
+## Common Failure Patterns and Fixes
+
+Here are the most common patterns teams encounter and how to address each one:
+
+**Pattern: Agent uses the wrong test framework**
+The agent reaches for Jest when your project uses Vitest, or uses pytest when you use unittest. This happens when CLAUDE.md does not specify the test tooling.
+
+Fix: Add explicit test instructions to CLAUDE.md -- the exact command, the framework name, and where test files live.
+
+**Pattern: Agent creates files in the wrong directory**
+The agent puts a new component in `src/components/` when your convention is `src/features/{feature}/components/`. This happens when the project structure is not documented.
+
+Fix: Add a directory map to CLAUDE.md that shows where different types of files belong. Include the pattern, not just examples.
+
+**Pattern: Agent writes code that works but violates team conventions**
+The agent uses class components when your team uses functional components, or uses callbacks when your project uses async/await. The code works, but it does not match your codebase.
+
+Fix: Add a conventions section to CLAUDE.md with explicit do/don't examples. The agent follows what it sees documented.
+
+**Pattern: Agent gets stuck in an iteration loop**
+The agent tries to fix a test failure, introduces a new failure, fixes that, breaks something else, and loops. This usually means the task was too broad or the codebase has hidden dependencies.
+
+Fix: Break tasks into smaller scopes. Add dependency documentation to CLAUDE.md so the agent understands what touching one file affects.
+
+**Pattern: Agent ignores existing utilities**
+The agent writes a helper function that already exists in your codebase. It did not know to look for existing utilities.
+
+Fix: Document key utilities and shared modules in CLAUDE.md. Tell the agent where to find reusable code before writing new code.
+
+## What to Update
+
+When you identify a failure pattern, the fix lives in one of four places:
+
+| Update Target | When to Use | Example |
+|--------------|-------------|---------|
+| CLAUDE.md | Agent lacked context or conventions | Add test commands, directory structure, coding patterns |
+| .claude/settings.json | Agent was blocked by permissions | Add allowed commands, deny dangerous operations |
+| Workflow scripts | The workflow itself had gaps | Add a validation step, narrow the prompt scope |
+| Hooks | Agent needs automated guardrails | Add pre-commit hook to catch common mistakes |
+
+Most improvements go into CLAUDE.md. It is the single most impactful file for agent performance. A well-maintained CLAUDE.md grows over time as the team discovers what the agent needs to know.
+
+## Building an Improvement Cadence
+
+Ad-hoc improvement works, but a regular cadence works better. Here is a practical approach:
+
+**Weekly: scan transcripts.** Pick 3-5 recent agent sessions and skim the transcripts. Look for the failure patterns described above. Note any recurring themes.
+
+**Biweekly: update CLAUDE.md.** Based on the weekly scans, make targeted updates. Add missing conventions, clarify ambiguous instructions, document utilities the agent missed.
+
+**Monthly: review workflows.** Are the CI agent steps still relevant? Are the review prompts catching real issues? Has the false positive rate changed? Adjust prompts and thresholds.
+
+**Quarterly: audit permissions.** Review `.claude/settings.json`. Are there permissions that are too broad? Commands that were added temporarily and never removed? Tighten the allowlist.
+
+<MermaidDiagram chart={`flowchart LR
+    W["Weekly\nScan Transcripts"] --> B["Biweekly\nUpdate CLAUDE.md"]
+    B --> M["Monthly\nReview Workflows"]
+    M --> Q["Quarterly\nAudit Permissions"]
+    Q --> W
+    
+    style W fill:#bee3f8,stroke:#3182ce
+    style B fill:#c6f6d5,stroke:#38a169
+    style M fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style Q fill:#fed7d7,stroke:#e53e3e
+`} />
+
+## Measuring Improvement
+
+How do you know your agent configuration is getting better? Track these signals:
+
+- **First-try success rate** -- how often does the agent complete a task without needing correction? This should trend upward.
+- **Iteration count** -- how many attempt-fix cycles does the agent need per task? This should trend downward.
+- **Review rejection rate** -- how often do human reviewers reject agent-generated code? This should decrease.
+- **Time to completion** -- how long does the agent take per task? This should stabilize or decrease as context improves.
+- **False positive rate** -- for review workflows, how many findings are dismissed as non-issues? This should decrease.
+
+You do not need sophisticated tooling to track these. A simple spreadsheet or periodic notes in your team's docs is enough. The goal is trend awareness, not precise measurement.
+
+## The Compounding Effect
+
+Agent improvement compounds. Each fix to CLAUDE.md makes the agent better at every future task, not just the one that triggered the fix. Each convention you document prevents an entire class of mistakes. Each permission you properly configure eliminates a category of failures.
+
+After three months of consistent improvement, teams typically report:
+
+- The agent handles 80-90% of routine tasks without intervention
+- Code review comments shift from "wrong pattern" to "minor style preference"
+- New team members ramp up faster because CLAUDE.md is now comprehensive project documentation
+- The team spends less time correcting agent output and more time on architecture and design
+
+> Your CLAUDE.md is not just agent instructions -- it is the best documentation your project has ever had. The improvement cycle benefits humans and agents alike.
+
+## Anti-Patterns in Agent Improvement
+
+Avoid these common mistakes:
+
+- **Over-documenting** -- writing 50 pages of CLAUDE.md that the agent cannot fit in its context window. Keep it focused and prioritized.
+- **Under-iterating** -- setting up CLAUDE.md once and never updating it. The codebase evolves; the documentation must follow.
+- **Blaming the model** -- when the agent fails, the instinct is to say "the AI is not good enough." More often, the configuration is missing context. Check CLAUDE.md before blaming the model.
+- **Copying others' configs** -- every codebase is different. Another team's CLAUDE.md is a starting point, not a solution. Your improvement must be driven by your transcripts.
+- **Ignoring successes** -- teams focus on what went wrong but ignore what went right. When the agent nails a task, understand why so you can replicate those conditions.
+
+## Making Improvement a Team Sport
+
+Agent improvement works best when the whole team participates:
+
+- Share interesting transcript excerpts in team channels -- both failures and wins
+- Make CLAUDE.md updates part of code review -- when a reviewer spots a convention violation, ask "is this in CLAUDE.md?"
+- Rotate the transcript review responsibility so everyone builds the skill
+- Celebrate improvements -- when the first-try success rate goes up, acknowledge the work that went into it
+
+## Summary
+
+**Continuous agent improvement** is the practice of observing how agents perform in real tasks and iterating on your configuration based on what you learn. The raw material is **session transcripts**, which reveal hesitation patterns, wrong assumptions, permission blocks, and other signals that point to documentation gaps. Most fixes go into CLAUDE.md -- adding missing conventions, clarifying project structure, or documenting existing utilities. A regular cadence of weekly transcript scans, biweekly CLAUDE.md updates, monthly workflow reviews, and quarterly permission audits keeps the configuration sharp. The effect compounds: each improvement makes every future agent session more effective. The best agent configuration is not the one you write on day one -- it is the one you have refined through dozens of real-world iterations.

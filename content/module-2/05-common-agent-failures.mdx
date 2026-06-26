@@ -1,0 +1,320 @@
+---
+title: Common Agent Failures
+quiz:
+- question: What is 'path hallucination' in the context of AI coding agents?
+  options:
+  - The agent references file paths that do not exist, inventing plausible but incorrect paths
+  - The agent creates files in the wrong directory
+  - The agent reads the wrong version of a file
+  - The agent cannot find files because the project structure is too complex
+  correctIndex: 0
+- question: What is the best way to prevent an agent from making edits that break other parts of the codebase?
+  options:
+  - Give the agent read-only access to all files
+  - Limit the agent to editing one file per session
+  - Ensure the project has comprehensive tests and the agent is instructed to run them after changes
+  - Review every edit manually before the agent proceeds
+  correctIndex: 2
+- question: Why do agents sometimes produce 'drift' -- code that technically works but does not match the project's existing patterns?
+  options:
+  - Agents draw on general training data and may use patterns that differ from your project's conventions
+  - Agents deliberately introduce new patterns to improve the code
+  - Agents cannot read existing code, so they always start from scratch
+  correctIndex: 0
+- question: What is the most effective codebase-level defense against agent failures?
+  options:
+  - Using the latest and largest AI model available
+  - Combining clear documentation, consistent structure, comprehensive tests, and explicit conventions
+  - Restricting agents to only simple tasks
+  - Always having a human review before any change is applied
+  correctIndex: 1
+---
+
+## Overview
+
+AI coding agents fail. They fail in ways that are sometimes obvious and sometimes subtle, sometimes harmless and sometimes destructive. The good news is that **most agent failures follow predictable patterns**, and once you know those patterns, you can design your codebase to prevent them.
+
+This lesson catalogs the most common failure modes, explains why they happen (connecting back to the agent loop, context window, and decision-making concepts from earlier lessons), and provides concrete codebase-level strategies to prevent each one.
+
+## Failure Mode 1: Path Hallucination
+
+**Path hallucination** is when an agent references a file or directory that does not exist. The agent invents a plausible path based on common conventions and its understanding of the project -- but the path is wrong.
+
+<CodeBlock code={`# The agent confidently writes:
+# "Let me read the validation logic..."
+
+# Tool call:
+{
+  "tool": "Read",
+  "arguments": {
+    "file_path": "/project/src/utils/validators.ts"
+  }
+}
+
+# Result: ERROR - File not found
+
+# The actual file is at:
+# /project/src/lib/validation/index.ts
+
+# The agent guessed a conventional path
+# instead of searching for the real one
+`} language="json" filename="path-hallucination.json" />
+
+**Why it happens**: The LLM predicts likely file paths based on patterns in its training data. If your project uses an unconventional structure, the model's predictions will be wrong.
+
+**How to prevent it**:
+
+- Document your project structure in CLAUDE.md
+- Use conventional directory names where possible
+- Include a brief file map in your project documentation
+- Encourage agents to search before assuming paths
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent needs to find a file"] --> B{"Strategy?"}
+    B -->|Bad: Guess the path| C["Read /src/utils/validators.ts"]
+    C --> D["ERROR: File not found"]
+    D --> E["Wasted loop + tokens"]
+
+    B -->|Good: Search first| F["Search for 'validation'"]
+    F --> G["Found: src/lib/validation/index.ts"]
+    G --> H["Read the correct file"]
+
+    style C fill:#fff5f5,stroke:#e53e3e
+    style D fill:#fff5f5,stroke:#e53e3e
+    style F fill:#f0fff4,stroke:#38a169
+    style H fill:#f0fff4,stroke:#38a169
+`} />
+
+## Failure Mode 2: Editing the Wrong File
+
+This failure is more dangerous than path hallucination because it *succeeds* -- the agent makes changes, but to the wrong file. This often happens when:
+
+- Multiple files have similar names (e.g., `user.ts` in three different directories)
+- The agent loses track of which file it was working on after context truncation
+- The agent confuses a test file with the source file
+
+**Why it happens**: The agent's decision about which file to edit is based on its current context. If the context is ambiguous (multiple files match), the agent may pick the wrong one.
+
+**How to prevent it**:
+
+- Use unique, descriptive file names that clearly indicate purpose
+- Avoid having identically named files in different directories
+- Keep related files in the same directory so the agent encounters them together
+- Document the canonical location for important logic in CLAUDE.md
+
+## Failure Mode 3: Context Overflow Amnesia
+
+When the context window fills up and older messages are truncated, the agent can **forget critical information** it learned earlier. This manifests as:
+
+- Re-reading files it already read
+- Reversing decisions it made earlier in the session
+- Forgetting constraints ("do not change the public API") it acknowledged earlier
+- Losing track of a multi-step plan
+
+<CodeBlock code={`# Early in session (Turn 3):
+# Agent reads CLAUDE.md and notes:
+# "Important: All API responses must use the ResponseWrapper type"
+
+# ...40 turns of work later, context is truncated...
+
+# Turn 44:
+# Agent creates a new endpoint that returns raw data
+# without ResponseWrapper -- it forgot the constraint
+
+# The constraint was in the truncated portion
+# of the conversation history
+`} language="bash" filename="context-amnesia.sh" />
+
+**Why it happens**: Context overflow is a fundamental limitation of the architecture. The agent literally cannot see information that has been truncated.
+
+**How to prevent it**:
+
+- Keep critical constraints in CLAUDE.md (which is re-injected at every turn in some frameworks)
+- Break large tasks into smaller sessions to avoid hitting context limits
+- Use linters and type systems that enforce constraints automatically -- if the constraint is checked by tooling, the agent does not need to remember it
+- Keep files small to reduce per-turn token consumption
+
+## Failure Mode 4: The Infinite Fix Loop
+
+The **infinite fix loop** occurs when an agent's fix for one problem creates a new problem, and the fix for that creates another, cycling endlessly.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent edits function A"] --> B["Test for function B fails"]
+    B --> C["Agent edits function B to fix"]
+    C --> D["Test for function C fails"]
+    D --> E["Agent edits function C"]
+    E --> F["Test for function A fails<br/>(the original edit is now broken)"]
+    F --> G["Agent goes back to function A"]
+    G --> A
+
+    H["Root cause:"] --> I["Agent does not understand<br/>the dependency chain<br/>A → B → C → A"]
+
+    style A fill:#fff5f5,stroke:#e53e3e
+    style F fill:#fff5f5,stroke:#e53e3e
+    style H fill:#f0fff4,stroke:#38a169
+`} />
+
+**Why it happens**: The agent does not have a holistic understanding of the dependencies between components. It fixes problems locally without seeing the global impact.
+
+**How to prevent it**:
+
+- Make dependencies explicit through imports and type definitions
+- Document circular or complex dependencies in CLAUDE.md
+- Write tests that fail with clear error messages indicating the root cause, not just the symptom
+- Keep module coupling low -- loosely coupled code has fewer cascading failures
+
+## Failure Mode 5: Style and Convention Drift
+
+**Convention drift** is when the agent produces code that works correctly but does not match your project's style, patterns, or conventions. Examples include:
+
+- Using a different error handling pattern than the rest of the codebase
+- Naming variables in camelCase when the project uses snake_case
+- Creating a new utility function when an equivalent one already exists
+- Using a different library for the same purpose (e.g., adding axios when the project uses fetch)
+
+<CodeBlock code={`# Existing project pattern (src/services/user.ts):
+export async function getUser(id: string): Promise<Result<User>> {
+  try {
+    const user = await db.users.findById(id);
+    return Result.ok(user);
+  } catch (error) {
+    return Result.err(new ServiceError('USER_NOT_FOUND', error));
+  }
+}
+
+# Agent-generated code (does NOT match the pattern):
+export async function getUser(id: string): Promise<User | null> {
+  const user = await db.users.findById(id);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  return user;
+}
+
+# The agent used a different return type (User | null vs Result<User>),
+# a different error type (Error vs ServiceError),
+# and a different error handling approach (throw vs Result.err)
+`} language="bash" filename="convention-drift.sh" />
+
+**Why it happens**: The agent draws on its general training data, which contains millions of valid but different ways to write the same code. Without explicit guidance, it may pick a pattern from its training rather than matching your project's conventions.
+
+**How to prevent it**:
+
+- Document your conventions in CLAUDE.md: error handling, naming, patterns, preferred libraries
+- Use linters (eslint, ruff, rubocop) that enforce conventions automatically
+- Use type checking that catches type mismatches (TypeScript strict mode, mypy)
+- Include example code in your documentation that demonstrates the correct pattern
+
+> **Key insight**: Linters and type checkers are not just for humans. They serve as automated reviewers of agent output, catching convention drift before it reaches your codebase.
+
+## Failure Mode 6: Incomplete Changes
+
+An agent may make a change to one file but miss the other files that need corresponding updates. Common examples:
+
+- Changing a function signature without updating all call sites
+- Adding a new field to a data model without updating serialization, validation, and tests
+- Renaming a module without updating imports across the codebase
+
+**Why it happens**: The agent works with the files it has read. If related files are scattered across the project and the agent does not search for them, it will miss them.
+
+**How to prevent it**:
+
+- Use TypeScript, mypy, or other type systems that catch mismatches at compile time
+- Colocate related files (put the test next to the source, the types next to the implementation)
+- Run the build after changes -- build failures catch incomplete changes
+- Document cross-cutting concerns in CLAUDE.md ("When modifying the User type, also update the migration, the API schema, and the test fixtures")
+
+## Failure Mode 7: Hallucinated APIs and Syntax
+
+Agents sometimes use APIs that do not exist in the version of a library your project uses, or invent syntax that looks plausible but is incorrect.
+
+<CodeBlock code={`# Agent writes code using a non-existent method:
+const result = await prisma.user.findFirstOrCreate({
+  where: { email: input.email },
+  create: { email: input.email, name: input.name }
+});
+
+# The actual Prisma method is "upsert", not "findFirstOrCreate"
+# The agent conflated Prisma's API with another ORM's API
+
+# Correct code:
+const result = await prisma.user.upsert({
+  where: { email: input.email },
+  create: { email: input.email, name: input.name },
+  update: {}
+});
+`} language="bash" filename="api-hallucination.sh" />
+
+**Why it happens**: The LLM's training data includes many versions of many libraries. It may mix up APIs from different versions or even different libraries.
+
+**How to prevent it**:
+
+- Pin dependency versions and document them
+- Include a brief note about key library versions in CLAUDE.md
+- Use TypeScript or type-checking tools that catch invalid method calls
+- Keep lock files (package-lock.json, yarn.lock) committed so the agent can check actual versions
+
+## The Defense-in-Depth Strategy
+
+No single technique prevents all agent failures. The most resilient codebases use a **layered defense**:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Layer1["Layer 1: Documentation"]
+        A1["CLAUDE.md with conventions"]
+        A2["Architecture docs"]
+        A3["Inline code comments"]
+    end
+
+    subgraph Layer2["Layer 2: Code Structure"]
+        B1["Small, focused files"]
+        B2["Consistent naming"]
+        B3["Explicit dependencies"]
+    end
+
+    subgraph Layer3["Layer 3: Automated Checks"]
+        C1["Type checking"]
+        C2["Linting"]
+        C3["Formatting"]
+    end
+
+    subgraph Layer4["Layer 4: Tests"]
+        D1["Unit tests"]
+        D2["Integration tests"]
+        D3["Clear error messages"]
+    end
+
+    Layer1 --> Layer2 --> Layer3 --> Layer4
+
+    E["Agent makes a change"] --> Layer1
+    Layer4 --> F{"All layers pass?"}
+    F -->|Yes| G["Change is likely correct"]
+    F -->|No| H["Error caught before merging"]
+
+    style Layer1 fill:#f0fff4,stroke:#38a169
+    style Layer2 fill:#ebf8ff,stroke:#3182ce
+    style Layer3 fill:#fef3c7,stroke:#d69e2e
+    style Layer4 fill:#fff5f5,stroke:#e53e3e
+`} />
+
+Each layer catches different types of failures:
+
+- **Documentation** prevents the agent from making wrong assumptions
+- **Code structure** makes the right path obvious and the wrong path difficult
+- **Automated checks** catch syntax, type, and style errors immediately
+- **Tests** verify behavior is correct and catch regressions
+
+When all four layers are in place, agent failures are caught early and cheaply. When layers are missing, failures slip through and reach production.
+
+## Summary
+
+Agent failures are predictable and preventable. The seven common failure modes and their primary defenses are:
+
+- **Path hallucination** -- document project structure, use conventional paths
+- **Wrong file edits** -- use unique descriptive names, avoid duplicate filenames
+- **Context amnesia** -- keep constraints in always-loaded docs, break large tasks into sessions
+- **Infinite fix loops** -- reduce coupling, write clear error messages, document dependencies
+- **Convention drift** -- document patterns, enforce with linters and type checkers
+- **Incomplete changes** -- use type systems, colocate related files, run the build
+- **API hallucination** -- pin versions, use type checking, document key library versions
+
+The overarching principle: **make the right thing easy and the wrong thing detectable**. The next module will show you how to implement these defenses systematically, starting with the documentation layer.

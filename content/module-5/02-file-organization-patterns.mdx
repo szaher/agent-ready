@@ -1,0 +1,289 @@
+---
+title: File Organization Patterns
+quiz:
+- question: Which file organization pattern gives agents the best locality for feature-level work?
+  options:
+  - Feature-based colocation where all files for a feature live in the same directory
+  - Layer-based structure with separate controllers, services, and models directories
+  - Flat structure with all files in one directory
+  - Type-based structure where files are grouped by file extension
+  correctIndex: 0
+- question: What is a barrel file and why does it help agents?
+  options:
+  - A compressed archive of rarely-used source files
+  - A configuration file that lists all project dependencies
+  - An index file that re-exports a module's public API, giving agents a clear entry point
+  - A test file that validates the entire module at once
+  correctIndex: 2
+- question: When is a layer-based (MVC) structure acceptable for agent-ready codebases?
+  options:
+  - Never — it should always be avoided
+  - Only for projects with fewer than 10 files
+  - Only when using a framework that enforces it at the language level
+  - When the project is small enough that each layer directory contains few files, and the structure is consistent
+  correctIndex: 3
+- question: What problem does deep nesting (more than 4 levels) create for AI agents?
+  options:
+  - It makes the code run slower at runtime
+  - It forces the agent to spend tokens traversing directories, and long paths are harder to recall accurately
+  - It causes import paths to exceed maximum length limits
+  - It prevents version control from tracking changes
+  correctIndex: 1
+---
+
+## Overview
+
+The previous lesson established that project structure is the primary interface between an AI agent and your codebase. This lesson goes deeper: we examine four common file organization patterns, analyze each through the lens of agent navigation, and provide concrete directory layouts you can adopt. By the end, you will know which pattern to choose for your project size and which anti-patterns to avoid.
+
+## The Four Patterns
+
+Every codebase falls somewhere on a spectrum between four organizational strategies. Each has trade-offs for humans, but their impact on agents differs significantly.
+
+<MermaidDiagram chart={`graph LR
+    A["Flat"] -->|"growing pains"| B["Layer-Based"]
+    B -->|"feature growth"| C["Feature-Based"]
+    C -->|"scale demands"| D["Domain-Driven"]
+    style A fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style B fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style C fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style D fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+`} />
+
+## Pattern 1: Flat Structure
+
+In a flat structure, all source files live in a single directory or a very shallow hierarchy.
+
+<CodeBlock code={`project/
+├── main.py
+├── models.py
+├── routes.py
+├── database.py
+├── auth.py
+├── email.py
+├── config.py
+├── utils.py
+├── tests.py
+└── requirements.txt
+`} language="bash" filename="flat-structure" />
+
+**Agent impact:** Flat structures are highly discoverable for small projects. The agent lists one directory and immediately sees every file. There is zero navigation cost. However, flat structures break down rapidly. Once a project exceeds 15-20 files, the single directory becomes a wall of names that the agent must scan sequentially. There is no grouping to guide the agent toward the right files.
+
+**Best for:** Prototypes, scripts, and projects with fewer than 15 source files.
+
+**Agent verdict:** Good at small scale, terrible at medium or large scale.
+
+## Pattern 2: Layer-Based (MVC)
+
+Layer-based structure groups files by their architectural role: controllers handle requests, services contain business logic, models define data structures.
+
+<CodeBlock code={`src/
+├── controllers/
+│   ├── auth.controller.ts
+│   ├── users.controller.ts
+│   ├── billing.controller.ts
+│   └── notifications.controller.ts
+├── services/
+│   ├── auth.service.ts
+│   ├── users.service.ts
+│   ├── billing.service.ts
+│   └── notifications.service.ts
+├── models/
+│   ├── User.ts
+│   ├── Invoice.ts
+│   └── Notification.ts
+├── middleware/
+│   ├── auth.middleware.ts
+│   └── logging.middleware.ts
+├── utils/
+│   ├── helpers.ts
+│   └── validators.ts
+└── types/
+    ├── auth.types.ts
+    ├── users.types.ts
+    └── billing.types.ts
+`} language="bash" filename="layer-based-structure" />
+
+**Agent impact:** When an agent receives a task like "add email verification to user registration," it must visit `controllers/`, `services/`, `models/`, `types/`, and possibly `middleware/` and `utils/`. That is six directories to navigate, six sets of files to scan, and multiple unrelated files in each directory that the agent must read past. The agent builds its mental model by stitching together fragments from across the project.
+
+**Best for:** Small to medium projects using frameworks that encourage this pattern (Rails, Laravel, early Express apps).
+
+**Agent verdict:** Workable at small scale with consistent naming, but forces agents to scatter their attention across many directories for feature-level work.
+
+## Pattern 3: Feature-Based Colocation
+
+Feature-based structure groups all files related to a single feature or domain concept into one directory.
+
+<CodeBlock code={`src/
+├── auth/
+│   ├── index.ts
+│   ├── auth.service.ts
+│   ├── auth.controller.ts
+│   ├── auth.middleware.ts
+│   ├── auth.types.ts
+│   └── auth.test.ts
+├── users/
+│   ├── index.ts
+│   ├── users.service.ts
+│   ├── users.controller.ts
+│   ├── users.repository.ts
+│   ├── users.types.ts
+│   └── users.test.ts
+├── billing/
+│   ├── index.ts
+│   ├── billing.service.ts
+│   ├── billing.controller.ts
+│   ├── billing.types.ts
+│   └── billing.test.ts
+├── shared/
+│   ├── database.ts
+│   ├── logger.ts
+│   └── errors.ts
+└── app.ts
+`} language="bash" filename="feature-based-structure" />
+
+**Agent impact:** This is the sweet spot for most agents. When the task is "add email verification to user registration," the agent navigates to `src/users/` and finds everything it needs: the service, the controller, the types, and the tests. The **locality** is excellent -- the agent can focus on one directory and hold the complete context for that feature.
+
+The `index.ts` files serve as **barrel files** -- they re-export the module's public API, giving the agent a clear entry point for understanding what a module exposes.
+
+**Best for:** Medium to large projects where features map cleanly to directories.
+
+**Agent verdict:** The recommended default for agent-ready codebases. Excellent discoverability, predictability, and locality.
+
+## Pattern 4: Domain-Driven Structure
+
+Domain-driven structure extends feature-based colocation with explicit boundaries between domains, shared kernel libraries, and clear dependency direction.
+
+<CodeBlock code={`src/
+├── domains/
+│   ├── identity/
+│   │   ├── auth/
+│   │   │   ├── auth.service.ts
+│   │   │   ├── auth.controller.ts
+│   │   │   └── auth.test.ts
+│   │   └── users/
+│   │       ├── users.service.ts
+│   │       ├── users.aggregate.ts
+│   │       └── users.test.ts
+│   ├── commerce/
+│   │   ├── orders/
+│   │   │   ├── orders.service.ts
+│   │   │   └── orders.test.ts
+│   │   └── billing/
+│   │       ├── billing.service.ts
+│   │       └── billing.test.ts
+│   └── notifications/
+│       ├── email/
+│       │   └── email.service.ts
+│       └── sms/
+│           └── sms.service.ts
+├── shared/
+│   ├── database/
+│   ├── logging/
+│   └── errors/
+└── infrastructure/
+    ├── http/
+    ├── queue/
+    └── cache/
+`} language="bash" filename="domain-driven-structure" />
+
+**Agent impact:** Domain-driven structure adds an extra layer of nesting that costs the agent more navigation tokens, but the payoff is clearer boundaries. For large codebases, the domain grouping helps the agent understand which modules are related. However, the deeper nesting means the agent must traverse more directories, and the domain concepts (like "identity" vs. "commerce") may not be obvious without documentation.
+
+**Best for:** Large projects with complex business domains and multiple teams.
+
+**Agent verdict:** Justified for large codebases but requires documentation (a README in each domain directory) to make the domain concepts discoverable.
+
+## Comparing the Patterns
+
+<MermaidDiagram chart={`graph TD
+    subgraph Comparison["Pattern Comparison for Agents"]
+        subgraph Flat["Flat"]
+            F1["Discovery: Instant"]
+            F2["Locality: Perfect"]
+            F3["Scale: Poor"]
+        end
+        subgraph Layer["Layer-Based"]
+            L1["Discovery: Moderate"]
+            L2["Locality: Poor"]
+            L3["Scale: Moderate"]
+        end
+        subgraph Feature["Feature-Based"]
+            FE1["Discovery: Excellent"]
+            FE2["Locality: Excellent"]
+            FE3["Scale: Good"]
+        end
+        subgraph Domain["Domain-Driven"]
+            D1["Discovery: Good*"]
+            D2["Locality: Excellent"]
+            D3["Scale: Excellent"]
+        end
+    end
+    style Flat fill:#e2e8f0,stroke:#4a5568
+    style Layer fill:#fed7d7,stroke:#e53e3e
+    style Feature fill:#c6f6d5,stroke:#38a169
+    style Domain fill:#bee3f8,stroke:#3182ce
+`} />
+
+The asterisk on Domain-Driven discovery reflects that it depends on documentation -- without README files explaining domain concepts, agents must guess at the meaning of directory names like "identity" or "commerce."
+
+## Barrel Files: The Agent's Entry Point
+
+A **barrel file** (typically `index.ts` or `__init__.py`) re-exports the public API of a module. For agents, barrel files serve a critical purpose: they answer the question "what does this module provide?" without requiring the agent to read every file in the directory.
+
+<CodeBlock code={`// src/users/index.ts — barrel file
+
+export { UsersService } from './users.service';
+export { UsersController } from './users.controller';
+export { createUserRouter } from './users.routes';
+export type { User, CreateUserDTO, UpdateUserDTO } from './users.types';
+`} language="typescript" filename="src/users/index.ts" />
+
+When an agent reads this barrel file, it immediately understands:
+- The module exposes a service, a controller, a router factory, and three types
+- The service and controller are classes (capital names)
+- The router is created via a factory function
+- The types define a User entity and two DTOs for create/update operations
+
+Without the barrel file, the agent must open every file individually to discover the same information.
+
+> Every feature directory should have a barrel file. It costs you five minutes to write and saves the agent hundreds of tokens on every task.
+
+## Anti-Patterns to Avoid
+
+### Deep Nesting
+
+Limit directory depth to three or four levels from the project root. Anything deeper forces the agent to spend tokens on navigation and makes import paths harder to read and recall.
+
+<CodeBlock code={`# Bad: 7 levels deep
+src/modules/core/domain/entities/user/validators/EmailValidator.ts
+
+# Good: 3 levels deep
+src/users/validators.ts
+`} language="bash" filename="nesting-comparison" />
+
+### The "utils" Dumping Ground
+
+A directory named `utils/` or `helpers/` tells the agent nothing about what is inside. Agents cannot predict whether `utils.ts` contains string formatting, date math, authentication helpers, or database utilities. Distribute utility functions to the features that use them, or create specific directories like `src/shared/date-utils/` and `src/shared/string-utils/`.
+
+### Inconsistent Patterns
+
+Mixing organizational patterns is worse than using a suboptimal pattern consistently. If half your features use colocation and the other half use layer-based structure, the agent cannot rely on pattern recognition and must investigate each area independently.
+
+### Empty or Near-Empty Directories
+
+Directories with only one file add navigational overhead with no grouping benefit. If a directory contains a single file, consider moving that file up one level.
+
+## Putting It Into Practice
+
+Here is a checklist for evaluating your project's file organization:
+
+- Every feature has a single directory containing its service, controller, types, and tests
+- Each feature directory has a barrel file (`index.ts` or `__init__.py`)
+- Directory depth does not exceed four levels from the project root
+- No directory is named `utils`, `helpers`, or `misc` without further qualification
+- The same organizational pattern is used consistently across all features
+- Related files are never more than one directory apart
+- The `src/shared/` directory contains only truly cross-cutting code
+
+## Summary
+
+File organization patterns range from flat to domain-driven, each with distinct trade-offs for agent navigation. **Feature-based colocation** is the recommended default for agent-ready codebases: it puts all files for a single feature in one directory, minimizing the navigation cost and maximizing locality. Barrel files give agents a quick entry point into each module. Avoid deep nesting, vague directory names like `utils/`, and inconsistent patterns that force the agent to re-learn your structure for every feature. In the next lesson, we will examine how naming conventions within those directories further help agents understand your code.

@@ -1,0 +1,53 @@
+{
+  "id": 1,
+  "title": "Why Agent-Ready Matters",
+  "description": "Understand the agentic shift and why preparing your codebase for AI agents is a competitive advantage",
+  "color": "#68d391",
+  "lessons": [
+    {
+      "slug": "01-the-agentic-shift",
+      "title": "The Agentic Shift",
+      "description": "Why AI coding agents are reshaping how software gets built",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-what-is-agent-ready",
+      "title": "What Is Agent-Ready?",
+      "description": "Defining what makes a codebase ready for AI coding agents",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-agent-ready-maturity-model",
+      "title": "The Agent-Ready Maturity Model",
+      "description": "From chaos to excellence: a framework for measuring agent readiness",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-your-first-agent-session",
+      "title": "Your First Agent Session",
+      "description": "Hands-on: running an AI coding agent on a real repository",
+      "estimatedMinutes": 15,
+      "diagramTypes": ["sequence"],
+      "hasCode": true,
+      "hasQuiz": false
+    },
+    {
+      "slug": "05-measuring-agent-effectiveness",
+      "title": "Measuring Agent Effectiveness",
+      "description": "How to tell if your repo is agent-friendly and track improvements",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+---
+title: The Agentic Shift
+quiz:
+- question: What distinguishes an AI coding agent from a traditional autocomplete tool?
+  options:
+  - It can autonomously plan, execute, and iterate across multiple files
+  - It uses a larger language model
+  - It generates code faster
+  - It only works in specific programming languages
+  correctIndex: 0
+- question: Why does the agentic shift require changes to how codebases are structured?
+  options:
+  - Agents refuse to work on unstructured code
+  - Language models cannot parse source code without special formatting
+  - Agents rely on contextual signals like documentation, conventions, and project structure to operate effectively
+  - It is a requirement imposed by AI vendors
+  correctIndex: 2
+- question: Which of the following best describes the evolution of AI-assisted coding?
+  options:
+  - Autocomplete replaced copilots, which replaced agents
+  - Agents came first, then copilots simplified them into autocomplete
+  - All three are different names for the same technology
+  - Autocomplete, copilot, and agent represent increasing levels of autonomy and scope
+  correctIndex: 3
+---
+
+## Overview
+
+Something fundamental has changed in how software gets built. We have moved beyond AI tools that suggest the next line of code and into an era where **AI coding agents** can plan multi-step tasks, execute them across entire repositories, and iterate on their own work. This lesson explores what that shift means, why it matters, and what it demands from the codebases we build.
+
+## From Autocomplete to Autonomous Agent
+
+To understand where we are, it helps to see where we have been. AI-assisted coding has evolved through three distinct waves, each representing a leap in autonomy and capability.
+
+<MermaidDiagram chart={`graph LR
+    A["Wave 1\nAutocomplete"] -->|"more context"| B["Wave 2\nCopilot"]
+    B -->|"more autonomy"| C["Wave 3\nAgent"]
+    style A fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style B fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style C fill:#c6f6d5,stroke:#38a169,color:#1a202c
+`} />
+
+**Wave 1 -- Autocomplete** brought inline suggestions as you typed. Tools like GitHub Copilot's early mode and TabNine would predict the next few tokens based on the current file. The scope was narrow: one line, one file, one moment.
+
+**Wave 2 -- Copilot** expanded the aperture. Chat-based interfaces let you ask questions, generate entire functions, and explain code. You could paste in a file and get a refactored version back. But you were still the orchestrator -- copying, pasting, deciding where things go.
+
+**Wave 3 -- Agent** is the current frontier. Tools like **Claude Code**, **Cursor Agent Mode**, and **GitHub Copilot Workspace** can read your entire repository, plan a multi-file change, write the code, run the tests, read the errors, fix the issues, and iterate until the task is done. The human shifts from typist to reviewer.
+
+## What Makes an Agent Different
+
+The word "agent" gets overused, so let us be precise. An AI coding agent has four capabilities that set it apart from earlier tools:
+
+- **Planning** -- it breaks a high-level request into concrete steps
+- **Tool use** -- it reads files, writes files, runs terminal commands, searches codebases
+- **Iteration** -- it observes the results of its actions and adjusts its approach
+- **Multi-file scope** -- it operates across the entire repository, not just the current file
+
+<MermaidDiagram chart={`graph TD
+    subgraph Agent["AI Coding Agent"]
+        P["Plan"] --> E["Execute"]
+        E --> O["Observe"]
+        O --> A["Adjust"]
+        A --> E
+    end
+    U["Developer Request"] --> P
+    O --> R["Result"]
+    style Agent fill:#ebf8ff,stroke:#3182ce
+    style U fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style R fill:#c6f6d5,stroke:#38a169,color:#1a202c
+`} />
+
+This **plan-execute-observe-adjust loop** is the defining characteristic of agentic behavior. A copilot generates code when asked. An agent pursues a goal.
+
+## Why This Changes Everything
+
+When your coding assistant can autonomously navigate a codebase, the quality of that codebase becomes a direct multiplier on the assistant's effectiveness. Consider two scenarios:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Good["Well-Prepared Repo"]
+        G1["Clear CLAUDE.md"] --> G2["Agent understands context"]
+        G2 --> G3["Correct implementation"]
+        G3 --> G4["Tests pass first try"]
+    end
+    subgraph Bad["Unprepared Repo"]
+        B1["No documentation"] --> B2["Agent guesses at conventions"]
+        B2 --> B3["Wrong patterns used"]
+        B3 --> B4["Multiple fix cycles"]
+        B4 --> B2
+    end
+    style Good fill:#c6f6d5,stroke:#38a169
+    style Bad fill:#fed7d7,stroke:#e53e3e
+`} />
+
+In a well-prepared repository, an agent can read the project instructions, understand the architecture, follow the conventions, and produce code that a human reviewer would approve. In an unprepared one, the agent flails -- guessing at patterns, breaking conventions, and generating code that requires extensive rework.
+
+> The quality of your codebase is no longer just about human readability. It is about machine actionability.
+
+## The Cost of Ignoring the Shift
+
+Teams that do not adapt to the agentic shift face compounding disadvantages:
+
+- **Slower adoption** -- developers on the team cannot use agents effectively, so they stick with manual coding while competitors accelerate
+- **Wasted tokens** -- agents burn through context windows trying to understand poorly documented code, increasing costs with no return
+- **Review burden** -- when agents produce inconsistent code because the repo gives no guidance, humans spend more time reviewing and fixing than they would have spent writing it themselves
+- **Talent friction** -- developers increasingly expect agent-friendly tooling; repos that fight against agents become less attractive to work in
+
+## The Opportunity
+
+The flip side is equally powerful. Teams that prepare their codebases for agents unlock:
+
+- **Multiplicative output** -- a single developer with a well-configured agent can produce the throughput of a small team
+- **Consistent quality** -- agents follow documented conventions perfectly, every time, unlike humans who cut corners under pressure
+- **Faster onboarding** -- new team members can use the agent to navigate the codebase, understand patterns, and contribute meaningfully from day one
+- **Reduced toil** -- repetitive tasks like writing tests, updating boilerplate, and refactoring become delegatable
+
+## What "Agent-Ready" Looks Like (Preview)
+
+We will define **agent-ready** precisely in the next lesson, but here is the intuition: an agent-ready codebase is one where an AI agent can start working productively within seconds, not hours.
+
+This means the repo provides:
+
+- **Context** -- what the project is, how it is structured, what matters
+- **Conventions** -- how code should be written, tested, and organized
+- **Constraints** -- what must not be touched, what requires special handling
+- **Feedback loops** -- tests, linters, and type checkers that tell the agent whether its work is correct
+
+None of these are new ideas. Good documentation, clear structure, and automated checks have always been engineering best practices. What is new is that these practices now have a direct, measurable impact on how effectively your team can work with AI.
+
+## Summary
+
+The software industry is undergoing an **agentic shift** -- moving from AI tools that suggest code to AI agents that autonomously plan, execute, and iterate on complex tasks. This shift transforms your codebase from something humans read into something machines act on. Preparing for this shift is not optional; it is the difference between multiplying your team's output and watching your AI tools struggle with every task. In the next lesson, we will define exactly what makes a codebase "agent-ready" and break down the components that matter most.

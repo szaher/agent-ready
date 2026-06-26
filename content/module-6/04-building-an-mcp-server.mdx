@@ -1,0 +1,568 @@
+---
+title: "Building an MCP Server"
+---
+
+## Overview
+
+Pre-built MCP servers cover common services like GitHub and PostgreSQL, but every team has domain-specific tools that no generic server provides -- internal APIs, custom deployment pipelines, proprietary data stores, or company-specific workflows. This lesson walks through building a custom MCP server from scratch using the official TypeScript SDK. You will build a server that exposes project-specific tools an agent can use, and you will understand every layer of the process.
+
+## Why Build a Custom Server
+
+You should build a custom MCP server when:
+
+- You have an **internal API** that agents need to access (deployment, monitoring, feature flags)
+- You want to give agents **domain-specific operations** that do not map to a generic tool (e.g., "create a migration for our ORM" or "validate against our schema registry")
+- You need to **wrap complex workflows** as simple tool calls (e.g., a single "deploy to staging" tool that runs five steps behind the scenes)
+- You want to **enforce business rules** at the tool level (e.g., ensuring agents cannot deploy to production without a ticket number)
+
+> Think of an MCP server as a **domain expert translator** -- it understands both the MCP protocol and your specific systems, and it bridges the gap between them.
+
+## Project Setup
+
+We will build a project management MCP server that exposes three tools: listing team members, getting project status, and creating task summaries. This is a realistic pattern -- many teams have internal APIs that agents should be able to query.
+
+Start by initializing a new Node.js project:
+
+<CodeBlock code={`mkdir project-tools-mcp
+cd project-tools-mcp
+npm init -y
+npm install @modelcontextprotocol/sdk zod
+npm install -D typescript @types/node
+npx tsc --init`} language="bash" filename="terminal" />
+
+The key dependencies are:
+
+- **`@modelcontextprotocol/sdk`** -- the official MCP SDK that handles protocol details, transport, and message routing
+- **`zod`** -- used for defining and validating tool input schemas
+
+Configure TypeScript for ES modules:
+
+<CodeBlock code={`{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "declaration": true
+  },
+  "include": ["src/**/*"]
+}`} language="json" filename="tsconfig.json" />
+
+## The Server Skeleton
+
+Every MCP server follows the same basic structure: create a server instance, register capabilities, and start listening on a transport. Here is the minimal skeleton:
+
+<CodeBlock code={`import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+// Create the server
+const server = new McpServer({
+  name: "project-tools",
+  version: "1.0.0",
+});
+
+// Tools, resources, and prompts will be registered here
+
+// Start the server on stdio transport
+const transport = new StdioServerTransport();
+await server.connect(transport);`} language="typescript" filename="src/index.ts" />
+
+This is the frame around which everything else is built. The `McpServer` class handles all the protocol details -- JSON-RPC parsing, capability negotiation, message routing. You focus on defining what your tools do.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Server["project-tools MCP Server"]
+        SK["Server Skeleton\nMcpServer + StdioTransport"]
+        T1["Tool: list_team"]
+        T2["Tool: project_status"]
+        T3["Tool: create_summary"]
+        R1["Resource: team-directory"]
+        SK --> T1
+        SK --> T2
+        SK --> T3
+        SK --> R1
+    end
+    Agent["MCP Client\n(Claude Code)"] <-->|"stdio"| SK
+    style Server fill:#ebf8ff,stroke:#3182ce
+    style SK fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style T1 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style T2 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style T3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style R1 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style Agent fill:#e9d8fd,stroke:#805ad5,color:#1a202c
+`} />
+
+## Defining Tools
+
+Tools are the heart of most MCP servers. Each tool has a name, a description, an input schema, and a handler function. The SDK uses Zod for schema definition, which gives you both runtime validation and TypeScript type inference.
+
+Let us add our first tool -- listing team members:
+
+<CodeBlock code={`import { z } from "zod";
+
+// Simulated data store (replace with your actual API calls)
+const teamMembers = [
+  { name: "Alice Chen", role: "Backend Engineer", projects: ["auth", "payments"] },
+  { name: "Bob Martinez", role: "Frontend Engineer", projects: ["dashboard", "onboarding"] },
+  { name: "Carol Williams", role: "SRE", projects: ["infrastructure", "monitoring"] },
+  { name: "David Kim", role: "Backend Engineer", projects: ["search", "recommendations"] },
+];
+
+server.tool(
+  "list_team",
+  "List team members, optionally filtered by project",
+  {
+    project: z
+      .string()
+      .optional()
+      .describe("Filter by project name (e.g., 'auth', 'payments')"),
+  },
+  async ({ project }) => {
+    let members = teamMembers;
+
+    if (project) {
+      members = members.filter((m) =>
+        m.projects.some((p) => p.toLowerCase() === project.toLowerCase())
+      );
+    }
+
+    if (members.length === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: \`No team members found for project "\${project}".\`,
+          },
+        ],
+      };
+    }
+
+    const formatted = members
+      .map((m) => \`- \${m.name} (\${m.role}) — projects: \${m.projects.join(", ")}\`)
+      .join("\\n");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: \`Team members:\n\${formatted}\`,
+        },
+      ],
+    };
+  }
+);`} language="typescript" filename="src/index.ts" />
+
+Let us break down the `server.tool()` call:
+
+- **First argument** (`"list_team"`) -- the tool name the agent will use to call it
+- **Second argument** -- a human-readable description that helps the model understand when to use this tool
+- **Third argument** -- a Zod schema defining the input parameters. Each field can have a `.describe()` annotation that the model uses to understand what to pass
+- **Fourth argument** -- the async handler function that executes when the tool is called
+
+The handler returns a `content` array of content blocks. The most common type is `text`, but you can also return `image` blocks with base64-encoded images.
+
+## Adding More Tools
+
+Let us add a project status tool that aggregates information from multiple sources:
+
+<CodeBlock code={`const projectData: Record<string, {
+  status: string;
+  openIssues: number;
+  lastDeploy: string;
+  healthScore: number;
+}> = {
+  auth: {
+    status: "healthy",
+    openIssues: 3,
+    lastDeploy: "2025-01-15T10:30:00Z",
+    healthScore: 98,
+  },
+  payments: {
+    status: "degraded",
+    openIssues: 7,
+    lastDeploy: "2025-01-14T15:45:00Z",
+    healthScore: 85,
+  },
+  dashboard: {
+    status: "healthy",
+    openIssues: 1,
+    lastDeploy: "2025-01-15T09:00:00Z",
+    healthScore: 99,
+  },
+};
+
+server.tool(
+  "project_status",
+  "Get the current status of a project including health score, open issues, and last deployment",
+  {
+    project: z.string().describe("Project name (e.g., 'auth', 'payments', 'dashboard')"),
+  },
+  async ({ project }) => {
+    const data = projectData[project.toLowerCase()];
+
+    if (!data) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: \`Project "\${project}" not found. Available projects: \${Object.keys(projectData).join(", ")}\`,
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: [
+            \`Project: \${project}\`,
+            \`Status: \${data.status}\`,
+            \`Health Score: \${data.healthScore}/100\`,
+            \`Open Issues: \${data.openIssues}\`,
+            \`Last Deploy: \${data.lastDeploy}\`,
+          ].join("\\n"),
+        },
+      ],
+    };
+  }
+);`} language="typescript" filename="src/index.ts" />
+
+And a tool that creates a summary across all projects:
+
+<CodeBlock code={`server.tool(
+  "create_summary",
+  "Generate a summary report of all projects or a specific project, suitable for standups or status updates",
+  {
+    project: z
+      .string()
+      .optional()
+      .describe("Specific project to summarize. Omit for all projects."),
+    format: z
+      .enum(["brief", "detailed"])
+      .default("brief")
+      .describe("Output format: 'brief' for one-liners, 'detailed' for full status"),
+  },
+  async ({ project, format }) => {
+    const projects = project
+      ? { [project]: projectData[project.toLowerCase()] }
+      : projectData;
+
+    const lines: string[] = [];
+
+    for (const [name, data] of Object.entries(projects)) {
+      if (!data) continue;
+
+      if (format === "brief") {
+        const icon = data.status === "healthy" ? "OK" : "WARN";
+        lines.push(\`[\${icon}] \${name}: \${data.healthScore}/100, \${data.openIssues} open issues\`);
+      } else {
+        lines.push(\`## \${name}\`);
+        lines.push(\`- Status: \${data.status}\`);
+        lines.push(\`- Health: \${data.healthScore}/100\`);
+        lines.push(\`- Open issues: \${data.openIssues}\`);
+        lines.push(\`- Last deploy: \${data.lastDeploy}\`);
+        lines.push("");
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: lines.join("\\n"),
+        },
+      ],
+    };
+  }
+);`} language="typescript" filename="src/index.ts" />
+
+## Adding Resources
+
+Resources provide read-only data that agents can access without making a tool call. They are useful for reference information that the agent might need as context.
+
+<CodeBlock code={`server.resource(
+  "team-directory",
+  "team://directory",
+  async (uri) => {
+    const directory = teamMembers
+      .map((m) => \`\${m.name} | \${m.role} | \${m.projects.join(", ")}\`)
+      .join("\\n");
+
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/plain",
+          text: \`Name | Role | Projects\n\${"-".repeat(50)}\n\${directory}\`,
+        },
+      ],
+    };
+  }
+);`} language="typescript" filename="src/index.ts" />
+
+Resources use **URIs** to identify themselves. The URI scheme is up to you -- use something descriptive like `team://` or `project://` for your domain.
+
+## The Complete Server
+
+Here is the full server assembled into a single file:
+
+<CodeBlock code={`import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const server = new McpServer({
+  name: "project-tools",
+  version: "1.0.0",
+});
+
+// --- Data (replace with real API calls) ---
+
+const teamMembers = [
+  { name: "Alice Chen", role: "Backend Engineer", projects: ["auth", "payments"] },
+  { name: "Bob Martinez", role: "Frontend Engineer", projects: ["dashboard", "onboarding"] },
+  { name: "Carol Williams", role: "SRE", projects: ["infrastructure", "monitoring"] },
+  { name: "David Kim", role: "Backend Engineer", projects: ["search", "recommendations"] },
+];
+
+const projectData: Record<string, {
+  status: string;
+  openIssues: number;
+  lastDeploy: string;
+  healthScore: number;
+}> = {
+  auth: { status: "healthy", openIssues: 3, lastDeploy: "2025-01-15T10:30:00Z", healthScore: 98 },
+  payments: { status: "degraded", openIssues: 7, lastDeploy: "2025-01-14T15:45:00Z", healthScore: 85 },
+  dashboard: { status: "healthy", openIssues: 1, lastDeploy: "2025-01-15T09:00:00Z", healthScore: 99 },
+};
+
+// --- Tools ---
+
+server.tool(
+  "list_team",
+  "List team members, optionally filtered by project",
+  { project: z.string().optional().describe("Filter by project name") },
+  async ({ project }) => {
+    let members = teamMembers;
+    if (project) {
+      members = members.filter((m) =>
+        m.projects.some((p) => p.toLowerCase() === project.toLowerCase())
+      );
+    }
+    const formatted = members
+      .map((m) => \`- \${m.name} (\${m.role}) — \${m.projects.join(", ")}\`)
+      .join("\\n");
+    return {
+      content: [{ type: "text" as const, text: formatted || "No members found." }],
+    };
+  }
+);
+
+server.tool(
+  "project_status",
+  "Get current status of a project",
+  { project: z.string().describe("Project name") },
+  async ({ project }) => {
+    const data = projectData[project.toLowerCase()];
+    if (!data) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: \`Unknown project. Available: \${Object.keys(projectData).join(", ")}\`,
+        }],
+      };
+    }
+    return {
+      content: [{
+        type: "text" as const,
+        text: \`\${project}: \${data.status} | health \${data.healthScore}/100 | \${data.openIssues} issues | deployed \${data.lastDeploy}\`,
+      }],
+    };
+  }
+);
+
+server.tool(
+  "create_summary",
+  "Generate a status summary for standups",
+  {
+    project: z.string().optional().describe("Project name, or omit for all"),
+    format: z.enum(["brief", "detailed"]).default("brief").describe("Output format"),
+  },
+  async ({ project, format }) => {
+    const targets = project
+      ? [[project, projectData[project.toLowerCase()]]] as const
+      : Object.entries(projectData);
+
+    const lines = targets.map(([name, data]) => {
+      if (!data) return \`\${name}: not found\`;
+      if (format === "brief") {
+        return \`[\${data.status === "healthy" ? "OK" : "WARN"}] \${name}: \${data.healthScore}/100\`;
+      }
+      return \`## \${name}\\nStatus: \${data.status} | Health: \${data.healthScore} | Issues: \${data.openIssues}\`;
+    });
+
+    return {
+      content: [{ type: "text" as const, text: lines.join("\\n") }],
+    };
+  }
+);
+
+// --- Resources ---
+
+server.resource(
+  "team-directory",
+  "team://directory",
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      mimeType: "text/plain",
+      text: teamMembers.map((m) => \`\${m.name} | \${m.role} | \${m.projects.join(", ")}\`).join("\\n"),
+    }],
+  })
+);
+
+// --- Start ---
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+console.error("project-tools MCP server running on stdio");`} language="typescript" filename="src/index.ts" />
+
+Notice the `console.error` at the end -- MCP servers must write diagnostic output to **stderr**, not stdout. Stdout is reserved for JSON-RPC messages.
+
+## Building and Testing
+
+Compile and test your server:
+
+<CodeBlock code={`# Build
+npx tsc
+
+# Test by running directly (Ctrl+C to exit)
+node dist/index.js
+
+# You should see on stderr:
+# project-tools MCP server running on stdio
+
+# The server is now waiting for JSON-RPC input on stdin.
+# In practice, you won't interact with it manually --
+# the MCP client handles this.`} language="bash" filename="terminal" />
+
+## Connecting Your Server to Claude Code
+
+To use your server with Claude Code, add it to your project's MCP configuration. Since this is a local server, point the command at the compiled JavaScript file:
+
+<CodeBlock code={`{
+  "mcpServers": {
+    "project-tools": {
+      "command": "node",
+      "args": ["/absolute/path/to/project-tools-mcp/dist/index.js"]
+    }
+  }
+}`} language="json" filename=".claude/settings.json" />
+
+After restarting Claude Code, the agent will discover your three tools (`list_team`, `project_status`, `create_summary`) and the `team-directory` resource during initialization.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant CC as Claude Code
+    participant Server as project-tools
+
+    Note over CC,Server: Startup
+    CC->>Server: Start process (node dist/index.js)
+    CC->>Server: initialize
+    Server-->>CC: capabilities: {tools, resources}
+    CC->>Server: tools/list
+    Server-->>CC: [list_team, project_status, create_summary]
+    CC->>Server: resources/list
+    Server-->>CC: [team://directory]
+
+    Note over CC,Server: Usage
+    CC->>Server: tools/call {name: "project_status", arguments: {project: "payments"}}
+    Server-->>CC: "payments: degraded | health 85/100 | 7 issues"
+`} />
+
+Now you can ask your agent "What is the status of the payments project?" and it will call your custom MCP tool to get the answer.
+
+## Patterns for Real-World Servers
+
+The example above uses hardcoded data, but real servers call actual APIs. Here are patterns you will use in production:
+
+### Wrapping REST APIs
+
+<CodeBlock code={`server.tool(
+  "get_deployments",
+  "List recent deployments for a service",
+  {
+    service: z.string().describe("Service name"),
+    limit: z.number().default(5).describe("Number of deployments to return"),
+  },
+  async ({ service, limit }) => {
+    // Call your internal API
+    const response = await fetch(
+      \`https://deploy.internal.example.com/api/v1/services/\${service}/deployments?limit=\${limit}\`,
+      {
+        headers: {
+          Authorization: \`Bearer \${process.env.DEPLOY_API_TOKEN}\`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: \`Failed to fetch deployments: \${response.status} \${response.statusText}\`,
+        }],
+        isError: true,
+      };
+    }
+
+    const deployments = await response.json();
+    const formatted = deployments
+      .map((d: any) => \`\${d.version} — \${d.status} — \${d.timestamp}\`)
+      .join("\\n");
+
+    return {
+      content: [{ type: "text" as const, text: formatted }],
+    };
+  }
+);`} language="typescript" filename="src/tools/deployments.ts" />
+
+Note the `isError: true` flag in the error case. This tells the MCP client that the tool call failed, which helps the model decide whether to retry or report the error.
+
+### Handling Authentication via Environment Variables
+
+<CodeBlock code={`// Read credentials from environment at startup
+const API_TOKEN = process.env.DEPLOY_API_TOKEN;
+const DB_CONNECTION = process.env.DATABASE_URL;
+
+if (!API_TOKEN) {
+  console.error("ERROR: DEPLOY_API_TOKEN environment variable is required");
+  process.exit(1);
+}
+
+// Use in tool handlers
+// headers: { Authorization: \`Bearer \${API_TOKEN}\` }`} language="typescript" filename="src/config.ts" />
+
+Always validate required environment variables at startup. Failing fast with a clear error message is better than failing silently when the first tool call arrives.
+
+## Writing Effective Tool Descriptions
+
+The quality of your tool descriptions directly affects how well the agent uses your tools. The model reads these descriptions to decide which tool to call and what arguments to pass.
+
+Good descriptions:
+
+- State what the tool does in one sentence
+- Mention when to use it (and when not to)
+- Use domain language the model will encounter in user requests
+
+Compare these two descriptions:
+
+- Weak: `"Get data"` -- the model has no idea what data, when to use it, or what to expect
+- Strong: `"Get the current deployment status and health metrics for a service. Use when the user asks about uptime, deployment history, or service health."` -- the model knows exactly when this tool is relevant
+
+The same principle applies to parameter descriptions. Each `.describe()` annotation should tell the model what values are valid and what format to use.
+
+## Summary
+
+Building a custom MCP server lets you expose your team's domain-specific tools and internal APIs to any MCP-compatible agent. The process follows a consistent pattern: create a server with the SDK, define tools with Zod schemas and handler functions, optionally add resources for reference data, and connect via stdio transport. The key to effective servers is writing clear tool and parameter descriptions that help the model understand when and how to use each capability. In the next lesson, we will cover the production concerns -- security, authentication, performance, and deployment -- that matter when your MCP servers handle real data and real users.

@@ -1,0 +1,53 @@
+{
+  "id": 4,
+  "title": "Custom Agents and Multi-Agent Patterns",
+  "description": "Define specialized agents with focused roles, tools, and permissions for your project",
+  "color": "#b794f4",
+  "lessons": [
+    {
+      "slug": "01-why-custom-agents",
+      "title": "Why Custom Agents?",
+      "description": "When a general-purpose agent isn't enough and specialization pays off",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["comparison", "architecture"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-agent-definition-format",
+      "title": "The Agent Definition Format",
+      "description": "Anatomy of an agent markdown file: frontmatter, system prompt, and tool configuration",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-agent-tools-and-permissions",
+      "title": "Agent Tools and Permissions",
+      "description": "Controlling what each agent can read, write, execute, and access",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-building-a-custom-agent",
+      "title": "Building a Custom Agent",
+      "description": "Hands-on: creating a specialized code reviewer agent from scratch",
+      "estimatedMinutes": 15,
+      "diagramTypes": ["sequence"],
+      "hasCode": true,
+      "hasQuiz": false
+    },
+    {
+      "slug": "05-multi-agent-orchestration",
+      "title": "Multi-Agent Orchestration",
+      "description": "Patterns for coordinating multiple agents: teams, pipelines, and fan-out",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "sequence"],
+      "hasCode": true,
+      "hasQuiz": true
+    }
+  ]
+}

@@ -1,0 +1,474 @@
+---
+title: "Designing Your Safety Framework"
+---
+
+## Overview
+
+You have learned the three pillars of agent safety: permissions define what the agent can do, hooks inspect each action in context, and isolation contains the blast radius of mistakes. Now it is time to bring them together. This lesson walks you through designing and building a complete safety framework for a real project -- from the initial risk assessment to the final configuration files.
+
+By the end of this lesson, you will have a working `.claude/settings.json` with permission rules, hook scripts, and a worktree setup script that you can adapt for your own codebase.
+
+## Step 1: Assess Your Risk Profile
+
+Before writing any configuration, you need to understand what you are protecting and what the agent needs to do. This is not a theoretical exercise -- different projects have genuinely different risk profiles.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Start: Assess Risk Profile"] --> B{"Does the repo contain<br/>secrets or credentials?"}
+    B -->|Yes| C["HIGH: Add secret-scanning hook<br/>Deny all network commands"]
+    B -->|No| D{"Does the repo deploy<br/>to production?"}
+    D -->|Yes| E["HIGH: Deny CI/CD modifications<br/>Deny push to main"]
+    D -->|No| F{"Is the repo public?"}
+    F -->|Yes| G["MEDIUM: Deny push --force<br/>Require branch isolation"]
+    F -->|No| H["STANDARD: Basic deny rules<br/>Allowlist common commands"]
+    C --> I["Combine all applicable rules"]
+    E --> I
+    G --> I
+    H --> I
+    I --> J["Write settings.json"]
+    style C fill:#fed7d7,stroke:#e53e3e
+    style E fill:#fed7d7,stroke:#e53e3e
+    style G fill:#fef3c7,stroke:#d69e2e
+    style H fill:#c6f6d5,stroke:#38a169
+`} />
+
+Ask yourself these questions:
+
+- What commands does the agent need to run routinely? (build, test, lint, type-check)
+- What commands should never run? (deploy, publish, force-push, destructive deletes)
+- Are there directories or files that must never be modified? (CI/CD configs, infrastructure, secrets)
+- Does the agent need network access? (installing packages, fetching APIs)
+- Who reviews the agent's work, and when?
+
+Write down the answers. They become the inputs to your configuration.
+
+## Step 2: Build the Permission Layer
+
+Start with the deny list. This is the most important part of the configuration because deny rules cannot be overridden.
+
+<CodeBlock code={`{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(rm -r /:*)",
+      "Bash(sudo:*)",
+      "Bash(chmod 777:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git checkout -- .)",
+      "Bash(git clean -fd:*)",
+      "Bash(npm publish:*)",
+      "Bash(npx -y:*)",
+      "Bash(curl -X POST:*)",
+      "Bash(curl -X PUT:*)",
+      "Bash(curl -X DELETE:*)",
+      "Bash(wget:*)",
+      "Bash(eval:*)",
+      "Bash(exec:*)",
+      "Bash(docker run:*)",
+      "Bash(docker exec:*)",
+      "Bash(pip install:*)",
+      "Bash(gem install:*)"
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json (deny rules)" />
+
+Next, build the allow list based on the commands your agent needs for everyday work. Group them by category for readability.
+
+<CodeBlock code={`{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git stash list)",
+      "Bash(git rev-parse:*)",
+
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm format:*)",
+
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(diff:*)",
+      "Bash(which:*)",
+      "Bash(echo:*)",
+      "Bash(pwd)",
+      "Bash(date)",
+      "Bash(tree:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git checkout -- .)",
+      "Bash(git clean -fd:*)",
+      "Bash(npm publish:*)",
+      "Bash(npx -y:*)",
+      "Bash(curl -X POST:*)",
+      "Bash(curl -X PUT:*)",
+      "Bash(curl -X DELETE:*)",
+      "Bash(wget:*)",
+      "Bash(eval:*)",
+      "Bash(docker run:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json (permissions)" />
+
+Notice the structure: deny rules block the dangerous commands unconditionally, allow rules auto-approve the routine ones, and everything else falls through to the permission mode's default behavior (ask the user).
+
+## Step 3: Add Hook Scripts
+
+With permissions handling the broad strokes, hooks add the fine-grained control. Create a hooks directory and build the scripts.
+
+<CodeBlock code={`mkdir -p .claude/hooks
+`} language="bash" filename="terminal" />
+
+### Pre-Tool Hook: Comprehensive Command Validator
+
+This hook combines multiple validation checks into a single script.
+
+<CodeBlock code={`#!/bin/bash
+# .claude/hooks/pre-validate.sh
+# Comprehensive pre-tool validation hook
+# Validates commands and file paths before execution
+
+set -euo pipefail
+
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
+
+case "$TOOL" in
+  Bash)
+    COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+
+    # Block commands that modify protected directories
+    PROTECTED_DIRS=(".github/workflows" ".circleci" "terraform" "infrastructure" "k8s" "deploy")
+    for dir in "\${PROTECTED_DIRS[@]}"; do
+      if echo "$COMMAND" | grep -q "$dir"; then
+        echo "BLOCKED: Command targets protected directory: $dir" >&2
+        echo "These directories require manual changes." >&2
+        exit 1
+      fi
+    done
+
+    # Block commands that could leak secrets
+    if echo "$COMMAND" | grep -qE "(printenv|env|set ).*((API|SECRET|TOKEN|KEY|PASSWORD|CREDENTIAL))" ; then
+      echo "BLOCKED: Command may expose environment secrets" >&2
+      exit 1
+    fi
+    ;;
+
+  Edit|Write)
+    FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+
+    # Block edits to lock files
+    if echo "$FILE_PATH" | grep -qE "(package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|Gemfile\\.lock|poetry\\.lock|go\\.sum)$"; then
+      echo "BLOCKED: Cannot modify lock file: $FILE_PATH" >&2
+      echo "Lock files should be regenerated by package managers." >&2
+      exit 1
+    fi
+
+    # Block edits to environment files
+    if echo "$FILE_PATH" | grep -qE "(\\.env|\\.env\\..*)$"; then
+      echo "BLOCKED: Cannot modify environment file: $FILE_PATH" >&2
+      echo "Environment files may contain secrets." >&2
+      exit 1
+    fi
+
+    # Block edits to CI/CD configuration
+    if echo "$FILE_PATH" | grep -qE "(\\.github/workflows/|\\.circleci/|Jenkinsfile|.gitlab-ci)"; then
+      echo "BLOCKED: Cannot modify CI/CD configuration: $FILE_PATH" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+exit 0
+`} language="bash" filename=".claude/hooks/pre-validate.sh" />
+
+### Post-Tool Hook: Lint and Log
+
+This hook runs after file edits to maintain code quality and create an audit trail.
+
+<CodeBlock code={`#!/bin/bash
+# .claude/hooks/post-action.sh
+# Post-tool hook: lint modified files and log all actions
+
+set -uo pipefail
+
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Ensure log directory exists
+LOG_DIR=".claude/logs"
+mkdir -p "$LOG_DIR"
+
+# Log every action
+case "$TOOL" in
+  Bash)
+    COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+    echo "$TIMESTAMP | BASH | $COMMAND" >> "$LOG_DIR/agent-audit.log"
+    ;;
+  Edit|Write)
+    FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+    echo "$TIMESTAMP | $TOOL | $FILE_PATH" >> "$LOG_DIR/agent-audit.log"
+
+    # Run linter on modified file if it exists
+    if [ -f "$FILE_PATH" ]; then
+      EXT="\${FILE_PATH##*.}"
+      case "$EXT" in
+        ts|tsx|js|jsx)
+          npx eslint --fix "$FILE_PATH" 2>/dev/null || true
+          ;;
+        py)
+          ruff check --fix "$FILE_PATH" 2>/dev/null || true
+          ;;
+        go)
+          gofmt -w "$FILE_PATH" 2>/dev/null || true
+          ;;
+      esac
+    fi
+    ;;
+esac
+
+exit 0
+`} language="bash" filename=".claude/hooks/post-action.sh" />
+
+### Register the Hooks
+
+Add the hook configuration to your settings file.
+
+<CodeBlock code={`{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm build:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(npm publish:*)",
+      "Bash(eval:*)",
+      "Bash(docker run:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hook": "bash .claude/hooks/pre-validate.sh"
+      },
+      {
+        "matcher": "Edit",
+        "hook": "bash .claude/hooks/pre-validate.sh"
+      },
+      {
+        "matcher": "Write",
+        "hook": "bash .claude/hooks/pre-validate.sh"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hook": "bash .claude/hooks/post-action.sh"
+      },
+      {
+        "matcher": "Write",
+        "hook": "bash .claude/hooks/post-action.sh"
+      },
+      {
+        "matcher": "Bash",
+        "hook": "bash .claude/hooks/post-action.sh"
+      }
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json (complete)" />
+
+## Step 4: Set Up Worktree Isolation
+
+Create a reusable script that sets up an isolated worktree for every agent session.
+
+<CodeBlock code={`#!/bin/bash
+# scripts/agent-session.sh
+# Sets up an isolated worktree for an agent session
+# Usage: bash scripts/agent-session.sh <task-description>
+
+set -euo pipefail
+
+TASK="\${1:?Usage: agent-session.sh <task-description>}"
+# Sanitize task name for use as branch/directory name
+SAFE_TASK=$(echo "$TASK" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | head -c 50)
+BRANCH="agent/$SAFE_TASK"
+WORKTREE_DIR=".claude/worktrees/$SAFE_TASK"
+
+# Ensure we are in a git repository
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "Error: not inside a git repository" >&2
+  exit 1
+fi
+
+# Create the branch from current HEAD
+if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+  echo "Branch $BRANCH already exists. Reusing it."
+else
+  git branch "$BRANCH" HEAD
+  echo "Created branch: $BRANCH"
+fi
+
+# Create the worktree
+if [ -d "$WORKTREE_DIR" ]; then
+  echo "Worktree already exists at $WORKTREE_DIR"
+else
+  mkdir -p "$(dirname "$WORKTREE_DIR")"
+  git worktree add "$WORKTREE_DIR" "$BRANCH"
+  echo "Created worktree: $WORKTREE_DIR"
+fi
+
+# Copy settings to worktree if they exist
+if [ -d ".claude" ]; then
+  cp -r .claude/settings.json "$WORKTREE_DIR/.claude/settings.json" 2>/dev/null || true
+  cp -r .claude/hooks "$WORKTREE_DIR/.claude/hooks" 2>/dev/null || true
+fi
+
+echo ""
+echo "================================================"
+echo "  Agent session ready"
+echo "================================================"
+echo "  Worktree: $WORKTREE_DIR"
+echo "  Branch:   $BRANCH"
+echo ""
+echo "  Start your agent in this directory:"
+echo "    cd $WORKTREE_DIR"
+echo ""
+echo "  When done, review changes:"
+echo "    git -C $WORKTREE_DIR diff main..HEAD"
+echo ""
+echo "  Clean up:"
+echo "    git worktree remove $WORKTREE_DIR"
+echo "    git branch -D $BRANCH"
+echo "================================================"
+`} language="bash" filename="scripts/agent-session.sh" />
+
+## Step 5: Add Gitignore Rules
+
+Make sure transient agent files do not pollute your repository.
+
+<CodeBlock code={`# Agent worktrees (created per-session, never committed)
+.claude/worktrees/
+
+# Agent audit logs (review locally, do not commit)
+.claude/logs/
+
+# Temporary hook artifacts
+.claude/tmp/
+`} language="gitignore" filename=".gitignore (additions)" />
+
+## Step 6: Document the Safety Policy
+
+Add a section to your CLAUDE.md that tells the agent about the safety rules it is operating under. This helps the agent understand why certain actions are blocked and avoid wasting cycles trying to circumvent them.
+
+<CodeBlock code={`# Safety Policy
+
+## Permissions
+- You may read any file in the repository
+- You may edit source files in src/, tests/, and docs/
+- You may run: git status, git diff, git log, pnpm test, pnpm lint, pnpm build
+- You may NOT run: rm -rf, git push, sudo, npm publish, docker run
+- You may NOT modify: .env files, lock files, CI/CD configurations, infrastructure/
+
+## Workflow
+- Always work on a feature branch, never directly on main
+- Run tests after making changes: pnpm test
+- Run the linter before finishing: pnpm lint
+- If a pre-commit hook fails, fix the issue and try again
+
+## When Blocked
+- If a hook blocks your action, read the error message
+- Find an alternative approach that does not require the blocked action
+- Ask the developer if you are unsure how to proceed
+`} language="markdown" filename="CLAUDE.md (safety section)" />
+
+## Putting It All Together
+
+Here is the complete directory structure for a project with a fully configured safety framework:
+
+<CodeBlock code={`your-project/
+  .claude/
+    settings.json          # Permissions + hook configuration
+    hooks/
+      pre-validate.sh      # Pre-tool validation hook
+      post-action.sh       # Post-tool lint + logging hook
+    worktrees/             # (gitignored) Agent worktrees live here
+    logs/                  # (gitignored) Audit logs
+  scripts/
+    agent-session.sh       # Creates isolated worktree for agent
+    cleanup-worktrees.sh   # Removes stale worktrees
+  CLAUDE.md                # Includes safety policy section
+  .gitignore               # Excludes worktrees and logs
+`} language="text" filename="project structure" />
+
+## Adapting for Your Project
+
+The configuration above is a starting template. Here is how to adapt it for common project types.
+
+**Python projects**: Replace `pnpm` commands with `pytest`, `ruff`, `mypy`. Add `Bash(python:*)` and `Bash(pip list:*)` to the allowlist. Keep `pip install` in the deny list so the agent cannot add dependencies without review.
+
+**Go projects**: Allow `Bash(go test:*)`, `Bash(go build:*)`, `Bash(go vet:*)`. Deny `Bash(go install:*)` if you do not want the agent adding tools to the system.
+
+**Monorepos**: Extend the file path hook to check which workspace a file belongs to and apply different rules per workspace. An agent working on the frontend should not be able to modify backend infrastructure.
+
+**CI/CD agents**: Use bypass mode inside a Docker container with `network_mode: none`. The container itself is the safety boundary. Add post-hooks that create a PR rather than pushing directly.
+
+## The Iteration Mindset
+
+Your safety framework is never finished. It evolves as you learn more about how agents interact with your codebase.
+
+- **Week 1**: Start with strict permissions and default (ask-first) mode. Watch what the agent asks for.
+- **Week 2**: Add frequently approved commands to the allowlist. Add hooks for any patterns that need validation.
+- **Month 1**: Move to worktree isolation for autonomous sessions. Set up the review-gate workflow.
+- **Month 3**: Consider container isolation for CI/CD. Build team-specific audit logging.
+- **Ongoing**: Review the audit logs periodically. Update deny rules when you discover new risks. Remove allow rules for commands the agent no longer needs.
+
+> **The goal is not perfection from day one. The goal is a framework that improves with every agent session.**
+
+## Summary
+
+Designing a safety framework means bringing together all three pillars into a coherent configuration. Start with a **risk assessment** to understand what you are protecting. Build **deny rules** for the most dangerous commands. Add **allow rules** for routine operations. Layer in **hooks** for context-aware validation and automatic quality checks. Set up **worktree isolation** so agent mistakes are always reversible. Document the policy in **CLAUDE.md** so the agent understands its boundaries. Commit the configuration to version control so every developer and CI job gets the same rules. Then iterate: watch, learn, and refine. Safety is not a one-time setup -- it is a practice that matures alongside your team's relationship with AI agents.

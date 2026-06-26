@@ -1,0 +1,343 @@
+---
+title: The Hooks System
+quiz:
+- question: What is the key difference between permissions and hooks?
+  options:
+  - Permissions are static allow/deny rules while hooks run custom logic before or after each action
+  - Permissions are for shell commands and hooks are for file edits
+  - Hooks are faster to evaluate than permissions
+  - Permissions are defined in JSON and hooks are defined in YAML
+  correctIndex: 0
+- question: What happens when a pre-tool hook exits with a non-zero exit code?
+  options:
+  - The agent retries the action with different arguments
+  - The action proceeds but a warning is logged
+  - The action is blocked and the agent receives an error message
+  - The entire agent session is terminated
+  correctIndex: 2
+- question: Which hook event type would you use to run a linter after every file edit?
+  options:
+  - PreToolUse on the Bash tool
+  - PostToolUse on the Bash tool
+  - PreToolUse on the Read tool
+  - PostToolUse on the Write or Edit tool
+  correctIndex: 3
+---
+
+## Overview
+
+Permissions tell the agent what it can and cannot do. But permissions are static -- they apply the same rules regardless of context. What if you want to block shell commands only when they target certain directories? Or run a linter automatically after every file edit? Or log every command the agent executes for audit purposes?
+
+This is where **hooks** come in. Hooks are shell commands that the agent framework executes before or after specific tool calls, giving you dynamic, context-aware control over agent behavior. They are the security guards standing at each gate, inspecting every action in real time.
+
+## How Hooks Work
+
+A hook is a shell command that runs at a specific point in the agent's workflow. There are two types:
+
+**Pre-tool hooks** run before the agent's action executes. They can inspect the action, validate it against custom rules, and either allow it (exit code 0) or block it (non-zero exit code). A blocked action is reported back to the agent as an error.
+
+**Post-tool hooks** run after the agent's action completes. They cannot block the action (it already happened), but they can log it, run follow-up commands like linters, send notifications, or update audit trails.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Agent
+    participant Framework
+    participant PreHook as Pre-Hook
+    participant Tool
+    participant PostHook as Post-Hook
+
+    Agent->>Framework: Request tool call
+    Framework->>PreHook: Run pre-hook script
+    alt Hook exits 0
+        PreHook-->>Framework: ALLOW (exit 0)
+        Framework->>Tool: Execute tool
+        Tool-->>Framework: Result
+        Framework->>PostHook: Run post-hook script
+        PostHook-->>Framework: Done
+        Framework-->>Agent: Return result
+    else Hook exits non-zero
+        PreHook-->>Framework: BLOCK (exit 1)
+        Framework-->>Agent: Error: action blocked by hook
+    end
+`} />
+
+The critical design principle is that **pre-hooks are gates** (they can stop execution) while **post-hooks are observers** (they react to what happened). This separation gives you both preventive and detective controls.
+
+## Hook Configuration
+
+Hooks are configured in the same `settings.json` file that holds permissions. Each hook specifies an event type, an optional match pattern, and the command to execute.
+
+<CodeBlock code={`{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hook": "bash /path/to/project/.claude/hooks/validate-command.sh"
+      },
+      {
+        "matcher": "Edit",
+        "hook": "bash /path/to/project/.claude/hooks/check-file-path.sh"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hook": "bash /path/to/project/.claude/hooks/run-linter.sh"
+      },
+      {
+        "matcher": "Bash",
+        "hook": "bash /path/to/project/.claude/hooks/log-command.sh"
+      }
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json" />
+
+### Event Types
+
+The two primary event types are:
+
+- **PreToolUse** -- fires before a tool call executes. The hook receives the tool name and arguments as input. Returning a non-zero exit code blocks the action.
+- **PostToolUse** -- fires after a tool call completes. The hook receives the tool name, arguments, and result. The return code is logged but does not affect the agent.
+
+### Matcher Patterns
+
+The **matcher** field filters which tool calls trigger the hook. Common matchers include:
+
+- `"Bash"` -- matches all shell command executions
+- `"Edit"` -- matches file edit operations
+- `"Write"` -- matches file write operations
+- `"Read"` -- matches file read operations
+
+If no matcher is specified, the hook fires for every tool call.
+
+### Hook Input
+
+The hook script receives the tool call details through **environment variables** and **stdin**. The exact mechanism varies by agent framework, but typically includes:
+
+- The tool name (e.g., `Bash`, `Edit`, `Write`)
+- The tool arguments (e.g., the command string, the file path, the edit content)
+- For post-hooks: the tool result
+
+## Building a Pre-Tool Hook: Command Validation
+
+Let us build a practical pre-tool hook that validates shell commands before they execute. This hook blocks commands that target protected directories or use dangerous patterns.
+
+<CodeBlock code={`#!/bin/bash
+# validate-command.sh
+# Pre-tool hook for Bash commands
+# Blocks commands targeting protected paths or using dangerous patterns
+
+# The command is passed via stdin as JSON
+INPUT=$(cat)
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+
+# If no command found, allow
+if [ -z "$COMMAND" ]; then
+  exit 0
+fi
+
+# Deny patterns -- block these unconditionally
+DENY_PATTERNS=(
+  "rm -rf /"
+  "rm -rf ~"
+  "rm -rf \."
+  "git push.*--force"
+  "git reset --hard"
+  "> /dev/sda"
+  "mkfs\."
+  "dd if="
+  ":(){ :|:& };:"
+)
+
+for pattern in "\${DENY_PATTERNS[@]}"; do
+  if echo "$COMMAND" | grep -qE "$pattern"; then
+    echo "BLOCKED: Command matches deny pattern: $pattern" >&2
+    exit 1
+  fi
+done
+
+# Protected directories -- block modifications
+PROTECTED_DIRS=(
+  ".github/workflows"
+  ".circleci"
+  "infrastructure/"
+  "terraform/"
+  "k8s/"
+)
+
+for dir in "\${PROTECTED_DIRS[@]}"; do
+  if echo "$COMMAND" | grep -q "$dir"; then
+    echo "BLOCKED: Command targets protected directory: $dir" >&2
+    exit 1
+  fi
+done
+
+# Command is allowed
+exit 0
+`} language="bash" filename=".claude/hooks/validate-command.sh" />
+
+This script demonstrates the core pattern: parse the input, check against rules, exit 0 to allow or exit 1 to block. The error message sent to stderr is relayed back to the agent, which can adjust its approach.
+
+## Building a Pre-Tool Hook: File Path Protection
+
+A second common hook validates file edits to prevent the agent from modifying files it should not touch.
+
+<CodeBlock code={`#!/bin/bash
+# check-file-path.sh
+# Pre-tool hook for Edit/Write operations
+# Blocks edits to protected files and directories
+
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+
+if [ -z "$FILE_PATH" ]; then
+  exit 0
+fi
+
+# Protected file patterns
+PROTECTED=(
+  "package-lock.json"
+  "yarn.lock"
+  "pnpm-lock.yaml"
+  ".env"
+  ".env.local"
+  ".env.production"
+  "*.pem"
+  "*.key"
+  "*.cert"
+)
+
+FILENAME=$(basename "$FILE_PATH")
+
+for pattern in "\${PROTECTED[@]}"; do
+  if [[ "$FILENAME" == $pattern ]]; then
+    echo "BLOCKED: Cannot modify protected file: $FILENAME" >&2
+    exit 1
+  fi
+done
+
+# Protected directories
+if [[ "$FILE_PATH" == *".github/workflows"* ]] || \
+   [[ "$FILE_PATH" == *"terraform/"* ]] || \
+   [[ "$FILE_PATH" == *".claude/settings.json"* ]]; then
+  echo "BLOCKED: Cannot modify files in protected directory" >&2
+  exit 1
+fi
+
+exit 0
+`} language="bash" filename=".claude/hooks/check-file-path.sh" />
+
+> **Tip**: The agent receives the error message from your hook. Write clear messages so the agent understands why the action was blocked and can try a different approach.
+
+## Building a Post-Tool Hook: Auto-Linting
+
+Post-tool hooks are ideal for automated quality checks. This hook runs a linter whenever the agent edits a file, catching style issues immediately.
+
+<CodeBlock code={`#!/bin/bash
+# run-linter.sh
+# Post-tool hook for Edit/Write operations
+# Runs the appropriate linter based on file extension
+
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+
+if [ -z "$FILE_PATH" ] || [ ! -f "$FILE_PATH" ]; then
+  exit 0
+fi
+
+EXTENSION="\${FILE_PATH##*.}"
+
+case "$EXTENSION" in
+  ts|tsx)
+    npx eslint --fix "$FILE_PATH" 2>/dev/null
+    ;;
+  py)
+    ruff check --fix "$FILE_PATH" 2>/dev/null
+    ;;
+  go)
+    gofmt -w "$FILE_PATH" 2>/dev/null
+    ;;
+  rs)
+    rustfmt "$FILE_PATH" 2>/dev/null
+    ;;
+esac
+
+exit 0
+`} language="bash" filename=".claude/hooks/run-linter.sh" />
+
+Since this is a post-hook, it runs after the edit is applied. The linter fixes are applied directly to the file, so the next time the agent reads it, the code is already formatted correctly.
+
+## Building a Post-Tool Hook: Audit Logging
+
+For teams that need to track what agents do, an audit logging hook records every command execution.
+
+<CodeBlock code={`#!/bin/bash
+# log-command.sh
+# Post-tool hook for Bash commands
+# Appends every command execution to an audit log
+
+INPUT=$(cat)
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+TOOL=$(echo "$INPUT" | jq -r '.tool_name // "unknown"')
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+LOG_DIR=".claude/logs"
+mkdir -p "$LOG_DIR"
+
+echo "$TIMESTAMP | $TOOL | $COMMAND" >> "$LOG_DIR/agent-audit.log"
+
+exit 0
+`} language="bash" filename=".claude/hooks/log-command.sh" />
+
+This creates a timestamped record of every action. Teams in regulated industries can use this log for compliance auditing.
+
+## Hook Execution Flow
+
+When multiple hooks are configured for the same event type, they execute in order. For pre-hooks, all must pass (exit 0) for the action to proceed. If any hook blocks, the action is stopped.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent requests Bash command"] --> B["Pre-Hook 1: validate-command.sh"]
+    B -->|exit 0| C["Pre-Hook 2: check-project-rules.sh"]
+    B -->|exit 1| X["BLOCKED"]
+    C -->|exit 0| D["Execute command"]
+    C -->|exit 1| X
+    D --> E["Post-Hook 1: log-command.sh"]
+    E --> F["Post-Hook 2: notify-team.sh"]
+    F --> G["Return result to agent"]
+    style X fill:#fed7d7,stroke:#e53e3e
+    style D fill:#c6f6d5,stroke:#38a169
+    style G fill:#ebf8ff,stroke:#3182ce
+`} />
+
+This pipeline model means you can decompose your safety logic into small, focused hooks rather than building one monolithic script. Each hook handles one concern: one validates commands, another checks file paths, another enforces naming conventions.
+
+## Hooks vs. Permissions: When to Use Which
+
+Permissions and hooks serve different purposes and should be used together, not as alternatives.
+
+**Use permissions when**:
+- The rule is simple and static (allow `git status`, deny `rm -rf`)
+- The rule applies regardless of context
+- You want zero-latency evaluation (permissions are checked in-process)
+
+**Use hooks when**:
+- The rule depends on context (block edits to files in certain directories)
+- You need custom logic (validate that a command does not target production)
+- You want side effects (logging, linting, notifications)
+- You need to inspect the content of the action, not just its type
+
+> The best configurations use both: permissions for the broad strokes and hooks for the fine detail.
+
+## Performance Considerations
+
+Hooks add latency to every tool call they match. A few guidelines to keep them fast:
+
+- Keep hook scripts under 100 milliseconds of execution time
+- Use simple string matching (grep) rather than complex parsing
+- Avoid network calls in pre-hooks (they block the agent)
+- For post-hooks, consider running expensive operations asynchronously
+- Limit the number of hooks per event type -- two or three is typical
+
+## Summary
+
+The **hooks system** adds dynamic, context-aware control to the static rules of permissions. **Pre-tool hooks** validate actions before they execute and can block dangerous operations. **Post-tool hooks** run after actions complete and are ideal for linting, logging, and notifications. Hooks are configured in `settings.json` alongside permissions, using matchers to target specific tool types. The combination of static permissions (broad rules) and dynamic hooks (contextual logic) creates a layered safety system where the agent can work productively while every action is inspected against your project's specific requirements. In the next lesson, we will add the third pillar: sandboxing and isolation.

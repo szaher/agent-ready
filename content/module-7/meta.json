@@ -1,0 +1,53 @@
+{
+  "id": 7,
+  "title": "Hooks, Permissions, and Safety",
+  "description": "Control what agents can do in your repo with permission models, hooks, and sandboxing",
+  "color": "#ecc94b",
+  "lessons": [
+    {
+      "slug": "01-why-safety-matters",
+      "title": "Why Safety Matters",
+      "description": "The risks of autonomous code changes and why guardrails are non-negotiable",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-permission-models",
+      "title": "Permission Models",
+      "description": "Understanding allowlists, deny patterns, and the permission hierarchy",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-hooks-system",
+      "title": "The Hooks System",
+      "description": "Pre-tool and post-tool hooks for validating, logging, and controlling agent actions",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["sequence", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-sandboxing-and-isolation",
+      "title": "Sandboxing and Isolation",
+      "description": "Git worktrees, containers, and other isolation patterns for safe agent execution",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-designing-your-safety-framework",
+      "title": "Designing Your Safety Framework",
+      "description": "Hands-on: building a complete permission and hook configuration for your project",
+      "estimatedMinutes": 15,
+      "diagramTypes": ["flowchart"],
+      "hasCode": true,
+      "hasQuiz": false
+    }
+  ]
+}

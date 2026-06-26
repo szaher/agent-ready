@@ -1,0 +1,153 @@
+---
+title: Why Custom Agents?
+quiz:
+- question: What is the primary risk of using a general-purpose agent for code review?
+  options:
+  - It has write and execute permissions it does not need, increasing the blast radius of mistakes
+  - It cannot read the codebase
+  - It runs too slowly
+  - It costs more tokens than a custom agent
+  correctIndex: 0
+- question: Which principle from security engineering directly supports creating specialized agents?
+  options:
+  - Defense in depth
+  - Security through obscurity
+  - The principle of least privilege
+  - Zero trust networking
+  correctIndex: 2
+- question: When does creating a custom agent NOT pay off?
+  options:
+  - When the task is performed frequently across many repositories
+  - When the task requires a specific personality and tone
+  - When the task has clear permission boundaries
+  - When you need a one-off task done once and never again
+  correctIndex: 3
+---
+
+## Overview
+
+In Module 3, you learned how CLAUDE.md gives every agent session a shared understanding of your project. But what happens when different tasks need fundamentally different behaviors? A code reviewer should never modify files. A test writer needs different instructions than a documentation generator. A security auditor should not have access to deployment scripts. This lesson explores why **custom agents** exist, when specialization pays off, and what you gain by moving beyond a single general-purpose agent.
+
+## The Problem with One Agent for Everything
+
+A general-purpose agent is like a Swiss Army knife -- it can do many things, but it excels at none of them. When you use the same agent configuration for reviewing code, writing tests, refactoring modules, and generating documentation, you encounter three recurring problems.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Problems["Problems with a Single Agent"]
+        P1["Overly Broad Permissions"]
+        P2["Conflicting Instructions"]
+        P3["Context Dilution"]
+    end
+    P1 --> R1["Agent can modify files\nwhen it should only read"]
+    P2 --> R2["Review instructions clash\nwith writing instructions"]
+    P3 --> R3["System prompt is so long\nthe agent loses focus"]
+    style Problems fill:#fed7d7,stroke:#e53e3e
+    style R1 fill:#fff5f5,stroke:#fc8181
+    style R2 fill:#fff5f5,stroke:#fc8181
+    style R3 fill:#fff5f5,stroke:#fc8181
+`} />
+
+**Overly broad permissions** mean the agent can do things it should not. A review agent with write access might "helpfully" fix issues instead of just flagging them. A documentation agent with Bash access might run commands that alter your environment.
+
+**Conflicting instructions** arise when you try to pack guidance for every role into a single system prompt. "Be thorough and flag every issue" conflicts with "Be concise and only change what is necessary." The agent cannot optimize for both.
+
+**Context dilution** happens when the system prompt grows to cover every possible task. The agent spends tokens processing instructions that are irrelevant to the current job, and the instructions that matter get less attention.
+
+## The Case for Specialization
+
+Custom agents solve these problems by applying a principle borrowed from security engineering and microservice architecture: **separation of concerns**. Each agent gets a focused role, targeted instructions, and only the permissions it needs.
+
+<MermaidDiagram chart={`graph LR
+    subgraph General["General-Purpose Agent"]
+        GA["One agent\nAll permissions\nAll instructions"]
+    end
+    subgraph Specialized["Specialized Agents"]
+        SA["Reviewer\nRead-only\nReview rules"]
+        SB["Test Writer\nRead + Write\nTest patterns"]
+        SC["Refactorer\nRead + Edit\nRefactoring rules"]
+        SD["Docs Generator\nRead + Write\nStyle guide"]
+    end
+    General -.->|"specialize"| Specialized
+    style General fill:#fed7d7,stroke:#e53e3e
+    style Specialized fill:#c6f6d5,stroke:#38a169
+    style SA fill:#ebf8ff,stroke:#3182ce
+    style SB fill:#ebf8ff,stroke:#3182ce
+    style SC fill:#ebf8ff,stroke:#3182ce
+    style SD fill:#ebf8ff,stroke:#3182ce
+`} />
+
+This is not a theoretical exercise. Consider how different these roles actually are:
+
+- A **code reviewer** should read files, analyze patterns, and produce feedback -- but never modify a single line. It needs strict read-only access.
+- A **test writer** needs to read the source code to understand what to test, then write new test files. It needs read and write access, but should not run arbitrary shell commands.
+- A **refactorer** needs to read and edit existing files, but should not create new ones or delete existing ones without explicit approval.
+- A **security auditor** needs to read code and configuration but should have no write access at all, and its system prompt should emphasize vulnerability patterns, not code style.
+
+## The Principle of Least Privilege
+
+The most compelling reason to create custom agents is the **principle of least privilege**: every agent should have the minimum permissions required to do its job, and no more. This is not about distrusting the AI. It is about reducing the blast radius when things go wrong.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Least["Principle of Least Privilege"]
+        L1["Define the task"] --> L2["Identify required tools"]
+        L2 --> L3["Grant only those tools"]
+        L3 --> L4["Deny everything else"]
+    end
+    L4 --> O["Smaller blast radius\nPredictable behavior\nEasier review"]
+    style Least fill:#ebf8ff,stroke:#3182ce
+    style O fill:#c6f6d5,stroke:#38a169
+`} />
+
+When a review agent has only read access, you know with certainty that invoking it will not change your codebase. When a test writer cannot run Bash commands, you know it will not accidentally execute tests in a way that modifies state. These guarantees make agents trustworthy enough to run with less human supervision.
+
+> The less an agent can do, the more you can trust it to do its job unsupervised.
+
+## When Specialization Pays Off
+
+Custom agents are not free -- they take time to define and maintain. Here is when the investment pays off:
+
+- **Repeated tasks** -- if your team runs code reviews, writes tests, or generates docs regularly, a custom agent amortizes the setup cost across hundreds of uses
+- **Safety-critical operations** -- when mistakes are expensive (production deployments, database migrations, security reviews), restricting permissions is essential
+- **Team-shared workflows** -- custom agents checked into the repo become shared tools that every team member can invoke identically
+- **Compliance requirements** -- some organizations require that automated tools operate within defined permission boundaries
+
+And here is when it does not:
+
+- **One-off tasks** -- if you need something done once, the general-purpose agent is fine
+- **Exploratory work** -- when you are not sure what you need, constraining the agent too early slows you down
+- **Rapidly changing requirements** -- if the task definition shifts daily, maintaining a custom agent adds overhead
+
+## How Custom Agents Fit Into the Agent-Ready Stack
+
+Custom agents build directly on the foundation you created in Module 3. Your CLAUDE.md provides the shared context that every agent reads. Custom agents add a layer of specialization on top of that shared context.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Stack["Agent-Ready Stack"]
+        direction TB
+        A["Custom Agents\n.claude/agents/*.md"] ---|"specialize"| B["Project Instructions\nCLAUDE.md"]
+        B ---|"document"| C["Codebase Structure\nCode + Tests + Config"]
+    end
+    D["Developer"] -->|"invokes"| A
+    A -->|"reads"| B
+    A -->|"operates on"| C
+    style Stack fill:#f0fff4,stroke:#38a169
+    style A fill:#b794f4,stroke:#6b46c1,color:#ffffff
+    style B fill:#63b3ed,stroke:#3182ce,color:#ffffff
+    style C fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style D fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+`} />
+
+Think of it this way: CLAUDE.md is the employee handbook that every team member reads. Custom agents are the **job descriptions** that define what each role does, what tools they have access to, and what they are responsible for. Both are necessary. The handbook without job descriptions gives everyone the same broad mandate. Job descriptions without the handbook leave each role without shared context.
+
+## Real-World Impact
+
+Teams that adopt custom agents report several concrete improvements:
+
+- **Review quality increases** because the review agent's entire system prompt is optimized for finding issues, not writing code
+- **Trust increases** because team members know that invoking a read-only agent cannot break anything
+- **Onboarding accelerates** because new developers can run predefined agents instead of figuring out how to prompt a general-purpose one
+- **Consistency improves** because every invocation of a custom agent follows the same instructions, regardless of who triggers it
+
+## Summary
+
+General-purpose agents are a good starting point, but they become a liability as your needs diverge. **Custom agents** let you apply the principle of least privilege, eliminate conflicting instructions, and focus each agent on doing one thing well. They build on the CLAUDE.md foundation from Module 3 by adding role-specific instructions and permission boundaries. In the next lesson, you will learn the exact format for defining a custom agent -- the markdown file structure, frontmatter fields, and system prompt conventions that bring specialization to life.

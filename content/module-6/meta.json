@@ -1,0 +1,53 @@
+{
+  "id": 6,
+  "title": "MCP — Model Context Protocol",
+  "description": "Connect agents to external tools, databases, and services through the Model Context Protocol",
+  "color": "#fc8181",
+  "lessons": [
+    {
+      "slug": "01-what-is-mcp",
+      "title": "What Is MCP?",
+      "description": "Understanding the Model Context Protocol and why it's the USB-C of AI agents",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["architecture", "comparison"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-mcp-architecture",
+      "title": "MCP Architecture",
+      "description": "Servers, clients, tools, resources, and the protocol flow",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "sequence"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-using-mcp-servers",
+      "title": "Using MCP Servers",
+      "description": "Connecting agents to databases, GitHub, Jira, and other services via existing MCP servers",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["sequence"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-building-an-mcp-server",
+      "title": "Building an MCP Server",
+      "description": "Hands-on: building a custom MCP server that exposes your domain tools to agents",
+      "estimatedMinutes": 15,
+      "diagramTypes": ["architecture", "sequence"],
+      "hasCode": true,
+      "hasQuiz": false
+    },
+    {
+      "slug": "05-mcp-in-production",
+      "title": "MCP in Production",
+      "description": "Security, authentication, performance, and deployment patterns for MCP servers",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    }
+  ]
+}

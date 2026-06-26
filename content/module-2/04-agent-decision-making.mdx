@@ -1,0 +1,246 @@
+---
+title: Agent Decision Making
+quiz:
+- question: What is 'greedy' decision making in the context of AI agents?
+  options:
+  - The agent chooses the action that seems best right now without planning ahead
+  - The agent tries to use as many tools as possible in each turn
+  - The agent requests more files than it needs to maximize context
+  - The agent tries to complete the task in the fewest possible turns
+  correctIndex: 0
+- question: What is the most common cause of an agent going in circles (repeating the same actions)?
+  options:
+  - A bug in the agent framework software
+  - The context window is too large
+  - The agent lacks information to make progress but does not realize it, so it retries the same approach
+  - The user gave too many instructions
+  correctIndex: 2
+- question: How does ambiguity in a user's request affect agent decision making?
+  options:
+  - The agent always asks for clarification before proceeding
+  - Ambiguity has no effect because agents understand intent perfectly
+  - The agent refuses to work until the request is clarified
+  - The agent picks one interpretation and commits to it, which may be the wrong one
+  correctIndex: 3
+---
+
+## Overview
+
+You now understand the agent loop and the tools agents use. But how does an agent *decide* what to do at each step? How does it choose between reading a file, searching for a symbol, or making an edit? And why does it sometimes make choices that seem wrong?
+
+**Agent decision making** is the process by which the LLM translates its understanding of the task, the current state, and the available tools into a specific action. Understanding this process helps you write instructions and structure code that guide agents toward better decisions.
+
+## How the Model Chooses an Action
+
+At every step, the LLM receives the full conversation context and must produce one of two outputs: a **tool call** (to take an action) or a **text response** (to communicate with the user). The choice depends on a complex interplay of factors.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Full Context Available to the Model"] --> B["User's Original Request"]
+    A --> C["System Prompt Instructions"]
+    A --> D["Results from Previous Actions"]
+    A --> E["Current Understanding of the Codebase"]
+
+    B --> F{"What should I do next?"}
+    C --> F
+    D --> F
+    E --> F
+
+    F -->|Need more info| G["Call Read or Search"]
+    F -->|Ready to change| H["Call Edit or Write"]
+    F -->|Need to verify| I["Call Bash (run tests)"]
+    F -->|Task complete| J["Respond to User"]
+    F -->|Stuck or uncertain| K["Ask User for Clarification"]
+
+    style F fill:#ebf8ff,stroke:#3182ce
+    style G fill:#f0fff4,stroke:#38a169
+    style H fill:#fef3c7,stroke:#d69e2e
+    style I fill:#fef3c7,stroke:#d69e2e
+    style J fill:#f0fff4,stroke:#38a169
+    style K fill:#fff5f5,stroke:#e53e3e
+`} />
+
+The model does not follow a rigid algorithm. It uses its training to estimate the best next action given the context. This is both a strength (flexibility) and a weakness (unpredictability).
+
+## Greedy vs. Planning Behavior
+
+Agent decision making generally falls on a spectrum between two modes:
+
+### Greedy Decision Making
+
+In **greedy mode**, the agent picks the action that seems best *right now* without considering future steps. This looks like:
+
+1. "I need to find the function" -- search for it
+2. "I found it, let me read the file" -- read the file
+3. "I can see where to add code" -- make the edit immediately
+
+Greedy decisions are fast and often correct for simple tasks. But they can lead to problems:
+
+- Editing before understanding the full picture
+- Missing dependencies or side effects
+- Creating solutions that work locally but break other parts of the system
+
+### Planning Behavior
+
+In **planning mode**, the agent thinks multiple steps ahead before acting. This looks like:
+
+1. "Before I change anything, let me understand the architecture"
+2. "I should check if there are tests for this function"
+3. "I need to understand the type definitions before modifying the interface"
+4. "Now I have enough context to plan my changes across all affected files"
+5. "Let me implement the changes in dependency order"
+
+Planning behavior produces better results for complex tasks but consumes more tokens on observation before acting.
+
+<MermaidDiagram chart={`stateDiagram-v2
+    [*] --> Exploring: Task received
+
+    Exploring --> Exploring: Read more files
+    Exploring --> Exploring: Search for patterns
+    Exploring --> Planning: Enough context gathered
+
+    Planning --> Acting: Plan formulated
+    Planning --> Exploring: Need more information
+
+    Acting --> Verifying: Change made
+    Acting --> Acting: Make additional changes
+
+    Verifying --> Acting: Test failed, fix needed
+    Verifying --> Exploring: Unexpected side effect
+    Verifying --> [*]: All checks pass
+
+    note right of Exploring: Greedy agents<br/>leave this state<br/>too quickly
+
+    note right of Planning: Good agents spend<br/>adequate time here<br/>before acting
+`} />
+
+> **Key insight**: You can influence whether the agent explores or rushes to act. Detailed instructions like "Before making changes, review the test file and the type definitions" push the agent toward planning mode.
+
+## What Influences the Agent's Decisions
+
+Several factors affect which tool the agent calls and how it approaches the task:
+
+### The User's Prompt
+
+The most direct influence. Compare these two prompts for the same task:
+
+**Vague prompt**: "Fix the auth bug"
+
+The agent must decide: Which auth bug? Where is the auth code? What is the expected behavior? It will spend many loops exploring and may fix the wrong thing.
+
+**Specific prompt**: "The login function in src/services/auth.ts returns null instead of throwing an error when the user is not found. Fix it to throw an AuthenticationError."
+
+The agent knows exactly where to look, what is wrong, and what the fix should look like. It can act efficiently.
+
+### The System Prompt and CLAUDE.md
+
+Instructions in the system prompt and project documentation shape ongoing behavior. For example:
+
+- "Always run tests after making changes" -- the agent will include a test step
+- "Do not modify files in the generated/ directory" -- the agent will avoid those files
+- "Use the existing validation utilities in src/utils/" -- the agent will look there before creating new code
+
+### Prior Tool Results
+
+What the agent has already discovered shapes its next move. If a search returned no results, the agent might try a different search query or fall back to reading directories. If a test failed, the agent will try to interpret the error and fix the issue.
+
+### The Model's Training
+
+The LLM has been trained on millions of coding interactions and has internalized patterns about how software is typically structured. It "expects" certain conventions:
+
+- Test files near source files
+- Configuration in the project root
+- Entry points in `main.ts`, `index.ts`, `app.py`, etc.
+- Package management files at the root
+
+When your project follows these conventions, the agent's built-in expectations align with reality, and it makes better decisions. When your project deviates significantly, the agent's assumptions lead it astray.
+
+## The Confidence Problem
+
+Agents do not express or even truly have calibrated confidence. An agent that is 50% sure about an edit and an agent that is 99% sure produce output that looks identical. There is no built-in "I am not sure about this" signal.
+
+This means agents will:
+
+- **Commit to an interpretation** without flagging uncertainty
+- **Make edits they are unsure about** without warning you
+- **Present incorrect information confidently** -- a phenomenon known as hallucination
+- **Not ask for help** when they should, because the threshold for "I should ask the user" is poorly calibrated
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent encounters ambiguity"] --> B{"Internal confidence"}
+    B -->|High| C["Proceed with action"]
+    B -->|Medium| D["Usually still proceeds<br/>(appears confident)"]
+    B -->|Low| E{"Ask user?"}
+    E -->|Sometimes| F["Asks for clarification"]
+    E -->|Often| G["Guesses and proceeds<br/>(appears confident)"]
+
+    style D fill:#fef3c7,stroke:#d69e2e
+    style G fill:#fff5f5,stroke:#e53e3e
+    style F fill:#f0fff4,stroke:#38a169
+`} />
+
+This is why **explicit instructions reduce errors**. When you remove ambiguity from the task, you remove the opportunity for the agent to guess wrong.
+
+## When Agents Go in Circles
+
+One of the most frustrating agent behaviors is **looping** -- repeating the same or similar actions without making progress. This happens when:
+
+- **The agent's approach is wrong but it does not know why**: It keeps retrying the same strategy, expecting a different result
+- **Error messages are unhelpful**: The agent cannot diagnose the problem from the output it receives
+- **The fix creates a new problem**: The agent fixes error A, which causes error B, which it fixes by reverting the change that fixed A
+- **Context loss**: The agent forgets it already tried an approach and tries it again after context truncation
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent tries approach X"] --> B["Gets error E"]
+    B --> C["Agent tries to fix error E"]
+    C --> D["Fix causes error F"]
+    D --> E["Agent tries to fix error F"]
+    E --> F["Fix reverts the change<br/>that fixed E"]
+    F --> B
+
+    G["Breaking the loop requires:"] --> H["Better error messages"]
+    G --> I["Clearer project structure"]
+    G --> J["Explicit instructions<br/>about known pitfalls"]
+
+    style A fill:#fff5f5,stroke:#e53e3e
+    style F fill:#fff5f5,stroke:#e53e3e
+    style G fill:#f0fff4,stroke:#38a169
+`} />
+
+You can help prevent loops by:
+
+- Writing clear error messages that explain *why* something failed, not just *that* it failed
+- Documenting known pitfalls in CLAUDE.md ("Do not use approach X because of Y")
+- Structuring code so there is one clear path to a solution, not multiple competing approaches
+
+## The Effect of Task Decomposition
+
+Agents make better decisions when they have a clear, focused task. A broad task like "refactor the authentication system" requires the agent to make many strategic decisions about *what* to refactor, *how* to organize it, and *in what order* to make changes. Each decision is an opportunity for the agent to diverge from what you expect.
+
+A focused task like "extract the password hashing logic from AuthService into a standalone hashPassword function in utils/crypto.ts" requires far fewer decisions. The agent knows exactly what to move, where to put it, and what the end state should look like.
+
+> **Practical tip**: Break large tasks into specific sub-tasks. Give the agent clear, focused instructions rather than broad objectives. Each sub-task should have an unambiguous definition of done.
+
+## How Context Shapes Strategy
+
+The agent's strategy shifts based on what it has observed. Early in a session (when it knows little about the codebase), it favors exploration -- reading files, searching for patterns, building understanding. Later (when it has context), it shifts to action -- editing files, running tests, making progress.
+
+This is a natural and healthy progression. Problems arise when:
+
+- **The agent acts too early**: It starts editing before understanding enough, leading to incorrect changes
+- **The agent explores too long**: It keeps reading files without ever making progress, consuming the context window on observation
+- **Context loss resets the strategy**: After truncation, the agent returns to exploration mode even though it already explored
+
+A well-structured codebase with clear documentation shortens the exploration phase, giving the agent more room for productive action.
+
+## Summary
+
+Agent decision making is fundamentally probabilistic -- the model estimates the best action given its context, but it does not follow a deterministic algorithm. Several practical insights follow:
+
+- **Specificity reduces errors**: Detailed instructions leave less room for incorrect guesses
+- **Conventions matter**: Agents expect standard project structures and make better decisions when reality matches their expectations
+- **Planning beats greedy**: Agents that explore before acting produce better results, and you can encourage this through instructions
+- **Agents do not express uncertainty well**: They appear confident even when guessing
+- **Loops happen when agents lack a way forward**: Clear error messages and documented pitfalls help break cycles
+- **Focused tasks produce better decisions**: Decompose large tasks into specific, unambiguous sub-tasks
+
+In the next lesson, we will examine the specific **failure modes** of AI coding agents -- the patterns of how and why they fail, and what you can do in your codebase to prevent each type of failure.

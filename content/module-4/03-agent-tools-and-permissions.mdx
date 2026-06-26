@@ -1,0 +1,294 @@
+---
+title: Agent Tools and Permissions
+quiz:
+- question: Which tool should a read-only analysis agent be denied?
+  options:
+  - Edit
+  - WebSearch
+  - Read
+  - All of the above
+  correctIndex: 0
+- question: What is the relationship between system prompt constraints and tool permissions?
+  options:
+  - They are redundant -- you only need one or the other
+  - Tool permissions override anything written in the system prompt
+  - System prompt constraints are suggestions; tool permissions are enforced boundaries
+  - System prompt constraints are stronger because the model reads them first
+  correctIndex: 2
+- question: Why would you deny Bash access to a documentation agent?
+  options:
+  - Documentation agents cannot use terminals
+  - Bash is only available on Linux systems
+  - Bash commands are too slow for documentation tasks
+  - Bash access could allow the agent to execute arbitrary commands, modify the filesystem, or run processes beyond its documentation role
+  correctIndex: 3
+---
+
+## Overview
+
+In the previous lesson, you learned how to define an agent's identity and behavior through its markdown file. But system prompt instructions are ultimately suggestions -- the agent might follow them, or it might decide that "helping" means ignoring a constraint. This lesson introduces the mechanism that turns suggestions into **enforced boundaries**: tool permissions. By controlling which tools each agent can access, you create agents that literally cannot overstep their role, regardless of what they are asked to do.
+
+## The Tool Landscape
+
+Before you can control permissions, you need to understand the tools available to an AI coding agent. Each tool represents a capability -- a specific action the agent can perform.
+
+<MermaidDiagram chart={`graph TD
+    subgraph ReadTools["Read Tools"]
+        R1["Read\nView file contents"]
+        R2["WebSearch\nSearch the web"]
+        R3["WebFetch\nFetch URL content"]
+    end
+    subgraph WriteTools["Write Tools"]
+        W1["Edit\nModify existing files"]
+        W2["Write\nCreate new files"]
+    end
+    subgraph ExecuteTools["Execute Tools"]
+        E1["Bash\nRun shell commands"]
+    end
+    subgraph ExternalTools["External Tools"]
+        X1["MCP Tools\nThird-party integrations"]
+    end
+    style ReadTools fill:#c6f6d5,stroke:#38a169
+    style WriteTools fill:#fefcbf,stroke:#d69e2e
+    style ExecuteTools fill:#fed7d7,stroke:#e53e3e
+    style ExternalTools fill:#e9d8fd,stroke:#805ad5
+`} />
+
+Here is what each core tool does:
+
+- **Read** -- Opens and reads file contents from the filesystem. This is the most basic tool and is safe in nearly all contexts.
+- **Edit** -- Modifies existing files by replacing specific content. This is a precision tool -- it changes known content in known files.
+- **Write** -- Creates new files or completely overwrites existing ones. More powerful than Edit because it can create files from scratch.
+- **Bash** -- Executes shell commands in the terminal. This is the most powerful and most dangerous tool -- it can do anything the operating system allows.
+- **WebSearch** -- Searches the web for information. Useful for agents that need to look up documentation or current best practices.
+- **WebFetch** -- Fetches content from a specific URL. Complements WebSearch for retrieving detailed information.
+- **MCP Tools** -- Connections to external services via the Model Context Protocol. These could include Jira, GitHub, databases, or any custom integration.
+
+## Permission Levels: A Spectrum of Trust
+
+Different agent roles need different levels of trust. You can think of permissions as a spectrum from observation to full autonomy:
+
+<MermaidDiagram chart={`graph LR
+    A["Observe\nRead only"] --> B["Suggest\nRead + Analyze"]
+    B --> C["Edit\nRead + Write files"]
+    C --> D["Execute\nRead + Write + Bash"]
+    D --> E["Full Access\nAll tools"]
+    style A fill:#c6f6d5,stroke:#38a169
+    style B fill:#ebf8ff,stroke:#3182ce
+    style C fill:#fefcbf,stroke:#d69e2e
+    style D fill:#fed7d7,stroke:#e53e3e
+    style E fill:#feb2b2,stroke:#c53030
+`} />
+
+| Level | Tools Allowed | Use Case |
+|-------|--------------|----------|
+| Observe | Read, WebSearch | Code review, security audit |
+| Suggest | Read, WebSearch, WebFetch | Architecture analysis, docs review |
+| Edit | Read, Edit, Write | Test writing, refactoring, docs |
+| Execute | Read, Edit, Write, Bash | Build verification, integration testing |
+| Full | All tools including MCP | Automated workflows, CI/CD agents |
+
+Most custom agents should operate at the lowest level that lets them complete their task.
+
+## Configuring Permissions in Agent Definitions
+
+Tool permissions are specified in the agent definition as part of the agent's instructions. You explicitly state what the agent is allowed and not allowed to do, and the tool access configuration in your `.claude/settings.json` enforces these boundaries at the platform level.
+
+Here is how a read-only reviewer agent defines its permissions:
+
+<CodeBlock code={`# Code Reviewer
+
+You are a read-only code reviewer. You analyze code but NEVER modify it.
+
+## Allowed Actions
+
+- Read any file in the repository
+- Search the web for best practices and documentation
+
+## Denied Actions
+
+- Do NOT use Edit, Write, or Bash tools
+- Do NOT modify any files under any circumstances
+- Do NOT execute any shell commands
+- If asked to fix an issue, describe the fix but do not apply it
+`} language="markdown" filename=".claude/agents/code-reviewer.md" />
+
+The complementary settings configuration enforces this at the platform level:
+
+<CodeBlock code={`{
+  "permissions": {
+    "allow": [
+      "Read",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "Edit",
+      "Write",
+      "Bash"
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json (agent-specific overrides)" />
+
+## Defense in Depth: Prompts Plus Permissions
+
+You might wonder: if tool permissions are enforced, why also mention them in the system prompt? The answer is **defense in depth** -- multiple layers of protection that complement each other.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Developer invokes agent"] --> B["Agent reads system prompt"]
+    B --> C{"System prompt says\ndo not edit files?"}
+    C -->|"Agent respects prompt"| D["Agent produces\nread-only output"]
+    C -->|"Agent tries anyway"| E{"Tool permission\nallows Edit?"}
+    E -->|"Permission denied"| F["Action blocked\nby platform"]
+    E -->|"Permission granted"| G["File modified\n(undesired)"]
+    style D fill:#c6f6d5,stroke:#38a169
+    style F fill:#fefcbf,stroke:#d69e2e
+    style G fill:#fed7d7,stroke:#e53e3e
+`} />
+
+The system prompt acts as the first line of defense -- most of the time, the agent will respect its instructions. Tool permissions act as the safety net -- even when the agent tries to overstep, the platform prevents it. Together, they create agents that are both well-behaved by default and constrained by design.
+
+> System prompt constraints tell the agent what it **should** do. Tool permissions control what it **can** do. Use both.
+
+## Permission Patterns for Common Agents
+
+Here are proven permission configurations for the most common agent types:
+
+**The Observer** -- for code review, security audit, and architecture analysis:
+
+<CodeBlock code={`# Security Auditor
+
+You analyze code for security vulnerabilities.
+
+## Permissions
+
+- You may ONLY read files and search the web
+- You must NOT modify any files or run any commands
+- Report vulnerabilities with severity ratings and remediation steps
+
+## Focus Areas
+
+- SQL injection and command injection
+- Hardcoded secrets and credentials
+- Insecure deserialization
+- Missing input validation
+- Overly permissive file or network access
+`} language="markdown" filename=".claude/agents/security-auditor.md" />
+
+**The Writer** -- for test writing, documentation, and code generation:
+
+<CodeBlock code={`# Test Writer
+
+You write comprehensive tests for this project.
+
+## Permissions
+
+- You may read any source file to understand the code under test
+- You may create new test files in the __tests__/ directory
+- You may edit existing test files to add new test cases
+- You must NOT modify source code files
+- You must NOT run Bash commands
+
+## Testing Standards
+
+- Use the project's existing test framework and patterns
+- Name tests descriptively: "should return error when input is empty"
+- Cover edge cases: null, empty, boundary values, error conditions
+- One test file per source module
+`} language="markdown" filename=".claude/agents/test-writer.md" />
+
+**The Executor** -- for build verification and integration testing (use sparingly):
+
+<CodeBlock code={`# Build Verifier
+
+You verify that the project builds and tests pass correctly.
+
+## Permissions
+
+- You may read any file in the repository
+- You may run Bash commands, but ONLY the following:
+  - pnpm build
+  - pnpm test
+  - pnpm lint
+- You must NOT modify any files
+- You must NOT run any commands not listed above
+- You must NOT install packages or modify dependencies
+
+## Workflow
+
+1. Run the build command and report the result
+2. Run the test suite and report pass/fail counts
+3. Run the linter and report any issues
+4. Summarize the overall health of the project
+`} language="markdown" filename=".claude/agents/build-verifier.md" />
+
+## Scoping Bash Access
+
+The **Bash tool** deserves special attention because it is the most powerful and most dangerous tool in the agent's toolkit. With Bash access, an agent can:
+
+- Read and write any file the user has access to
+- Install or remove packages
+- Start or stop processes
+- Access the network
+- Modify environment variables
+- Delete files and directories
+
+When you grant Bash access, scope it as tightly as possible in the system prompt. Enumerate the specific commands the agent may run rather than granting blanket access:
+
+<CodeBlock code={`## Bash Access
+
+You may ONLY run these commands:
+- git status
+- git diff
+- git log --oneline -20
+- pytest tests/
+- mypy src/
+
+Do NOT run:
+- Any command that modifies files (rm, mv, cp, sed)
+- Any command that installs packages (pip, npm, apt)
+- Any command that accesses the network (curl, wget)
+- Any command with sudo
+`} language="markdown" filename="Scoped Bash permissions" />
+
+## MCP Tool Permissions
+
+If your project uses **MCP (Model Context Protocol)** integrations -- connections to Jira, GitHub, Slack, databases, or other services -- you can control which agents have access to which integrations. An agent that reviews code does not need Jira access. An agent that triages bugs does not need write access to the codebase.
+
+<CodeBlock code={`# Bug Triager
+
+You analyze bug reports and categorize them.
+
+## Allowed Integrations
+
+- Jira: read tickets, add comments, update labels
+- GitHub: read issues and pull requests
+
+## Denied Integrations
+
+- Database access
+- Slack notifications
+- Deployment tools
+
+## Workflow
+
+1. Read the bug report from Jira or GitHub
+2. Analyze the described behavior against the codebase
+3. Categorize severity: Critical, High, Medium, Low
+4. Add a comment with your analysis and suggested priority
+`} language="markdown" filename=".claude/agents/bug-triager.md" />
+
+## Testing Your Permission Configuration
+
+After defining an agent's permissions, verify that they work as intended:
+
+1. **Invoke the agent** and ask it to perform its intended task -- it should succeed
+2. **Ask it to overstep** -- request an action outside its permissions and verify it is blocked
+3. **Check the boundaries** -- try edge cases like asking the agent to "just quickly fix" something when it should be read-only
+
+This testing cycle confirms that your agent behaves as expected both within and outside its designated role.
+
+## Summary
+
+Tool permissions transform your agent definitions from well-intentioned guidelines into **enforced boundaries**. The core tools -- Read, Edit, Write, Bash, WebSearch, WebFetch, and MCP integrations -- represent a spectrum of capability, and each agent should operate at the minimum level required for its role. Combine system prompt instructions with platform-level tool controls for defense in depth: the prompt guides behavior, the permissions enforce it. In the next lesson, you will put all of this together by building a complete custom agent from scratch.

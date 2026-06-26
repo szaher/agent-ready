@@ -1,0 +1,252 @@
+---
+title: Anatomy of an Agent
+quiz:
+- question: What is the correct order of the core agent loop?
+  options:
+  - Observe, Plan, Act, Verify
+  - Act, Observe, Plan, Verify
+  - Plan, Act, Observe, Verify
+  - Observe, Act, Plan, Verify
+  correctIndex: 0
+- question: Why do AI coding agents run in a loop rather than generating all changes at once?
+  options:
+  - Because LLMs can only produce a limited number of tokens per response
+  - Because loop-based architectures are faster than single-pass generation
+  - Because each action reveals new information that changes the plan
+  correctIndex: 2
+- question: What happens during the 'Observe' phase of the agent loop?
+  options:
+  - The agent writes code changes to disk
+  - The agent decides which tool to call next
+  - The agent verifies that tests pass
+  - The agent gathers information by reading files, searching code, and examining tool outputs
+  correctIndex: 3
+- question: What role does the system prompt play in an AI coding agent?
+  options:
+  - It replaces the user's instructions entirely
+  - It defines the agent's capabilities, constraints, and behavioral guidelines
+  - It contains the full source code of the project
+  - It stores the agent's memory between sessions
+  correctIndex: 1
+---
+
+## Overview
+
+Every AI coding agent -- whether it is Claude Code, Cursor, Copilot Workspace, or Aider -- follows the same fundamental architecture. Understanding that architecture is the key to working effectively with agents and building codebases they can navigate.
+
+In this lesson, you will look inside the **agent loop**: the repeating cycle of observe, plan, act, and verify that drives every interaction between an AI agent and your code. Once you see the loop, you will understand why some tasks succeed effortlessly and others spiral into confusion.
+
+## What Makes an Agent Different from a Chatbot
+
+A **chatbot** takes a prompt and returns a response. That is a single pass: input goes in, output comes out, and the conversation continues only if the user sends another message.
+
+An **AI coding agent** is fundamentally different. It receives a task, then autonomously takes multiple steps to complete it. It reads files, searches for symbols, edits code, runs tests, interprets errors, and retries -- all without waiting for you to tell it what to do next.
+
+The difference is **agency**: the ability to take actions in the world and respond to their results.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Chatbot["Chatbot (Single Pass)"]
+        A1[User Prompt] --> A2[LLM Response]
+    end
+    subgraph Agent["Agent (Multi-Step Loop)"]
+        B1[User Task] --> B2[Observe]
+        B2 --> B3[Plan]
+        B3 --> B4[Act]
+        B4 --> B5[Verify]
+        B5 -->|Not done| B2
+        B5 -->|Done| B6[Final Result]
+    end
+    style Chatbot fill:#fef3c7,stroke:#d69e2e
+    style Agent fill:#ebf8ff,stroke:#3182ce
+`} />
+
+This loop is what gives agents their power -- and also what makes them unpredictable. Each iteration can take the agent in a new direction based on what it discovers.
+
+## The Core Agent Loop
+
+Every agent cycle has four phases. Let us walk through each one.
+
+### Phase 1: Observe
+
+The agent gathers information about the current state of the world. In a coding context, this means:
+
+- **Reading files** to understand existing code
+- **Searching** for function definitions, imports, or patterns
+- **Examining outputs** from previous actions (test results, error messages, build logs)
+- **Reviewing the conversation** history to recall earlier context
+
+The observe phase is critical because **the agent can only reason about what it can see**. If a file is not read into the context window, the agent does not know it exists. This is a theme we will return to throughout this module.
+
+### Phase 2: Plan
+
+Based on what it has observed, the agent formulates a plan. This is where the LLM's reasoning ability comes in. The agent considers:
+
+- What the user asked for
+- What it has learned about the codebase so far
+- Which tools are available
+- What the most logical next step is
+
+Planning happens internally -- the agent thinks through the situation and decides on a course of action. Some agents make this planning explicit (writing out their reasoning), while others jump straight to a tool call.
+
+### Phase 3: Act
+
+The agent executes its plan by invoking a **tool**. Common actions include:
+
+- **Read** a file to learn more
+- **Edit** a file to make a change
+- **Run a command** to execute tests or build the project
+- **Search** for a symbol, definition, or pattern across the codebase
+
+Each action produces an **output** that feeds back into the next observe phase. This is the feedback loop that makes agents powerful.
+
+### Phase 4: Verify
+
+After acting, the agent checks whether the action succeeded and whether the overall task is complete. Verification might involve:
+
+- Checking if an edit was applied correctly
+- Running tests to see if they pass
+- Reading the modified file to confirm the change
+- Deciding if more steps are needed
+
+If the task is not done, the agent loops back to **Observe** and continues. If it is done, the agent returns the result to the user.
+
+## A Complete Loop in Action
+
+Let us trace through a concrete example. A developer asks: "Add input validation to the createUser function."
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant User
+    participant Agent
+    participant Codebase
+
+    User->>Agent: "Add input validation to createUser"
+
+    Note over Agent: Loop 1: Find the function
+    Agent->>Codebase: Search for "createUser"
+    Codebase-->>Agent: Found in src/services/user.ts:42
+
+    Note over Agent: Loop 2: Read the code
+    Agent->>Codebase: Read src/services/user.ts
+    Codebase-->>Agent: File contents (createUser function)
+
+    Note over Agent: Loop 3: Check for existing validation
+    Agent->>Codebase: Search for "validate" in src/services/
+    Codebase-->>Agent: Found validation utils in src/utils/validate.ts
+
+    Note over Agent: Loop 4: Read validation utilities
+    Agent->>Codebase: Read src/utils/validate.ts
+    Codebase-->>Agent: Existing validation functions
+
+    Note over Agent: Loop 5: Make the edit
+    Agent->>Codebase: Edit src/services/user.ts (add validation)
+    Codebase-->>Agent: Edit applied successfully
+
+    Note over Agent: Loop 6: Verify
+    Agent->>Codebase: Run tests
+    Codebase-->>Agent: All tests pass
+
+    Agent->>User: "Added input validation using existing validateEmail and validateName utilities"
+`} />
+
+Notice how the agent did not jump straight to editing. It spent four loops gathering information before making a single change. This **observe-heavy** approach is typical of well-functioning agents. The more an agent understands before acting, the better its edits will be.
+
+## The Anatomy of a Single Turn
+
+Zooming in further, each agent "turn" (one iteration of the loop) has a specific structure at the LLM level:
+
+<MermaidDiagram chart={`graph TD
+    A["System Prompt<br/>(agent identity, rules, tools)"] --> B["Conversation History<br/>(previous turns + results)"]
+    B --> C["Current Observation<br/>(latest tool output)"]
+    C --> D["LLM Reasoning<br/>(internal chain-of-thought)"]
+    D --> E{"Decision"}
+    E -->|Call a tool| F["Tool Call<br/>(name + arguments)"]
+    E -->|Task complete| G["Response to User"]
+    F --> H["Tool Execution<br/>(outside the LLM)"]
+    H --> I["Tool Result"]
+    I --> B
+
+    style A fill:#f0fff4,stroke:#38a169
+    style D fill:#ebf8ff,stroke:#3182ce
+    style F fill:#fef3c7,stroke:#d69e2e
+    style H fill:#fff5f5,stroke:#e53e3e
+`} />
+
+The key insight is that **tool execution happens outside the LLM**. The model generates a tool call (a structured request), the agent framework executes it in the real environment, and the result is fed back as a new message in the conversation. The LLM never directly touches your filesystem -- it asks the framework to do it.
+
+## What the System Prompt Does
+
+The **system prompt** is the foundational instruction set that shapes how the agent behaves. It typically includes:
+
+- **Identity and role**: "You are an AI coding assistant..."
+- **Available tools**: descriptions of each tool the agent can use
+- **Behavioral rules**: when to ask for permission, what files to avoid, how to handle errors
+- **Project context**: information from CLAUDE.md, README, or other documentation files
+
+The system prompt is injected at the start of every conversation and stays in the context window throughout. This is why project documentation files like CLAUDE.md are so powerful -- they become part of the agent's operating instructions.
+
+> **Key insight**: The system prompt plus your project documentation define the agent's "personality" for that session. A well-documented project literally makes the agent smarter by giving it better instructions to follow.
+
+## The Role of Memory
+
+Agents have a significant limitation: they have **no persistent memory** between sessions. Each new conversation starts from scratch. The agent does not remember:
+
+- What it worked on yesterday
+- Decisions it made in a previous session
+- Patterns it discovered in your code before
+- Mistakes it made and corrected
+
+This is why **documentation is the agent's long-term memory**. Files like CLAUDE.md, architecture decision records, and inline code comments persist between sessions and give each new agent instance the knowledge it needs to make good decisions.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Session1["Session 1"]
+        S1A[Read docs] --> S1B[Understand code]
+        S1B --> S1C[Make changes]
+    end
+    subgraph Session2["Session 2 (New Agent)"]
+        S2A[Read docs] --> S2B[Understand code]
+        S2B --> S2C[Make changes]
+    end
+    D[("Project Docs<br/>CLAUDE.md<br/>README<br/>Comments")] --> S1A
+    D --> S2A
+
+    style D fill:#f0fff4,stroke:#38a169
+    style Session1 fill:#ebf8ff,stroke:#3182ce
+    style Session2 fill:#fef3c7,stroke:#d69e2e
+`} />
+
+Each session independently reads the same documentation. The docs are the continuity between sessions.
+
+## How Many Loops Does an Agent Take?
+
+The number of loops varies dramatically based on task complexity:
+
+- **Simple rename**: 2-3 loops (search, edit, verify)
+- **Bug fix with known location**: 4-6 loops (read, understand, edit, test, maybe fix test)
+- **Feature implementation**: 10-30 loops (explore, plan, implement across files, test, iterate)
+- **Complex refactoring**: 30-100+ loops (deep exploration, many files, incremental changes, repeated testing)
+
+There is no fixed limit, but practical constraints apply. Each loop consumes tokens from the **context window**, and eventually the agent runs out of space. This is a topic we will explore in depth in the next lesson.
+
+## Why the Loop Sometimes Fails
+
+Understanding the loop also helps you understand why agents fail:
+
+- **Insufficient observation**: The agent edits code without reading enough context, leading to changes that break things it did not know about
+- **Poor planning**: The agent picks a suboptimal approach because it lacks information or because the task is ambiguous
+- **Action errors**: The edit syntax is wrong, the command fails, or the file path is incorrect
+- **Verification gaps**: The agent does not run tests or does not interpret test failures correctly
+- **Loop exhaustion**: The agent runs too many iterations without making progress, consuming the context window
+
+Each of these failure modes has specific codebase-level fixes, which we will cover in Lesson 5 of this module.
+
+## Summary
+
+The agent loop -- observe, plan, act, verify -- is the heartbeat of every AI coding agent. Understanding it reveals several practical insights:
+
+- **Agents are information-hungry**: The more they can observe, the better they perform
+- **Each loop costs tokens**: Efficient agents minimize unnecessary loops
+- **Documentation is memory**: Project docs bridge the gap between sessions
+- **Tool execution is external**: The LLM reasons and decides, but the framework acts
+- **Failure has patterns**: Most failures trace back to a specific phase of the loop
+
+In the next lesson, we will dive deep into the **context window** -- the most important constraint shaping how agents see and interact with your code.

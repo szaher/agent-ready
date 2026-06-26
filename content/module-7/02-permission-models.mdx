@@ -1,0 +1,291 @@
+---
+title: Permission Models
+quiz:
+- question: In the three-tier permission hierarchy, which level takes the highest precedence?
+  options:
+  - Enterprise policy (.claude/settings.json at the repo root)
+  - Project settings (.claude/settings.json in the project)
+  - User settings (~/.claude/settings.json in the home directory)
+  - All three levels have equal precedence
+  correctIndex: 0
+- question: What does an allowlist-based permission model do by default when an agent requests an action not on the list?
+  options:
+  - Executes the action and logs a warning
+  - Silently ignores the request
+  - Asks the user for approval before proceeding
+  - Terminates the agent session immediately
+  correctIndex: 2
+- question: Why should deny patterns take priority over allow patterns in permission configuration?
+  options:
+  - Because deny patterns are faster to evaluate
+  - Because deny patterns use less memory
+  - Because allow patterns are deprecated in newer agent frameworks
+  - Because a single allowed dangerous command can cause irreversible damage
+  correctIndex: 3
+- question: What is the security risk of using overly broad permission patterns like 'Bash(*)' in project settings?
+  options:
+  - It makes the agent run slower due to pattern matching overhead
+  - It allows any command to run without user approval, including destructive ones
+  - It prevents the agent from reading files
+  - It disables the hooks system
+  correctIndex: 1
+---
+
+## Overview
+
+Permissions are the first line of defense in agent safety. They define -- before the agent takes any action -- what it is allowed to do, what it must ask about, and what it is forbidden from doing. Without permissions, every agent session is a roll of the dice. With well-designed permissions, you create a predictable safety envelope that lets the agent work productively within boundaries you control.
+
+This lesson covers how **permission models** work in practice: the hierarchy of settings files, the syntax for allowlists and deny patterns, and strategies for building a permission configuration that balances safety with usability.
+
+## The Permission Decision Flow
+
+Every time an AI coding agent wants to execute a tool -- reading a file, running a command, making an edit -- the agent framework checks the action against the permission rules before proceeding.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent requests action"] --> B{"On deny list?"}
+    B -->|Yes| C["BLOCKED<br/>Action rejected"]
+    B -->|No| D{"On allow list?"}
+    D -->|Yes| E["AUTO-APPROVED<br/>Action executes"]
+    D -->|No| F{"Permission mode?"}
+    F -->|default| G["ASK USER<br/>Prompt for approval"]
+    F -->|auto| H["AUTO-APPROVED<br/>If deemed safe"]
+    F -->|bypass| I["AUTO-APPROVED<br/>All actions allowed"]
+    style C fill:#fed7d7,stroke:#e53e3e
+    style E fill:#c6f6d5,stroke:#38a169
+    style G fill:#fef3c7,stroke:#d69e2e
+    style H fill:#fef3c7,stroke:#d69e2e
+    style I fill:#e9d8fd,stroke:#805ad5
+`} />
+
+The flow is simple but powerful: deny rules are checked first, then allow rules, then the fallback behavior depends on the permission mode. This **deny-first** approach ensures that no allowlist can accidentally override a safety-critical restriction.
+
+## The Three-Tier Hierarchy
+
+Permission settings are defined in JSON configuration files at three levels. Higher levels in the hierarchy override lower levels, giving organizations and projects the ability to enforce baseline safety regardless of individual user preferences.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Tier1["Tier 1: Enterprise / Organization"]
+        E1[".claude/settings.json<br/>(managed by org)"]
+    end
+    subgraph Tier2["Tier 2: Project"]
+        P1[".claude/settings.json<br/>(checked into repo)"]
+    end
+    subgraph Tier3["Tier 3: User"]
+        U1["~/.claude/settings.json<br/>(personal preferences)"]
+    end
+    Tier1 -->|"overrides"| Tier2
+    Tier2 -->|"overrides"| Tier3
+    style Tier1 fill:#e9d8fd,stroke:#805ad5
+    style Tier2 fill:#ebf8ff,stroke:#3182ce
+    style Tier3 fill:#c6f6d5,stroke:#38a169
+`} />
+
+### Tier 1: Enterprise / Organization
+
+The highest-precedence settings. These are typically managed by a platform team and distributed through configuration management. Deny rules at this level cannot be overridden by project or user settings. This is where organizations enforce non-negotiable safety policies.
+
+### Tier 2: Project
+
+The `.claude/settings.json` file at the root of the repository. This is checked into version control and shared by everyone working on the project. It defines what commands are commonly needed, which tools are safe, and what patterns are blocked. This is the most important level for day-to-day work.
+
+### Tier 3: User
+
+The `~/.claude/settings.json` file in the developer's home directory. Personal preferences that apply across all projects. A developer might allow `git status` globally so they never have to approve it, or deny certain commands they personally find risky.
+
+> **Key principle**: Deny rules always win. If the enterprise tier denies `rm -rf`, no project or user setting can allow it.
+
+## Settings File Structure
+
+The settings file uses a straightforward JSON structure. Let us look at a complete project-level settings file.
+
+<CodeBlock code={`{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm build)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Read",
+      "Write",
+      "Edit"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git checkout -- .)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(npm publish:*)",
+      "Bash(pip install:*)",
+      "Bash(chmod:*)",
+      "Bash(sudo:*)"
+    ]
+  }
+}
+`} language="json" filename=".claude/settings.json" />
+
+Let us break down the key patterns.
+
+## Permission Pattern Syntax
+
+Permission patterns follow a consistent format: `ToolName(argument_pattern)`. The argument pattern supports glob-style matching.
+
+<CodeBlock code={`// Exact match -- only this specific command
+"Bash(git status)"
+
+// Prefix match with wildcard -- command plus any arguments
+"Bash(git diff:*)"
+
+// Tool without arguments -- all invocations allowed
+"Read"
+
+// MCP tool permissions
+"mcp__toolname(argument_pattern)"
+
+// Multiple arguments with wildcard
+"Bash(grep -r:*)"
+`} language="javascript" filename="permission-patterns.js" />
+
+The `:*` suffix is the most common pattern. It means "this command followed by any arguments." Without it, only the exact command string is matched.
+
+### Common Allow Patterns
+
+Here are the categories of commands most teams add to their allowlist.
+
+**Version control (read-only)**:
+
+<CodeBlock code={`"Bash(git status)",
+"Bash(git diff:*)",
+"Bash(git log:*)",
+"Bash(git branch:*)",
+"Bash(git show:*)",
+"Bash(git stash list)"
+`} language="json" filename="allow-patterns: git read" />
+
+**Build and test**:
+
+<CodeBlock code={`"Bash(pnpm test:*)",
+"Bash(pnpm lint:*)",
+"Bash(pnpm build)",
+"Bash(pnpm typecheck)",
+"Bash(pytest:*)",
+"Bash(cargo test:*)",
+"Bash(go test:*)",
+"Bash(make test)"
+`} language="json" filename="allow-patterns: build and test" />
+
+**File inspection**:
+
+<CodeBlock code={`"Bash(cat:*)",
+"Bash(ls:*)",
+"Bash(find:*)",
+"Bash(grep:*)",
+"Bash(rg:*)",
+"Bash(wc:*)",
+"Bash(head:*)",
+"Bash(tail:*)"
+`} language="json" filename="allow-patterns: file inspection" />
+
+### Critical Deny Patterns
+
+These commands should almost always be denied at the project level.
+
+<CodeBlock code={`"Bash(rm -rf:*)",
+"Bash(git push --force:*)",
+"Bash(git reset --hard:*)",
+"Bash(sudo:*)",
+"Bash(chmod 777:*)",
+"Bash(curl -X POST:*)",
+"Bash(wget:*)",
+"Bash(npm publish:*)",
+"Bash(docker run:*)",
+"Bash(eval:*)",
+"Bash(exec:*)"
+`} language="json" filename="deny-patterns: critical" />
+
+## Permission Modes
+
+Beyond individual allow/deny rules, agent frameworks offer global permission modes that set the overall behavior.
+
+**Default mode** is the standard interactive mode. The agent asks for approval on any action not explicitly allowed. This is the recommended mode for most development work.
+
+**Auto mode** auto-approves actions the framework considers safe (reads, searches) and asks about everything else. It is a convenience mode that reduces prompt fatigue for common operations while still gating risky ones.
+
+**Bypass mode** disables permission checks entirely. The agent can do anything without asking. This mode exists for CI/CD environments where the agent is already running inside a sandboxed container with no access to production systems.
+
+<MermaidDiagram chart={`flowchart LR
+    subgraph Default["Default Mode"]
+        D1["Most secure"]
+        D2["Asks for everything<br/>not allowlisted"]
+    end
+    subgraph Auto["Auto Mode"]
+        A1["Balanced"]
+        A2["Auto-approves safe actions<br/>asks for risky ones"]
+    end
+    subgraph Bypass["Bypass Mode"]
+        B1["No guardrails"]
+        B2["For sandboxed<br/>environments only"]
+    end
+    Default --> Auto --> Bypass
+    style Default fill:#c6f6d5,stroke:#38a169
+    style Auto fill:#fef3c7,stroke:#d69e2e
+    style Bypass fill:#fed7d7,stroke:#e53e3e
+`} />
+
+> **Warning**: Never use bypass mode on a developer workstation with access to production credentials, git remotes, or sensitive data. It is designed exclusively for isolated, disposable environments.
+
+## Building a Permission Configuration Step by Step
+
+Building your permissions from scratch is straightforward if you follow this methodology:
+
+**Step 1: Start with deny rules.** List every command that could cause irreversible damage in your environment. These go into the deny list first.
+
+**Step 2: Identify routine commands.** Watch a few agent sessions in default mode and note which commands you approve repeatedly. These are your candidates for the allow list.
+
+**Step 3: Add allow rules by category.** Group commands into read-only, build/test, and mutation categories. Allow the first two categories liberally. Be selective with mutations.
+
+**Step 4: Test the configuration.** Run the agent on a real task and verify it can complete its work without excessive approval prompts, while dangerous commands are still blocked.
+
+**Step 5: Iterate.** Permissions are a living document. As you discover new patterns the agent needs, add them. As you discover risks you missed, add deny rules.
+
+## User-Level Overrides
+
+Individual developers can supplement project settings with their personal `~/.claude/settings.json`. This is useful for commands that are specific to a developer's workflow but not relevant to the whole team.
+
+<CodeBlock code={`{
+  "permissions": {
+    "allow": [
+      "Bash(code:*)",
+      "Bash(open:*)",
+      "Bash(pbcopy)",
+      "Bash(pbpaste)"
+    ]
+  }
+}
+`} language="json" filename="~/.claude/settings.json" />
+
+Personal allow rules are additive -- they expand what the agent can do without asking. But they cannot override project-level or enterprise-level deny rules. If the project denies `git push --force`, no user setting can allow it.
+
+## Common Mistakes
+
+**Overly broad allows**: Using `Bash(*)` in the allow list defeats the purpose of permissions. Every command runs without approval, including destructive ones.
+
+**Missing deny rules**: Relying only on allowlists without deny rules means any command not on the allow list still triggers a prompt -- the user can still approve it by accident. Deny rules provide a hard block.
+
+**Forgetting about pipes and chains**: `Bash(ls:*)` allows `ls -la` but might not cover `ls | grep pattern` depending on how the framework parses compound commands. Test your patterns with realistic agent behavior.
+
+**Not checking in the settings file**: The `.claude/settings.json` file should be committed to version control so every developer and CI job gets the same safety rules. Keeping it out of version control means each developer starts from zero.
+
+## Summary
+
+Permission models are the foundation of agent safety. The **three-tier hierarchy** -- enterprise, project, and user -- gives organizations layered control over what agents can do. **Deny rules** block dangerous actions unconditionally. **Allow rules** reduce approval fatigue for known-safe commands. **Permission modes** set the global posture from fully interactive to fully autonomous. The key principle is to start restrictive and open up deliberately: deny the dangerous things first, allow the routine things next, and let the approval prompt handle everything in between. In the next lesson, we will add a dynamic layer on top of these static rules: the hooks system.

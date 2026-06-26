@@ -1,0 +1,312 @@
+---
+title: Context at Scale
+quiz:
+- question: What is hierarchical context, and why is it essential for large codebases?
+  options:
+  - A layered system where root CLAUDE.md provides global rules, package-level CLAUDE.md files add scoped rules, and .ctx files provide directory-level detail
+  - A strict file hierarchy where every directory must have exactly one .ctx file
+  - A ranking system that assigns priority numbers to each documentation file
+  - A version control strategy where context files are branched separately from code
+  correctIndex: 0
+- question: Why do large codebases benefit from a search-first approach to context loading?
+  options:
+  - Because search is faster than reading files
+  - Because search results are not counted against the context window
+  - Because most tasks touch only a small fraction of the codebase, and search loads only what is relevant rather than pre-loading everything
+  - Because developers prefer search interfaces over file browsing
+  correctIndex: 2
+- question: What is the 'context boundary' problem in monorepos?
+  options:
+  - The firewall between monorepo packages blocks agent access
+  - The context window shrinks when working in a monorepo compared to a single-package repo
+  - Monorepo packages cannot share .ctx files due to licensing restrictions
+  - Different packages in the monorepo have different conventions, dependencies, and patterns, and the agent must not mix them up
+  correctIndex: 3
+- question: When should you consider splitting a session instead of continuing a long one?
+  options:
+  - Every 10 messages, regardless of the task
+  - When the task changes scope or the agent starts referencing context that has been compressed
+  - Only when the agent explicitly says it has run out of context
+  - Never -- longer sessions are always more efficient
+  correctIndex: 1
+---
+
+## Overview
+
+The techniques from previous lessons -- .ctx files, memory, lean CLAUDE.md -- work well for small to medium projects. But large codebases introduce challenges that require a different level of thinking. When you have thousands of files, multiple packages, several teams, and distinct subsystems, context management becomes an architectural concern. This lesson covers hierarchical context structures, search-first approaches, context boundaries in monorepos, and operational patterns for teams working with agents at scale.
+
+## When Size Changes the Game
+
+A project with 50 files can get away with a single CLAUDE.md and maybe a few .ctx files. The agent can navigate the entire codebase in a few searches. But at some threshold -- typically around 500-1,000 files -- the dynamics change:
+
+- **Navigation cost increases.** The agent spends more turns finding the right files before it can start working.
+- **Convention drift appears.** Different parts of the codebase evolve different patterns, and a single CLAUDE.md cannot capture all of them without becoming unwieldy.
+- **Team boundaries emerge.** The backend team, the frontend team, and the platform team each have their own conventions.
+- **Dependency complexity grows.** Understanding how module A relates to module B requires context that is neither in A nor B.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Small["Small Project (50 files)"]
+        S1["Single CLAUDE.md\ncovers everything"]
+        S2["Agent navigates\nin 1-2 searches"]
+    end
+    subgraph Medium["Medium Project (500 files)"]
+        M1["CLAUDE.md + a few\n.ctx files"]
+        M2["Agent needs 3-5\nsearches to orient"]
+    end
+    subgraph Large["Large Project (5,000+ files)"]
+        L1["Hierarchical context\nrequired"]
+        L2["Agent needs a strategy\nbefore reading anything"]
+    end
+    Small --> Medium --> Large
+    style Small fill:#c6f6d5,stroke:#276749
+    style Medium fill:#fefcbf,stroke:#d69e2e
+    style Large fill:#ebf8ff,stroke:#3182ce
+`} />
+
+At scale, context management shifts from a content problem (what do I write?) to a systems problem (how do I organize, index, and deliver context efficiently?).
+
+## Hierarchical Context
+
+The most important pattern for large codebases is **hierarchical context** -- a layered system where context flows from broad to specific.
+
+<MermaidDiagram chart={`graph TD
+    A["Root CLAUDE.md\n(Global rules, build commands,\narchitecture overview)"]
+    A --> B["packages/api/CLAUDE.md\n(API conventions, middleware\npatterns, endpoint structure)"]
+    A --> C["packages/web/CLAUDE.md\n(React patterns, state mgmt,\ncomponent conventions)"]
+    A --> D["packages/shared/CLAUDE.md\n(Shared types, utility rules,\nversioning policy)"]
+    B --> B1["src/routes/.ctx"]
+    B --> B2["src/middleware/.ctx"]
+    B --> B3["src/validators/.ctx"]
+    C --> C1["src/components/.ctx"]
+    C --> C2["src/hooks/.ctx"]
+    C --> C3["src/pages/.ctx"]
+    D --> D1["src/types/.ctx"]
+    D --> D2["src/utils/.ctx"]
+    style A fill:#ebf8ff,stroke:#3182ce
+    style B fill:#c6f6d5,stroke:#276749
+    style C fill:#c6f6d5,stroke:#276749
+    style D fill:#c6f6d5,stroke:#276749
+`} />
+
+Each layer serves a different scope:
+
+**Root CLAUDE.md** contains what is true everywhere: the build system, the test framework, the top-level architecture, and the handful of rules that every agent session needs regardless of where it is working.
+
+**Package-level CLAUDE.md** files contain conventions specific to one package or subsystem. The API package has its middleware and routing patterns. The web package has its component and state management patterns. These are loaded only when the agent is working in that package.
+
+**Directory-level .ctx files** contain the most specific context: what this directory does, what files matter, and what patterns apply here. These are loaded on demand when the agent navigates to the directory.
+
+<CodeBlock code={`# Root CLAUDE.md for a monorepo
+
+## Commands
+- Build all: \`pnpm build\`
+- Test all: \`pnpm test\`
+- Build one package: \`pnpm --filter @acme/api build\`
+- Test one package: \`pnpm --filter @acme/api test\`
+
+## Architecture
+Monorepo with three packages:
+- @acme/api (Express REST API)
+- @acme/web (Next.js frontend)
+- @acme/shared (shared types and utilities)
+
+## Global Rules
+- All packages use TypeScript strict mode
+- Named exports only, no default exports
+- Changes to @acme/shared require tests in both api and web
+- Never import from another package's src/ directly --
+  use the package's public API
+`} language="markdown" filename="CLAUDE.md (root)" />
+
+<CodeBlock code={`# packages/api/CLAUDE.md
+
+## Commands
+- Dev server: \`pnpm dev\` (runs on port 3001)
+- Test: \`pnpm vitest run\`
+- DB migrate: \`pnpm db:migrate\`
+
+## API Conventions
+- Route files in src/routes/ export a router
+- Every route validates input with Zod (schemas in
+  src/validators/)
+- Business logic in src/services/, never in route handlers
+- Errors use AppError; never throw raw Error objects
+- All endpoints return { data, meta } wrapper
+
+## Testing
+- Integration tests use supertest + test database
+- Run \`pnpm db:migrate:test\` before first test run
+`} language="markdown" filename="packages/api/CLAUDE.md" />
+
+The hierarchy means an agent working on an API route sees the root rules plus the API-specific rules, but not the frontend rules. An agent working on a React component sees the root rules plus the web-specific rules, but not the API patterns. Each agent session gets exactly the context it needs.
+
+## The Search-First Approach
+
+In a large codebase, the agent cannot afford to read files speculatively. It needs a **search-first approach**: instead of browsing the file tree, it searches for what it needs and reads only the search results.
+
+<MermaidDiagram chart={`flowchart TD
+    A["Task: Add rate limiting\nto the /users endpoint"] --> B{"Search-first approach"}
+    B --> C["Search: 'rate limit'\nin codebase"]
+    B --> D["Search: 'users route'\nin src/routes/"]
+    B --> E["Search: 'middleware'\nin .ctx files"]
+    C --> F["Found: existing rate\nlimiter in middleware/"]
+    D --> G["Found: users.routes.ts"]
+    E --> H["Found: middleware .ctx\nexplains the pattern"]
+    F --> I["Read 3 targeted files"]
+    G --> I
+    H --> I
+    I --> J["Agent has focused context\n(~3,000 tokens of code)"]
+    J --> K["Implement rate limiting\nfollowing existing pattern"]
+
+    style B fill:#ebf8ff,stroke:#3182ce
+    style J fill:#c6f6d5,stroke:#276749
+`} />
+
+Compare this with a browse-first approach where the agent reads the file tree, opens several directories to understand the structure, reads a few files in each to find the right one, and eventually locates the same three files. The browse-first approach might consume 15,000 tokens of context on navigation before the agent starts working. The search-first approach consumes 3,000.
+
+You can support search-first by making your code searchable:
+
+- **Use consistent naming.** If all middleware files end in `.middleware.ts`, the agent can find them with one search.
+- **Use descriptive function names.** A function called `applyRateLimit` is found by searching "rate limit." A function called `middleware3` is not.
+- **Add comments at decision points.** A comment like `// RATE_LIMIT: 100 requests per minute per IP` is a search beacon.
+
+## Context Boundaries in Monorepos
+
+Monorepos introduce a subtle challenge: **context boundaries**. Each package in the monorepo may have different languages, frameworks, conventions, and dependencies. When the agent crosses a package boundary without recognizing it, mistakes follow.
+
+<CodeBlock code={`# Common mistake: applying API patterns in the frontend
+
+# Agent is working on packages/web but remembers API patterns:
+# "All endpoints return { data, meta } wrapper"
+# It then writes a React hook that wraps responses in { data, meta }
+# which makes no sense on the frontend
+
+# Prevention: Package-level CLAUDE.md clearly states scope:
+
+# packages/web/CLAUDE.md
+## Scope
+This is a Next.js frontend application. Ignore conventions
+from @acme/api -- they do not apply here.
+
+## Data Fetching
+- Use React Query for all API calls
+- API responses are unwrapped by the apiClient helper --
+  components receive the data directly, not wrapped objects
+`} language="markdown" filename="context-boundary-example" />
+
+Context boundaries need explicit management:
+
+- **State the scope.** Each package CLAUDE.md should start with what it is and what conventions do not apply.
+- **Isolate dependencies.** If the API uses Express and the frontend uses Next.js, make that explicit so the agent does not suggest Express patterns in Next.js code.
+- **Cross-package rules go in root.** Rules about how packages interact (like "never import from another package's src/") belong in the root CLAUDE.md where both sides see them.
+
+## Team-Scoped Context
+
+In organizations where multiple teams work on the same codebase, context needs a team dimension. The infrastructure team's conventions around Terraform differ from the application team's conventions around TypeScript. Mixing them is wasteful.
+
+<CodeBlock code={`# Team-scoped context using directory conventions
+
+infrastructure/
+  CLAUDE.md           # Terraform, AWS, IaC conventions
+  modules/
+    networking/.ctx
+    compute/.ctx
+    storage/.ctx
+
+services/
+  CLAUDE.md           # Microservice patterns, gRPC, Docker
+  user-service/
+    CLAUDE.md         # User service specific patterns
+    src/.ctx
+  payment-service/
+    CLAUDE.md         # Payment service specific patterns
+    src/.ctx
+
+frontend/
+  CLAUDE.md           # React, Next.js, CSS conventions
+  components/.ctx
+  pages/.ctx
+`} language="text" filename="team-scoped-structure" />
+
+Each team owns and maintains the context files in their area. The root CLAUDE.md covers cross-team concerns: CI/CD, shared tooling, code review expectations. This mirrors how organizations already work -- each team has autonomy over their domain, with shared agreements at the top.
+
+## Operational Patterns at Scale
+
+Beyond file structure, large teams benefit from operational patterns for managing context:
+
+**Context review in PRs.** When a PR changes the conventions or patterns in a directory, the PR checklist should include: "Does the .ctx file or package CLAUDE.md need updating?" Stale context is worse than missing context.
+
+**Context coverage metrics.** Track which directories have .ctx files and which do not. Like test coverage, context coverage tells you where agents are operating blind. Prioritize coverage for the directories agents work in most.
+
+**Session splitting.** Long sessions in large codebases are especially prone to context degradation. When a task spans multiple packages or subsystems, split it into focused sessions: one for the API change, one for the frontend change, one for the shared types update. Each session gets its own clean context window.
+
+**Context freshness automation.** Some teams add CI checks that verify .ctx files reference files that actually exist. A .ctx file that lists "key file: auth-handler.ts" when that file was renamed months ago is actively harmful.
+
+<CodeBlock code={`# CI check for context freshness (simplified)
+
+#!/bin/bash
+# verify-ctx-files.sh
+# Run in CI to catch stale .ctx references
+
+errors=0
+for ctx_file in $(find . -name ".ctx" -type f); do
+  dir=$(dirname "$ctx_file")
+  # Extract referenced files from the .ctx
+  grep -oP '[-\w]+\.\w+' "$ctx_file" | while read ref; do
+    if [ ! -f "$dir/$ref" ] && [ ! -d "$dir/$ref" ]; then
+      echo "STALE: $ctx_file references '$ref' which does not exist"
+      errors=$((errors + 1))
+    fi
+  done
+done
+
+if [ $errors -gt 0 ]; then
+  echo "Found $errors stale references in .ctx files"
+  exit 1
+fi
+`} language="bash" filename="verify-ctx-files.sh" />
+
+## When to Start New Sessions
+
+One of the most underrated context management techniques is knowing when to end a session and start a new one. In large codebases, this decision matters more because the context is more complex and degrades faster.
+
+**Start a new session when:**
+
+- You are switching to a different package or subsystem
+- The conversation has exceeded 30-40 messages and you are starting a new subtask
+- The agent seems to be confusing patterns from different parts of the codebase
+- You have made important corrections that you want the agent to have at full fidelity (not compressed)
+
+**Continue the current session when:**
+
+- You are iterating on the same files
+- The agent's understanding of the current task is still sharp
+- The remaining work directly depends on decisions made earlier in the session
+
+> **Think of sessions like physical workspaces.** When you finish a task at one workbench and move to a different one, you clear the first bench. You do not pile new materials on top of the old ones. Agents benefit from the same discipline.
+
+## The Context Management Maturity Model
+
+Teams typically progress through stages of context management maturity:
+
+**Stage 1: No context management.** No CLAUDE.md, no .ctx files. Agents guess at everything. High friction, low productivity.
+
+**Stage 2: Single CLAUDE.md.** A root CLAUDE.md covers the basics. Agents get build commands and key rules. Significant improvement.
+
+**Stage 3: Distributed context.** .ctx files and nested CLAUDE.md files distribute context across the codebase. Agents get relevant context on demand.
+
+**Stage 4: Automated context.** Context kits, memory systems, and CI-validated freshness checks ensure agents always have the right context, kept current automatically.
+
+**Stage 5: Context-aware architecture.** The codebase itself is designed for context efficiency -- self-describing code, clear boundaries, searchable names. Context files are a thin complement to code that already communicates well.
+
+Most teams are at stage 2. Getting to stage 3 is the biggest single leap in agent productivity for large codebases.
+
+## Summary
+
+- Large codebases require **hierarchical context**: root CLAUDE.md for global rules, package-level CLAUDE.md for scoped conventions, .ctx files for directory-level detail
+- A **search-first approach** lets agents find relevant code and context without browsing the entire file tree, saving thousands of tokens
+- **Context boundaries** in monorepos prevent agents from applying one package's conventions in another -- make scope explicit in each package's documentation
+- **Team-scoped context** mirrors organizational structure, with each team owning their area's context files
+- **Operational patterns** -- context review in PRs, coverage metrics, freshness checks, session splitting -- keep context management sustainable at scale
+- **Start new sessions** when crossing subsystem boundaries or when the current session's context has degraded from compression
+- Teams progress through a **maturity model** from no context management to context-aware architecture -- the biggest leap is moving from a single CLAUDE.md to distributed context

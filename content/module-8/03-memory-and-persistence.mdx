@@ -1,0 +1,227 @@
+---
+title: Memory and Persistence
+quiz:
+- question: What is the fundamental problem that persistent memory solves for AI agents?
+  options:
+  - It prevents agents from having to re-learn project-specific knowledge at the start of every session
+  - It allows agents to run faster by caching compiled code
+  - It gives agents access to the internet between sessions
+  - It enables agents to modify files without developer permission
+  correctIndex: 0
+- question: Which type of memory captures things like 'this project uses pnpm, not npm' or 'always run migrations before tests'?
+  options:
+  - User preferences -- personal style choices
+  - Feedback memory -- corrections from past sessions
+  - Project facts -- discovered truths about the codebase and its tooling
+  - Reference memory -- links to external documentation
+  correctIndex: 2
+- question: Why should memory systems be selective about what they persist rather than recording everything?
+  options:
+  - Storage costs make it impractical to save everything
+  - Privacy regulations prohibit storing raw conversation data
+  - Agents cannot read more than ten memory entries per session
+  - Too much stored memory floods future sessions with irrelevant context, recreating the drowning problem
+  correctIndex: 3
+- question: What happens when memory conflicts with CLAUDE.md?
+  options:
+  - Memory always wins because it is more recent
+  - CLAUDE.md always wins because it is the authoritative source
+  - The agent crashes due to contradictory instructions
+  - The agent should ask the developer which source to trust
+  correctIndex: 1
+---
+
+## Overview
+
+Every time you start a new session with an AI coding agent, the agent knows nothing about what happened in previous sessions. It does not remember that your test suite requires a running database. It does not recall that you prefer functional patterns over class hierarchies. It has no memory of the three debugging sessions where you discovered that the payment module has a race condition under load. **Persistent memory** systems change this. They allow agents to carry knowledge across sessions, so each conversation builds on the last instead of starting from scratch.
+
+## The Groundhog Day Problem
+
+Without memory, every agent session is a fresh start. The agent reads CLAUDE.md, loads whatever context it can find, and begins working. If the task requires knowledge that is not in CLAUDE.md or the code itself -- things the agent discovered through interaction -- that knowledge is lost.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant D as Developer
+    participant A1 as Session 1
+    participant A2 as Session 2
+    participant A3 as Session 3
+
+    D->>A1: "Fix the flaky test in payments"
+    A1->>A1: Discovers race condition in db pool
+    A1->>D: Fix applied: added connection mutex
+    Note over A1: Session ends. Knowledge lost.
+
+    D->>A2: "Another flaky test in payments"
+    A2->>A2: Spends 10 min rediscovering race condition
+    A2->>D: Fix applied: same mutex pattern
+    Note over A2: Session ends. Knowledge lost again.
+
+    D->>A3: "Yet another payment test issue"
+    A3->>A3: Rediscovers the same root cause
+    A3->>D: Same fix, third time
+    Note over A3: The agent never learns.
+`} />
+
+This is the **Groundhog Day problem**: the agent relives the same discovery process over and over. Each session pays the full cost of understanding something the agent already figured out before.
+
+The impact compounds across a team. If five developers each have sessions that rediscover the same facts about the codebase, that is five times the wasted context, five times the wasted compute, and five times the developer frustration.
+
+## How Memory Works
+
+A **memory system** for AI agents records observations from each session and injects relevant ones into future sessions. It operates in three phases:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Record["Phase 1: Record"]
+        A["Agent observes something\nnoteworthy during session"] --> B["Memory system captures\nthe observation"]
+        B --> C["Observation stored in\npersistent storage"]
+    end
+    subgraph Retrieve["Phase 2: Retrieve"]
+        D["New session begins"] --> E["Memory system searches for\nrelevant past observations"]
+        E --> F["Matched observations\ninjected into context"]
+    end
+    subgraph Apply["Phase 3: Apply"]
+        F --> G["Agent uses past knowledge\nwithout rediscovery"]
+        G --> H["Better decisions,\nfewer mistakes"]
+    end
+    C -.->|"between sessions"| D
+    style Record fill:#ebf8ff,stroke:#3182ce
+    style Retrieve fill:#fefcbf,stroke:#d69e2e
+    style Apply fill:#c6f6d5,stroke:#276749
+`} />
+
+**Recording** happens during or after a session. The memory system observes the agent's actions, the developer's corrections, and the facts discovered during the session. Not everything is recorded -- the system filters for observations that are likely useful in future sessions.
+
+**Retrieval** happens at the start of each new session. Given the current task or the files being worked on, the memory system searches its store for relevant past observations and injects them into the agent's context.
+
+**Application** is implicit. Once past observations are in the context, the agent uses them naturally. It does not need special instructions to "use memory" -- the observations become part of the information it reasons with.
+
+## Types of Memory
+
+Not all memories are equal. Different types of information serve different purposes, and organizing them helps both the memory system and the developer understand what is stored.
+
+**Project facts** are truths about the codebase that do not change often. "This project uses pnpm." "The database is PostgreSQL 15." "Integration tests require REDIS_URL to be set." These are the most valuable memories because they prevent the agent from guessing or using incorrect defaults.
+
+**Feedback corrections** are things the developer corrected during a session. "Do not use `any` in TypeScript -- use `unknown` instead." "Always destructure props in React components." These capture the team's preferences that go beyond what is written in CLAUDE.md.
+
+**Discovery notes** are insights the agent gained through investigation. "The `processPayment` function has a subtle race condition when called concurrently." "Module X depends on module Y even though it is not in the import graph -- it uses dynamic imports." These are expensive to rediscover.
+
+**User preferences** are personal to the developer. "I prefer verbose variable names." "Show me the diff before applying changes." "Explain your reasoning before writing code." These shape the agent's interaction style.
+
+<CodeBlock code={`# Example memory observations stored across sessions
+
+## Project Facts
+- Build: pnpm build (NOT npm)
+- Tests: pnpm vitest run (NOT jest)
+- DB migrations must run before integration tests:
+  pnpm db:migrate:test
+- The monorepo uses turborepo; run tasks from root
+
+## Feedback Corrections
+- Never use default exports; always use named exports
+- Prefer Zod schemas over manual validation
+- API errors must use the AppError class, not raw Error
+
+## Discovery Notes
+- src/payments/processor.ts: The connection pool has
+  max_connections=10; concurrent calls above 10 will
+  queue silently -- this causes flaky tests under load
+- src/auth/tokens.ts: JWT verification uses RS256,
+  but the test fixtures use HS256 -- tests need the
+  TEST_JWT_SECRET env var
+
+## User Preferences
+- Developer prefers seeing test output before committing
+- Developer wants explanations for non-obvious changes
+`} language="markdown" filename="memory-examples.md" />
+
+## Memory vs. CLAUDE.md
+
+Memory and CLAUDE.md serve different purposes, and understanding the distinction prevents duplication and conflict.
+
+**CLAUDE.md** is the authoritative, version-controlled source of truth. It contains the team's agreed-upon conventions, the correct build commands, and the project's architectural rules. Every developer on the team shares the same CLAUDE.md, and changes to it go through code review.
+
+**Memory** is supplementary, personal or project-scoped, and often auto-generated. It fills in the gaps that CLAUDE.md does not cover -- the discovered facts, the individual preferences, the corrections from past sessions.
+
+When memory conflicts with CLAUDE.md, **CLAUDE.md wins**. Memory is a convenience layer; CLAUDE.md is the contract. If you find that memory keeps recording something that should be in CLAUDE.md, promote it: add the information to CLAUDE.md and let the memory entry become redundant.
+
+> **Rule of thumb:** If the information is true for everyone on the team and should be enforced consistently, put it in CLAUDE.md. If it is personal, transient, or discovered rather than designed, let memory handle it.
+
+## How Memory Gets Injected
+
+The mechanics of memory injection vary by tool, but the general pattern is consistent. At the start of a session, the memory system receives a signal (the task description, the files being opened, or just the project name) and returns relevant observations. These observations are added to the agent's context alongside CLAUDE.md and other system instructions.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant D as Developer
+    participant M as Memory System
+    participant A as Agent
+
+    D->>A: "Fix the flaky payment test"
+    A->>M: Query: "payment test flaky"
+    M->>M: Search stored observations
+    M->>A: Return 3 relevant memories
+    Note over A: Context now includes:<br/>1. CLAUDE.md<br/>2. Memory: connection pool limit=10<br/>3. Memory: JWT test fixtures use HS256<br/>4. Memory: run db:migrate:test first
+    A->>A: Apply knowledge immediately
+    A->>D: "Found it -- the connection pool limit<br/>is causing test contention. Here is the fix."
+`} />
+
+Notice the difference from the Groundhog Day scenario. Instead of rediscovering the connection pool issue, the agent starts with that knowledge and goes straight to the fix.
+
+## Configuring Memory Effectively
+
+Memory systems work best when they are tuned to record the right things and ignore the noise. Here are practical guidelines:
+
+**Let it learn from corrections.** The most valuable memories come from moments when you correct the agent. "No, use pnpm, not npm." "That is the wrong test command." These corrections are high-signal because they indicate a gap between what the agent assumed and what is actually true.
+
+**Prune periodically.** Memory accumulates. Old observations about a module that has been rewritten, preferences that have changed, or facts about a dependency that has been replaced -- these become noise. Review stored memories periodically and remove what is no longer accurate.
+
+**Scope appropriately.** Project-level memory should contain facts about the codebase. User-level memory should contain personal preferences. Mixing the scopes means your personal preferences get injected into your teammate's sessions, which is rarely helpful.
+
+<CodeBlock code={`# Example memory configuration
+
+memory:
+  # What triggers recording
+  record:
+    on_correction: true    # Developer corrects the agent
+    on_discovery: true     # Agent discovers non-obvious fact
+    on_session_end: true   # Summarize session learnings
+
+  # What gets retrieved
+  retrieve:
+    max_observations: 10   # Limit to top 10 relevant memories
+    relevance_threshold: 0.7  # Only high-confidence matches
+    scopes:
+      - project            # Project-wide facts
+      - user               # Personal preferences
+
+  # Maintenance
+  maintenance:
+    max_age_days: 90       # Auto-archive after 90 days
+    dedup: true            # Merge duplicate observations
+`} language="yaml" filename="memory-config.yaml" />
+
+## The Memory Budget
+
+Memory itself consumes context. If the memory system injects twenty observations at the start of every session, that is potentially thousands of tokens before the agent even reads a file. This creates a new version of the drowning problem: too much memory flooding the context with marginally relevant past observations.
+
+The solution is the same principle we apply everywhere: **be selective**. A good memory system retrieves the 5-10 most relevant observations, not everything it has ever recorded. It weighs recency, relevance to the current task, and the confidence of the match.
+
+> **Think of memory as a filter, not a firehose.** The goal is to inject the three facts that will save the agent from making a mistake, not to replay the entire history of past sessions.
+
+## Anti-Patterns
+
+**Recording everything.** If the memory system saves every observation from every session, retrieval becomes noisy and slow. Be selective about what crosses the persistence threshold.
+
+**Never pruning.** Memory without maintenance becomes stale. Facts about the codebase change. Preferences evolve. Old memories that contradict current reality cause more harm than having no memory at all.
+
+**Duplicating CLAUDE.md.** If a fact is already in CLAUDE.md, storing it in memory is redundant. It wastes the memory retrieval budget and creates a risk of the two sources drifting apart.
+
+**Ignoring memory conflicts.** When the agent receives contradictory guidance from memory and CLAUDE.md, it must have a clear precedence rule. Without one, the agent's behavior becomes unpredictable.
+
+## Summary
+
+- Without memory, agents suffer the **Groundhog Day problem** -- rediscovering the same facts session after session
+- **Persistent memory** records observations from sessions and injects relevant ones into future sessions
+- Memory comes in four types: **project facts**, **feedback corrections**, **discovery notes**, and **user preferences**
+- CLAUDE.md is the authoritative source of truth; memory is supplementary -- when they conflict, CLAUDE.md wins
+- Memory systems should be **selective** about what they record and retrieve to avoid flooding context with irrelevant history
+- **Prune regularly** -- stale memories that contradict current reality cause more harm than no memory at all
+- Treat memory as a filter that surfaces the few critical facts that prevent mistakes, not a firehose of every past observation

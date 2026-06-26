@@ -1,0 +1,264 @@
+---
+title: Anatomy of a CLAUDE.md
+quiz:
+- question: Which section should appear first in a CLAUDE.md?
+  options:
+  - Build, test, and lint commands
+  - Code style preferences and formatting rules
+  - Project history and design rationale
+  - Team member contact information
+  correctIndex: 0
+- question: What is the purpose of the 'Do NOT' section in a CLAUDE.md?
+  options:
+  - To list features that have not been implemented yet
+  - To document bugs that need fixing
+  - To prevent the agent from repeating known mistakes or violating critical rules
+  - To describe deprecated APIs
+  correctIndex: 2
+- question: Why should a CLAUDE.md include file structure hints?
+  options:
+  - So the agent can generate a directory listing for the README
+  - So the agent can rename files to match a naming convention
+  - So the agent can delete unused files automatically
+  - So the agent knows where to put new code and where to find existing patterns
+  correctIndex: 3
+- question: What is the recommended total length for a CLAUDE.md?
+  options:
+  - As long as possible to cover every edge case
+  - Concise enough to fit key context without wasting the agent's context window
+  - Exactly 100 lines, no more
+  - One sentence per section maximum
+  correctIndex: 1
+---
+
+## Overview
+
+Now that you understand *why* CLAUDE.md matters, it is time to learn *what goes inside it*. A well-structured CLAUDE.md is not a free-form essay -- it follows a deliberate structure that mirrors how an agent processes information.
+
+In this lesson, you will learn the key sections of a CLAUDE.md, the mental model behind its organization, and how to structure each section for maximum agent effectiveness.
+
+## The Mental Model: Agent as New Team Member
+
+Before diving into sections, consider how a CLAUDE.md gets used. When an agent starts a session, it reads CLAUDE.md as part of its **system context**. This means:
+
+- The agent reads it **before** looking at any code
+- It shapes the agent's behavior for the **entire session**
+- Every token in CLAUDE.md **consumes context window space**
+- The agent treats instructions as **authoritative** -- it will follow them
+
+This gives us a design principle: **put the most operationally critical information first, keep everything concise, and never include information the agent does not need to act on.**
+
+<MermaidDiagram chart={`graph TD
+    subgraph SessionStart["Agent Session Initialization"]
+        A[Read CLAUDE.md] --> B[Read source files]
+        B --> C[Understand task from user]
+        C --> D[Plan changes]
+        D --> E[Write code]
+        E --> F[Run build/test commands]
+    end
+
+    subgraph CLAUDEmd["CLAUDE.md Sections"]
+        G["1. Build & Test Commands"] -.-> F
+        H["2. Code Style Rules"] -.-> E
+        I["3. Architecture Notes"] -.-> D
+        J["4. Do's and Don'ts"] -.-> E
+        K["5. File Structure"] -.-> D
+    end
+
+    style SessionStart fill:#ebf8ff,stroke:#3182ce
+    style CLAUDEmd fill:#f0fff4,stroke:#276749
+`} />
+
+Each section of CLAUDE.md maps to a phase in the agent's workflow. Build commands are needed at the end (verification), but they are listed first because they are the most frequently referenced and the most operationally critical.
+
+## Section 1: Build, Test, and Lint Commands
+
+This is the most important section. Without correct commands, the agent cannot verify its own work. Place it at the very top.
+
+<CodeBlock code={`# Build & Test Commands
+
+## Build
+pnpm build
+
+## Test
+pnpm vitest run              # Run all tests
+pnpm vitest run src/auth/    # Run tests for a specific directory
+pnpm vitest run --grep "login" # Run tests matching a pattern
+
+## Lint
+pnpm eslint . --fix
+
+## Type Check
+pnpm tsc --noEmit
+`} language="markdown" filename="CLAUDE.md" />
+
+Notice the structure:
+
+- **Exact commands** -- not "run the tests" but `pnpm vitest run`
+- **Variations** -- how to run a subset of tests, not just the full suite
+- **All verification steps** -- build, test, lint, and type-check are separate concerns
+
+> **Tip:** Include the command for running a single test file. Agents frequently need to iterate on one test without running the entire suite.
+
+## Section 2: Code Style and Conventions
+
+This section tells the agent how to write code that fits your codebase. Be specific about the conventions that matter most.
+
+<CodeBlock code={`# Code Style
+
+- Use TypeScript strict mode. Never use \`any\` — use \`unknown\` and narrow.
+- Prefer named exports over default exports.
+- Use functional components with hooks, never class components.
+- Error handling: always use Result types from \`src/lib/result.ts\`, never throw exceptions.
+- Naming: camelCase for variables/functions, PascalCase for types/components, UPPER_SNAKE for constants.
+- Imports: group as stdlib → external packages → internal modules, separated by blank lines.
+`} language="markdown" filename="CLAUDE.md" />
+
+Focus on conventions that:
+
+- Differ from language defaults or common practice
+- Have caused problems in past agent sessions
+- Would be hard for the agent to infer from existing code
+
+You do not need to document every convention. If your project uses Prettier with a config file, the agent can read that config. Document the conventions that live in people's heads.
+
+## Section 3: Architecture Notes
+
+This section gives the agent a map of the codebase. It helps the agent decide *where* to put new code and *how* components connect.
+
+<CodeBlock code={`# Architecture
+
+This is a Next.js 14 app with App Router. Key directories:
+
+- \`src/app/\` — Route handlers and page components (App Router conventions)
+- \`src/components/\` — Shared UI components (no business logic)
+- \`src/lib/\` — Business logic, utilities, and type definitions
+- \`src/lib/db/\` — Database access layer (Drizzle ORM, PostgreSQL)
+- \`src/lib/auth/\` — Authentication logic (NextAuth.js v5)
+
+## Data flow
+Request → Route handler → Service function (src/lib/) → Database layer (src/lib/db/)
+
+## Key patterns
+- Server Components by default. Use "use client" only for interactivity.
+- All database queries go through the service layer, never called directly from components.
+- API routes return typed responses using \`ApiResponse<T>\` from \`src/lib/types.ts\`.
+`} language="markdown" filename="CLAUDE.md" />
+
+Keep architecture notes **structural, not historical**. The agent does not need to know *why* you chose Drizzle over Prisma -- it needs to know that Drizzle is what you use and where the queries live.
+
+## Section 4: Do's and Don'ts
+
+This section is your guardrail. It prevents the agent from making mistakes that are hard to catch in review. **The "Don'ts" are often more valuable than the "Do's"** because they prevent specific failure modes.
+
+<CodeBlock code={`# Rules
+
+## Do
+- Write tests for all new functions. Place test files adjacent to source: \`foo.ts\` → \`foo.test.ts\`
+- Use the existing error handling pattern: wrap fallible operations in \`tryCatch()\`
+- Add JSDoc comments to all exported functions
+- Run \`pnpm build\` before considering a task complete
+
+## Do NOT
+- Do NOT use \`console.log\` for debugging — use the logger from \`src/lib/logger.ts\`
+- Do NOT add new dependencies without mentioning it — suggest the dependency and wait for approval
+- Do NOT modify files in \`src/generated/\` — these are auto-generated from the OpenAPI spec
+- Do NOT use relative imports that go up more than two levels (e.g., \`../../../\`)
+- Do NOT use \`any\` type — ever. Use \`unknown\` and type guards instead.
+`} language="markdown" filename="CLAUDE.md" />
+
+> **Key insight:** Every "Do NOT" rule usually comes from a real incident. When an agent makes a mistake, add a corresponding "Do NOT" rule. Your CLAUDE.md should evolve over time.
+
+## Section 5: File Structure Hints
+
+For complex projects, a brief file tree helps the agent navigate without having to explore the filesystem.
+
+<CodeBlock code={`# File Structure
+
+\`\`\`
+├── src/
+│   ├── app/              # Next.js App Router pages
+│   │   ├── api/          # API route handlers
+│   │   ├── (auth)/       # Auth-related pages (grouped route)
+│   │   └── dashboard/    # Dashboard pages
+│   ├── components/
+│   │   ├── ui/           # Primitives (Button, Input, Modal)
+│   │   └── features/     # Feature-specific components
+│   ├── lib/
+│   │   ├── db/           # Database schema and queries
+│   │   ├── auth/         # Auth configuration and helpers
+│   │   └── utils/        # Pure utility functions
+│   └── types/            # Shared TypeScript types
+├── tests/
+│   └── e2e/              # Playwright end-to-end tests
+├── prisma/
+│   └── schema.prisma     # Database schema
+└── scripts/              # Build and deployment scripts
+\`\`\`
+`} language="markdown" filename="CLAUDE.md" />
+
+You do not need to list every file. Focus on the top two or three levels and annotate directories whose purpose is not obvious from the name.
+
+## Putting It All Together
+
+Here is how these sections compose into a complete CLAUDE.md:
+
+<MermaidDiagram chart={`graph TD
+    subgraph CLAUDE["CLAUDE.md Structure"]
+        A["Section 1: Build & Test Commands<br/><i>Most critical — used every session</i>"]
+        B["Section 2: Code Style<br/><i>Shapes how code is written</i>"]
+        C["Section 3: Architecture<br/><i>Shapes where code goes</i>"]
+        D["Section 4: Do's and Don'ts<br/><i>Prevents known mistakes</i>"]
+        E["Section 5: File Structure<br/><i>Navigation aid</i>"]
+    end
+
+    A --> B --> C --> D --> E
+
+    F["High frequency,<br/>high impact"] -.-> A
+    G["Medium frequency,<br/>high impact"] -.-> B
+    G -.-> C
+    H["Low frequency,<br/>high impact"] -.-> D
+    I["Reference only"] -.-> E
+
+    style A fill:#c6f6d5,stroke:#276749
+    style B fill:#c6f6d5,stroke:#276749
+    style C fill:#fefcbf,stroke:#975a16
+    style D fill:#fefcbf,stroke:#975a16
+    style E fill:#ebf8ff,stroke:#3182ce
+`} />
+
+The ordering is intentional: **most operationally critical first, reference material last**. This matters because if the agent's context window is constrained, the most important information is processed first.
+
+## Length Guidelines
+
+A common question is "how long should my CLAUDE.md be?" The answer depends on your project's complexity, but here are guidelines:
+
+| Project Type | Typical Length | Sections to Prioritize |
+|---|---|---|
+| Small library | 20-40 lines | Commands, style, don'ts |
+| Web application | 40-80 lines | Commands, architecture, style, don'ts |
+| Monorepo | 30-50 lines (root) + 20-30 per package | Commands (root), architecture (root), per-package style |
+| Complex system | 60-100 lines | All sections |
+
+> **Warning:** Resist the urge to document everything. Every line in CLAUDE.md consumes context window tokens. Include only information the agent needs to *act correctly*. If a convention can be inferred from existing code or config files, you may not need to state it explicitly.
+
+## The Iteration Loop
+
+Your first CLAUDE.md will not be perfect, and it does not need to be. Treat it as a **living document** that improves through a feedback loop:
+
+1. **Write** an initial CLAUDE.md with build commands and top conventions
+2. **Use** an agent to do real work in the codebase
+3. **Notice** where the agent makes mistakes or asks unnecessary questions
+4. **Update** the CLAUDE.md to address those gaps
+5. **Repeat**
+
+Over a few sessions, your CLAUDE.md converges on the right level of detail for your project. The mistakes stop. The iterations shrink. And every team member benefits from the improvements.
+
+## Summary
+
+- A well-structured CLAUDE.md has five core sections: **commands, code style, architecture, rules, and file structure**
+- Order sections by **operational criticality** -- build and test commands come first
+- Be **specific and concise** -- exact commands, not vague descriptions
+- The **"Do NOT" rules** are often the most valuable section because they prevent known failure modes
+- Keep length **proportional to project complexity** -- 40-80 lines for a typical web application
+- Treat CLAUDE.md as a **living document** that evolves through the feedback loop of real agent sessions

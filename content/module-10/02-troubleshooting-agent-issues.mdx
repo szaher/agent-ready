@@ -1,0 +1,262 @@
+---
+title: Troubleshooting Agent Issues
+quiz:
+- question: What should be the FIRST step when an agent produces incorrect output?
+  options:
+  - Review the agent's transcript to identify where it diverged from the expected path
+  - Rewrite the CLAUDE.md from scratch
+  - Switch to a different AI model
+  - Add more instructions to the system prompt
+  correctIndex: 0
+- question: An agent keeps editing the wrong files despite clear project structure. What is the most likely root cause?
+  options:
+  - The agent's model is too small
+  - The agent has a bug in its file search algorithm
+  - The directory structure is ambiguous or the CLAUDE.md does not point to the correct locations
+  - The codebase has too many files
+  correctIndex: 2
+- question: What does 'context overflow' mean in agent troubleshooting?
+  options:
+  - The agent runs out of disk space
+  - The CLAUDE.md file is too short
+  - The agent sends too many API requests
+  - The agent's prompt exceeds the model's context window, causing it to lose earlier instructions or file content
+  correctIndex: 3
+- question: When comparing a successful agent session to a failed one, which difference is most diagnostic?
+  options:
+  - The time of day the session ran
+  - The sequence of tool calls and at what point the sequences diverge
+  - Which developer initiated the session
+  - The total number of tokens consumed
+  correctIndex: 1
+---
+
+## Overview
+
+Agents will fail. Not occasionally -- routinely, especially in the early days of adoption. The difference between teams that succeed with agents and teams that abandon them is not the failure rate. It is whether the team has a systematic approach to diagnosing and fixing failures. This lesson gives you that system: a repeatable process for identifying why an agent went wrong, the most common failure categories, and the diagnostic tools that make troubleshooting efficient rather than frustrating.
+
+## The Troubleshooting Mindset
+
+When an agent produces wrong output, the instinct is to blame the agent: "It is not smart enough" or "AI just cannot do this." But in the vast majority of cases, agent failures are **input failures** -- the agent received ambiguous instructions, insufficient context, or conflicting signals. Troubleshooting an agent is closer to debugging a misconfigured build system than debugging a logic error. The system is doing exactly what it was told; it was just told the wrong thing.
+
+> Treat every agent failure as a feedback signal about your codebase's readiness, not as evidence that agents do not work. The agent is a mirror -- it reflects the clarity (or confusion) in your project's documentation and structure.
+
+## The Diagnostic Flowchart
+
+When an agent session produces unexpected results, follow this systematic process.
+
+<MermaidDiagram chart={`graph TD
+    Start["Agent produced\nunexpected output"] --> Step1["Step 1: Review\nthe transcript"]
+    Step1 --> Q1{"Did the agent\nread the right files?"}
+    Q1 -->|No| Fix1["Fix: Update CLAUDE.md\nwith file pointers"]
+    Q1 -->|Yes| Q2{"Did the agent\nfollow instructions?"}
+    Q2 -->|No| Q3{"Is CLAUDE.md\nclear and specific?"}
+    Q3 -->|No| Fix2["Fix: Rewrite\nvague instructions"]
+    Q3 -->|Yes| Fix3["Fix: Check for\nconflicting rules"]
+    Q2 -->|Yes| Q4{"Did the agent\nhave enough context?"}
+    Q4 -->|No| Fix4["Fix: Reduce context\nor split the task"]
+    Q4 -->|Yes| Q5{"Is the task\nwell-scoped?"}
+    Q5 -->|No| Fix5["Fix: Break into\nsmaller tasks"]
+    Q5 -->|Yes| Fix6["Possible model limit\nTry different approach"]
+    style Start fill:#fed7d7,stroke:#e53e3e
+    style Fix1 fill:#c6f6d5,stroke:#38a169
+    style Fix2 fill:#c6f6d5,stroke:#38a169
+    style Fix3 fill:#c6f6d5,stroke:#38a169
+    style Fix4 fill:#c6f6d5,stroke:#38a169
+    style Fix5 fill:#c6f6d5,stroke:#38a169
+    style Fix6 fill:#fefcbf,stroke:#d69e2e
+`} />
+
+### Step 1: Review the Transcript
+
+The agent's transcript is your primary diagnostic tool. Every agent session produces a log of what the agent did: which files it read, which tools it called, what it wrote, and in what order. Before hypothesizing about the cause, read the transcript.
+
+Look for these signals:
+
+- **What files did the agent read first?** If it started with irrelevant files, the CLAUDE.md is not guiding it effectively
+- **Where did the output diverge from expectations?** Identify the exact tool call where things went wrong
+- **Did the agent explain its reasoning?** Many agents produce chain-of-thought that reveals misunderstandings
+- **Did the agent encounter errors?** Failed tool calls, permission denials, or compilation errors often redirect the agent down the wrong path
+
+### Step 2: Check the Instructions
+
+If the transcript shows the agent read the CLAUDE.md but still went wrong, the instructions themselves are the problem. Common instruction failures include:
+
+- **Vague language** -- "write clean code" means nothing actionable. "Use early returns, avoid nesting beyond three levels, prefer named exports" is actionable
+- **Contradictory rules** -- "keep functions short" and "avoid creating too many helper functions" work against each other
+- **Missing context** -- the CLAUDE.md describes conventions but not where they apply. "Use the repository pattern" without specifying which modules use it
+- **Buried critical rules** -- an important constraint on line 200 of a 250-line CLAUDE.md may be lost when context is tight
+
+### Step 3: Evaluate Task Scope
+
+Even with perfect instructions, some tasks are too broad for a single agent session. If the agent produced partially correct output -- got some things right but missed others -- the task may have exceeded what a single context window can hold.
+
+## The Five Most Common Failures
+
+Understanding the most frequent failure patterns lets you diagnose issues faster. Each pattern has a distinct symptom, root cause, and fix.
+
+### 1. Agent Ignores Instructions
+
+**Symptom:** The agent's output violates rules clearly stated in CLAUDE.md -- wrong naming conventions, forbidden imports, incorrect patterns.
+
+**Root cause:** Almost always one of three things:
+
+- The CLAUDE.md is too long, and critical instructions are pushed out of the model's effective attention window
+- The instructions are present but ambiguous -- the agent interpreted them differently than you intended
+- Conflicting instructions elsewhere (inline comments, other config files) override the CLAUDE.md
+
+**Fix:** Prioritize your CLAUDE.md. Put the most critical rules in the first 50 lines. Be concrete -- include examples of both correct and incorrect patterns.
+
+<CodeBlock code={`# Bad -- too vague
+## Code Style
+Follow our coding conventions.
+
+# Good -- specific and prioritized
+## Code Style (CRITICAL -- read first)
+- Functions: use snake_case, max 30 lines
+- Imports: use absolute imports from src/, never relative
+- Error handling: always use Result<T, AppError>, never unwrap()
+- Example of correct style: see src/services/user_service.rs
+`} language="markdown" filename="CLAUDE.md comparison" />
+
+### 2. Agent Edits Wrong Files
+
+**Symptom:** The agent modifies files it should not touch, or makes changes in the wrong part of the codebase.
+
+**Root cause:** The codebase structure is ambiguous from the agent's perspective. Multiple directories with similar names, no clear ownership boundaries, or missing pointers in the CLAUDE.md.
+
+**Fix:** Add explicit file-location guidance and off-limits declarations.
+
+<CodeBlock code={`## Project Structure
+- API handlers: src/handlers/ (one file per resource)
+- Business logic: src/services/ (one file per domain)
+- Database queries: src/repositories/ (one file per table)
+- Shared types: src/types/ (DO NOT add business logic here)
+
+## Off-Limits
+- src/core/engine.rs -- critical path, never modify without explicit ask
+- migrations/ -- database migrations require manual review
+- .github/workflows/ -- CI config changes need DevOps approval
+`} language="markdown" filename="CLAUDE.md structure section" />
+
+### 3. Agent Loops Without Progress
+
+**Symptom:** The agent repeats the same action, makes a change then reverts it, or enters a cycle of attempting and failing the same approach.
+
+**Root cause:** The task is ambiguous, the agent cannot determine success criteria, or each attempted approach triggers a failure that sends it back to the starting state.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Loop["Agent Loop Pattern"]
+        A["Attempt approach A"] --> B["Tests fail"]
+        B --> C["Revert changes"]
+        C --> D["Attempt approach A\nagain"]
+        D --> B
+    end
+    subgraph Fix["Breaking the Loop"]
+        E["Clarify success criteria"] --> F["Provide explicit\napproach guidance"]
+        F --> G["Add constraints that\neliminate dead ends"]
+    end
+    style Loop fill:#fed7d7,stroke:#e53e3e
+    style Fix fill:#c6f6d5,stroke:#38a169
+`} />
+
+**Fix:** Define success criteria explicitly in the task description. If the agent should use approach B instead of A, say so. If there are known dead ends, mention them.
+
+<CodeBlock code={`# Task: Fix the authentication timeout bug
+# 
+# Context: Users report sessions expiring after 5 minutes
+# instead of 30 minutes.
+#
+# The bug is NOT in the JWT expiration -- that is set correctly
+# in auth/jwt.ts. The issue is in the session middleware at
+# src/middleware/session.ts where the cookie maxAge is hardcoded.
+#
+# Success criteria:
+# - pnpm test:auth passes (all 12 tests)
+# - Session persists for 30 minutes in manual testing
+# - No changes to auth/jwt.ts
+`} language="markdown" filename="task-description.md" />
+
+### 4. Context Overflow
+
+**Symptom:** The agent starts well but degrades over the course of a long session. Late-session output ignores instructions that early-session output followed. The agent "forgets" conventions it was following minutes earlier.
+
+**Root cause:** **Context overflow** occurs when the accumulated content of the session -- the CLAUDE.md, files read, previous tool calls, and generated output -- exceeds the model's effective context window. Even if the model technically supports 200K tokens, attention quality degrades well before that limit.
+
+**Fix:** Keep sessions focused. One task per session. If a task requires reading many files, restructure it so the agent can work incrementally.
+
+<CodeBlock code={`# Instead of: "Refactor all 15 service files to use the new error type"
+# Do this:
+
+# Session 1: Refactor user_service.rs and order_service.rs
+# Session 2: Refactor payment_service.rs and inventory_service.rs  
+# Session 3: Refactor the remaining service files
+
+# Each session starts fresh with full context window available.
+`} language="markdown" filename="task-splitting.md" />
+
+### 5. Agent Produces Syntactically Valid but Semantically Wrong Code
+
+**Symptom:** The code compiles, the types check, but the behavior is wrong. The agent wrote a function that returns the wrong result, implements the wrong algorithm, or misunderstands the domain logic.
+
+**Root cause:** The agent lacks domain context. It knows the language and framework but not the business rules. This is the hardest failure to catch because automated tools (linters, type checkers) cannot detect it.
+
+**Fix:** Add domain context to the CLAUDE.md. Include business rule summaries, link to design documents, and provide example inputs and expected outputs.
+
+## Reading Agent Transcripts Effectively
+
+The transcript is a gold mine of diagnostic information, but only if you know what to look for. Here is a structured approach to reading transcripts.
+
+**Scan the tool call sequence first.** Before reading any content, look at just the sequence of actions: Read file X, Read file Y, Edit file Z, Run tests. Does this sequence make sense for the task? If the agent read files in an unexpected order, that tells you something about how it navigated the codebase.
+
+**Find the pivot point.** Identify the exact moment the agent's output went from reasonable to wrong. The tool call immediately before the pivot is usually the most diagnostic -- it reveals what information (or lack of information) triggered the wrong path.
+
+**Compare successful vs. failed sessions.** If you have a session where the agent did the same type of task correctly, compare the two transcripts side by side. The differences reveal what contextual factor changed.
+
+**Check for error recovery.** When the agent encounters an error (failed test, compilation error), how does it respond? Good error recovery means the feedback loops are working. Poor recovery -- ignoring the error or making random changes -- means the error messages are not informative enough.
+
+## Building a Failure Library
+
+Over time, your team will encounter the same failure patterns repeatedly. Create a **failure library** -- a shared document that records each significant failure, its root cause, and the fix applied.
+
+<CodeBlock code={`## Failure Library
+
+### F-001: Agent uses CommonJS require() instead of ES module import
+- **First seen:** 2025-03-15
+- **Root cause:** CLAUDE.md did not specify module system
+- **Fix applied:** Added "Always use ES module imports (import/export), 
+  never require()" to CLAUDE.md line 8
+- **Recurrence:** None since fix
+
+### F-002: Agent creates files in project root instead of src/
+- **First seen:** 2025-03-22
+- **Root cause:** Task description said "create a new utility" without 
+  specifying location
+- **Fix applied:** Added file creation rules to CLAUDE.md:
+  "New files go in src/{category}/ matching existing structure"
+- **Recurrence:** Reduced from 3x/week to 0
+
+### F-003: Agent loops on failing test due to timezone dependency
+- **First seen:** 2025-04-01
+- **Root cause:** Test used Date.now() and agent ran in different TZ
+- **Fix applied:** Added note in CLAUDE.md: "Time-dependent tests use
+  jest.useFakeTimers() -- see tests/helpers/time.ts"
+- **Recurrence:** None since fix
+`} language="markdown" filename="docs/agent-failure-library.md" />
+
+Each entry in the failure library is a permanent improvement. Over months, the library becomes a diagnostic reference that new team members use to solve known problems in minutes instead of hours.
+
+## When the Problem Is Not the Agent
+
+Sometimes the issue is not the agent, the CLAUDE.md, or the task description. It is the codebase itself.
+
+- **Flaky tests** -- if tests pass and fail randomly, the agent cannot use them as feedback. Fix the tests before blaming the agent
+- **Implicit dependencies** -- if the code requires environment variables, running services, or undocumented setup steps, the agent will fail on tasks that depend on them
+- **Circular dependencies** -- if modifying file A requires understanding file B, which requires understanding file C, which imports from file A, the agent faces the same confusion a human developer would
+- **Missing type information** -- in dynamically typed languages, the agent guesses types. Adding type hints (Python type annotations, JSDoc in JavaScript) dramatically reduces semantic errors
+
+> The best way to find what is unclear in your codebase is to watch an agent try to work in it. Agents are the ultimate "new developer" test -- they expose every implicit assumption.
+
+## Summary
+
+Troubleshooting agent issues is a systematic process, not guesswork. Start by reviewing the transcript to find the pivot point where things went wrong. Check whether the instructions were clear, specific, and non-contradictory. Evaluate whether the task scope fit within a single context window. Learn the five most common failure patterns -- ignored instructions, wrong files, loops, context overflow, and semantic errors -- and their corresponding fixes. Build a failure library that turns each diagnosis into a permanent improvement. Most importantly, treat failures as signals about your codebase's readiness rather than the agent's capability. In the next lesson, we will shift from diagnosing issues to preventing them, with a security audit checklist for repositories where agents have write access.

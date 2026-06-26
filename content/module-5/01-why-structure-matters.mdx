@@ -1,0 +1,179 @@
+---
+title: Why Structure Matters for Agents
+quiz:
+- question: How do AI coding agents primarily discover the contents of a codebase?
+  options:
+  - They read file trees, grep for patterns, and follow import chains
+  - They receive a complete map of the project from the IDE
+  - They use a pre-built database of every file's purpose
+  - They rely entirely on README files in the root directory
+  correctIndex: 0
+- question: What is the main risk of a deeply nested directory structure for an AI agent?
+  options:
+  - It makes the codebase slower to compile
+  - It prevents the agent from creating new files
+  - It exceeds the agent's token budget during exploration, causing it to miss relevant files
+  - It forces the agent to use a different programming language
+  correctIndex: 2
+- question: Why does inconsistent project structure cause agents to produce lower-quality code?
+  options:
+  - Agents cannot parse files that follow different patterns
+  - Inconsistency only affects human developers, not agents
+  - Agents are programmed to reject inconsistent codebases
+  - Inconsistency forces the agent to guess at conventions, leading to code that does not match the rest of the project
+  correctIndex: 3
+- question: Which structural property is MOST important for agent effectiveness?
+  options:
+  - Using the latest framework version
+  - Predictability — consistent patterns that let the agent infer where things belong
+  - Having fewer than 100 files in the project
+  - Storing all code in a single directory
+  correctIndex: 1
+---
+
+## Overview
+
+When a human developer joins a new project, they ask a colleague for a tour, browse a wiki, or explore the code in an IDE with jump-to-definition. An AI coding agent gets none of that. It starts with a **file tree** and a set of tools -- read file, search text, list directory -- and must build a mental model of the project from what it discovers. The structure of your project is the single biggest factor in whether that model is accurate or wildly wrong. This lesson explains why, shows what agents actually do when they encounter a codebase, and demonstrates the difference between structures that help and structures that hinder.
+
+## How Agents See Your Codebase
+
+An agent does not open your project in VS Code. It does not have a class hierarchy browser or a call graph visualizer. Instead, it navigates through a small set of primitive operations, executed in sequence:
+
+<MermaidDiagram chart={`graph TD
+    A["Receive Task"] --> B["List Root Directory"]
+    B --> C["Read Key Files\nREADME, CLAUDE.md, package.json"]
+    C --> D["Identify Relevant Areas"]
+    D --> E["Search / Grep for Patterns"]
+    E --> F["Read Target Files"]
+    F --> G["Build Mental Model"]
+    G --> H["Write Code"]
+    H --> I["Run Tests / Verify"]
+    I -->|"Failure"| E
+    I -->|"Success"| J["Done"]
+    style A fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style G fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style J fill:#c6f6d5,stroke:#38a169,color:#1a202c
+`} />
+
+Every step in this flow consumes **tokens** -- the agent's finite budget of attention. The more steps required to find the right files, the less budget remains for actually writing and verifying code. Structure determines how many steps the agent needs.
+
+> Think of project structure as a map. A good map has clear labels and logical groupings. A bad map is an unlabeled grid where you must check every cell to find what you need.
+
+## The Two Failure Modes
+
+When structure works against an agent, the failure shows up in one of two ways:
+
+<MermaidDiagram chart={`graph LR
+    subgraph Mode1["Failure Mode 1:\nCan't Find It"]
+        A1["Agent searches for\nauthentication code"] --> B1["Scattered across\n6 directories"]
+        B1 --> C1["Agent finds 3 of 6\nmisses critical pieces"]
+        C1 --> D1["Incomplete\nimplementation"]
+    end
+    subgraph Mode2["Failure Mode 2:\nWrong Mental Model"]
+        A2["Agent reads\nproject structure"] --> B2["Structure implies\npattern X"]
+        B2 --> C2["Actual pattern\nis Y"]
+        C2 --> D2["Code follows\nwrong conventions"]
+    end
+    style Mode1 fill:#fed7d7,stroke:#e53e3e
+    style Mode2 fill:#fefcbf,stroke:#d69e2e
+`} />
+
+**Failure Mode 1: Cannot find it.** The agent needs to modify the authentication flow, but auth-related code is spread across `src/controllers/authController.ts`, `src/middleware/checkAuth.js`, `lib/utils/tokenHelper.ts`, `src/services/userService.ts`, and `config/auth-config.yaml`. The agent finds some of these but misses others, producing an incomplete change.
+
+**Failure Mode 2: Wrong mental model.** The agent sees a `controllers/` directory and a `services/` directory, assumes a traditional MVC pattern, and writes code following those conventions. But the project actually uses a different pattern in practice -- the `controllers/` directory is legacy code and everything new goes through `handlers/`. The agent produces technically correct code in the wrong place.
+
+Both failures stem from the same root cause: the project structure does not communicate its intent clearly enough for the agent to act on it reliably.
+
+## What Makes Structure Agent-Friendly
+
+Agent-friendly structure has three properties: **discoverability**, **predictability**, and **locality**.
+
+### Discoverability
+
+An agent should be able to find relevant code by looking at directory names and file names alone, before reading any file contents. When a directory is named `src/auth/`, the agent knows immediately where authentication code lives. When it is named `src/modules/core/handlers/v2/`, the agent must read files to figure out what is inside.
+
+### Predictability
+
+Once an agent understands the pattern in one part of the codebase, it should be able to predict the pattern everywhere else. If `src/auth/` contains `auth.service.ts`, `auth.controller.ts`, and `auth.test.ts`, the agent expects `src/billing/` to contain `billing.service.ts`, `billing.controller.ts`, and `billing.test.ts`. Predictability means the agent can navigate confidently after learning the pattern once.
+
+### Locality
+
+Related code should live close together. If modifying a feature requires touching files in five different directories, the agent must hold all five contexts in memory simultaneously. If all the files for a feature live in one directory, the agent can focus its attention narrowly and work more effectively.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Friendly["Agent-Friendly Structure"]
+        F1["Discoverable\nNames reveal purpose"]
+        F2["Predictable\nPatterns repeat consistently"]
+        F3["Local\nRelated code lives together"]
+    end
+    subgraph Hostile["Agent-Hostile Structure"]
+        H1["Opaque\nNames require investigation"]
+        H2["Inconsistent\nEvery module is organized differently"]
+        H3["Scattered\nRelated code spread across directories"]
+    end
+    style Friendly fill:#c6f6d5,stroke:#38a169
+    style Hostile fill:#fed7d7,stroke:#e53e3e
+`} />
+
+## A Side-by-Side Comparison
+
+Consider a project with user management, billing, and notifications. Here are two ways to structure it:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Bad["Layer-Based (Agent-Hostile)"]
+        BC["src/controllers/"] --> BC1["userController.ts"]
+        BC --> BC2["billingController.ts"]
+        BC --> BC3["notificationController.ts"]
+        BS["src/services/"] --> BS1["userService.ts"]
+        BS --> BS2["billingService.ts"]
+        BS --> BS3["notificationService.ts"]
+        BM["src/models/"] --> BM1["User.ts"]
+        BM --> BM2["Invoice.ts"]
+        BM --> BM3["Notification.ts"]
+        BU["src/utils/"] --> BU1["helpers.ts"]
+        BU --> BU2["validators.ts"]
+    end
+    subgraph Good["Feature-Based (Agent-Friendly)"]
+        GU["src/users/"] --> GU1["users.service.ts"]
+        GU --> GU2["users.controller.ts"]
+        GU --> GU3["users.model.ts"]
+        GU --> GU4["users.test.ts"]
+        GB["src/billing/"] --> GB1["billing.service.ts"]
+        GB --> GB2["billing.controller.ts"]
+        GB --> GB3["billing.model.ts"]
+        GB --> GB4["billing.test.ts"]
+        GN["src/notifications/"] --> GN1["notifications.service.ts"]
+        GN --> GN2["notifications.controller.ts"]
+        GN --> GN3["notifications.model.ts"]
+        GN --> GN4["notifications.test.ts"]
+    end
+    style Bad fill:#fed7d7,stroke:#e53e3e
+    style Good fill:#c6f6d5,stroke:#38a169
+`} />
+
+In the **layer-based** structure, adding a new feature to billing requires the agent to navigate to `controllers/`, `services/`, `models/`, and `utils/`, reading each directory listing to find the right files. In the **feature-based** structure, the agent navigates to `src/billing/` and finds everything it needs in one place.
+
+The layer-based approach is not inherently wrong for humans -- many successful projects use it. But for agents that navigate by file tree traversal and text search, feature-based colocation dramatically reduces the number of exploration steps.
+
+## The Token Budget Problem
+
+Every action an agent takes consumes tokens from its context window. Listing a directory, reading a file, running a search -- each costs tokens. The context window is finite, and when it fills up, the agent loses track of earlier information.
+
+Structure impacts the token budget directly:
+
+- **Deep nesting** forces the agent to list many directories to find files, consuming tokens on navigation instead of comprehension
+- **Scattered code** forces the agent to read more files to understand a single feature, using tokens on breadth instead of depth
+- **Ambiguous names** force the agent to read file contents to determine relevance, spending tokens on investigation instead of action
+- **Inconsistent patterns** prevent the agent from making assumptions, requiring it to re-learn the structure for each part of the codebase
+
+> Every token spent navigating your project structure is a token not spent understanding your code and writing a correct implementation.
+
+## Structure as Communication
+
+Your project structure is not just an organizational tool -- it is a **communication channel** between you and every agent that will work on your code. When you name a directory `src/auth/`, you are telling the agent "authentication code lives here." When you place tests next to source files, you are telling the agent "tests and implementation are colocated." When you use consistent naming patterns, you are telling the agent "you can predict where things are."
+
+This communication happens without the agent reading a single line of documentation. It happens through the structure itself. That makes structure the most efficient form of context you can provide -- it costs zero tokens to convey because the agent reads it as part of its normal navigation.
+
+## Summary
+
+Project structure is not a cosmetic concern -- it is the primary interface between AI coding agents and your code. Agents navigate by listing directories, reading file trees, and following import chains. Every structural decision either helps or hinders this process. Agent-friendly structure is **discoverable** (names reveal purpose), **predictable** (patterns repeat consistently), and **local** (related code lives together). In the next lesson, we will examine specific file organization patterns and compare their impact on agent effectiveness.

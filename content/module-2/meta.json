@@ -1,0 +1,53 @@
+{
+  "id": 2,
+  "title": "How AI Coding Agents Work",
+  "description": "Peek inside the agent loop to understand how AI agents read, reason about, and modify your code",
+  "color": "#4fd1c5",
+  "lessons": [
+    {
+      "slug": "01-anatomy-of-an-agent",
+      "title": "Anatomy of an Agent",
+      "description": "Inside the observe-plan-act loop that drives every AI coding agent",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "sequence"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-context-windows-explained",
+      "title": "Context Windows Explained",
+      "description": "How agents see your code and what happens when they can't see enough",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["architecture", "comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-tool-use-and-actions",
+      "title": "Tool Use and Actions",
+      "description": "How agents interact with your codebase through tools like Read, Edit, and Bash",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["sequence", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-agent-decision-making",
+      "title": "Agent Decision Making",
+      "description": "How agents choose what to do next and why they sometimes choose wrong",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["flowchart", "state"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-common-agent-failures",
+      "title": "Common Agent Failures",
+      "description": "Why agents fail, what the failure modes look like, and how to prevent them",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    }
+  ]
+}

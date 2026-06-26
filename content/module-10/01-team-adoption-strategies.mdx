@@ -1,0 +1,195 @@
+---
+title: "Team Adoption Strategies"
+quiz:
+  - question: "What is the recommended first step when introducing agent-ready practices to an organization?"
+    options:
+      - "Mandate that all teams adopt CLAUDE.md files immediately"
+      - "Start with a single champion who demonstrates value on their own work"
+      - "Hire an external consultant to write all the documentation"
+      - "Wait until the entire engineering org agrees on a standard"
+    correctIndex: 1
+  - question: "Why is measuring 'tasks completed by agents' an important adoption metric?"
+    options:
+      - "It proves agents are replacing developers"
+      - "It gives leadership a number to justify the tool's license cost"
+      - "It demonstrates concrete value by showing work the team would otherwise do manually"
+      - "It is the only metric that matters for adoption"
+    correctIndex: 2
+  - question: "Which approach is most effective for addressing skepticism about AI agents?"
+    options:
+      - "Showing a live demo where the agent completes a task the skeptic finds tedious"
+      - "Sending a company-wide email about the benefits of AI"
+      - "Requiring everyone to use agents for at least one hour per day"
+      - "Sharing industry blog posts about AI productivity gains"
+    correctIndex: 0
+---
+
+## Overview
+
+You have spent nine modules learning how to make a codebase agent-ready -- from writing CLAUDE.md files to designing custom agents, structuring repositories, and setting up CI integration. But the hardest challenge is not technical. It is organizational. How do you take practices that work for one developer and scale them across a team of ten, a department of fifty, or an engineering org of hundreds? This lesson presents a staged adoption strategy that avoids the two most common failure modes: mandating from the top without buy-in, and waiting forever for consensus that never arrives.
+
+## Why Adoption Fails
+
+Before examining what works, it is worth understanding why agent-ready adoption stalls in most organizations. The pattern is remarkably consistent.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Failures["Common Adoption Failure Modes"]
+        F1["Top-Down Mandate"]
+        F2["Passive Awareness"]
+        F3["Perfectionist Delay"]
+    end
+    F1 --> R1["Teams resist imposed tools\nNo local champions\nCompliance without conviction"]
+    F2 --> R2["Everyone knows about it\nNobody actually uses it\nNo process change occurs"]
+    F3 --> R3["Wait for perfect CLAUDE.md\nDebate standards endlessly\nNever ship anything"]
+    style Failures fill:#fed7d7,stroke:#e53e3e
+    style R1 fill:#fff5f5,stroke:#fc8181
+    style R2 fill:#fff5f5,stroke:#fc8181
+    style R3 fill:#fff5f5,stroke:#fc8181
+`} />
+
+**Top-down mandates** fail because developers rightly resist being told how to work without understanding why. A CLAUDE.md written to satisfy a compliance checkbox is worse than no CLAUDE.md at all -- it gives the illusion of readiness without the substance.
+
+**Passive awareness** -- sending a Slack message that says "hey, we should try agents" -- generates interest but no action. Without a concrete next step and a person responsible for taking it, awareness decays within days.
+
+**Perfectionist delay** is the subtlest trap. Teams agree that agent readiness is valuable, then spend weeks debating the perfect CLAUDE.md template, the ideal directory structure, or the right set of hooks. Meanwhile, no one actually uses an agent.
+
+## The Four-Stage Adoption Model
+
+Successful adoption follows a progression from individual experimentation to organizational standard. Each stage builds evidence that justifies the next.
+
+<MermaidDiagram chart={`graph LR
+    S1["Stage 1\nChampion"] --> S2["Stage 2\nTeam Pilot"]
+    S2 --> S3["Stage 3\nCI Integration"]
+    S3 --> S4["Stage 4\nOrg-Wide Standard"]
+    S1 --- D1["One dev uses agents\non their own work"]
+    S2 --- D2["Team shares CLAUDE.md\nand reviews agent PRs"]
+    S3 --- D3["Agents run in CI\nwith hooks and gates"]
+    S4 --- D4["All repos have\nagent-ready foundations"]
+    style S1 fill:#c6f6d5,stroke:#38a169
+    style S2 fill:#bee3f8,stroke:#3182ce
+    style S3 fill:#fefcbf,stroke:#d69e2e
+    style S4 fill:#e9d8fd,stroke:#805ad5
+`} />
+
+### Stage 1: The Champion (Weeks 1-2)
+
+Every successful rollout starts with one person. The **champion** is a developer who uses agents on their own work, not because they were asked to, but because they see the value. Their role is not to evangelize -- it is to produce evidence.
+
+What the champion does:
+
+- Picks one repository they own and adds a CLAUDE.md
+- Uses an agent for real tasks: writing tests, implementing features, fixing bugs
+- Tracks what works and what does not -- informally, in notes or a document
+- Shares specific wins in team standups or Slack: "The agent wrote 14 tests in 8 minutes; here is the PR"
+
+The champion's credibility comes from showing, not telling. A PR where an agent correctly implemented a feature following the team's conventions is more persuasive than any slide deck.
+
+> The best champion is not the most senior engineer or the biggest AI enthusiast. It is the person who works on the most repetitive, well-defined tasks -- because those are where agents deliver undeniable value first.
+
+### Stage 2: Team Pilot (Weeks 3-6)
+
+Once the champion has concrete results, expand to the team. The **team pilot** phase is where shared practices emerge.
+
+Key activities in this stage:
+
+- The champion writes a team-level CLAUDE.md for the main repository, incorporating lessons from solo use
+- Two to three additional developers start using agents, with the champion available for pairing
+- The team establishes a shared convention for reviewing agent-generated PRs
+- Regular retrospectives (biweekly) capture what the agent does well and where it struggles
+
+This is the stage where the CLAUDE.md matures from a personal note into a team artifact. Each developer's experience reveals gaps: "The agent kept using class components instead of hooks" becomes a new rule. "The agent could not find the test utilities" becomes a pointer to the right directory.
+
+### Stage 3: CI Integration (Weeks 7-12)
+
+With a team using agents successfully, the next step is embedding agents into the team's automated workflows. This stage makes agents a natural part of the development process rather than an individual tool.
+
+Activities include:
+
+- Adding agent-generated PR checks (lint agent output, run tests against agent changes)
+- Setting up hooks that validate agent work before it reaches human reviewers
+- Creating specialized agents for specific CI tasks: automated code review, test generation, documentation updates
+- Establishing metrics for agent contributions (more on this below)
+
+CI integration is the point where agent readiness transitions from "a thing developers do" to "a thing the codebase supports." Once an agent can open a PR and have it validated by the same pipeline as human code, skeptics see that the quality bar is consistent.
+
+### Stage 4: Org-Wide Standard (Months 4-6)
+
+The final stage scales what works across the organization. This is the only stage where leadership involvement and standardization are appropriate -- because now there is evidence to support the standard.
+
+<MermaidDiagram chart={`graph TD
+    subgraph OrgStandard["Org-Wide Standard"]
+        T1["Template Repository\nCLAUDE.md starter\nHook examples\nCI configurations"]
+        T2["Internal Documentation\nBest practices guide\nFAQ and troubleshooting\nSuccess stories"]
+        T3["Support Channel\nSlack channel for agent questions\nOffice hours with champions\nShared learnings"]
+        T4["Governance\nAgent permission policies\nSecurity review process\nAudit requirements"]
+    end
+    T1 --> A1["New repos start\nagent-ready"]
+    T2 --> A2["Teams self-serve\nwithout bottlenecks"]
+    T3 --> A3["Problems get solved\nquickly"]
+    T4 --> A4["Risk is managed\nwithout blocking value"]
+    style OrgStandard fill:#e9d8fd,stroke:#805ad5
+`} />
+
+At this stage, the organization creates:
+
+- A **template repository** with a starter CLAUDE.md, recommended hooks, and CI configurations
+- **Internal documentation** capturing best practices, common patterns, and lessons learned
+- A **support channel** where developers across teams share tips and troubleshoot issues
+- **Governance policies** that define agent permissions, security review requirements, and audit trails
+
+> Do not create the template repository in Stage 1. Templates created without real-world experience encode assumptions instead of evidence. Wait until at least two teams have independently arrived at similar patterns, then extract the commonalities.
+
+## Addressing Skepticism
+
+Not everyone will be enthusiastic. Some skepticism is healthy -- agents are not magic, and uncritical adoption creates real risks. The key is to address specific concerns rather than dismissing them.
+
+**"Agents write bad code."** This is often true when the codebase is not agent-ready. The response is not "agents are great" but "let me show you what happens when we add a CLAUDE.md with our conventions." Demonstrate the before-and-after on the same task.
+
+**"I can write it faster myself."** For a single task, probably yes. The value of agents is not speed on any one task -- it is the ability to parallelize work, handle tedious tasks during focus time, and maintain consistency across large changes. Show the aggregate impact over a sprint, not a single file.
+
+**"What about code quality?"** Point to the CI integration. Agent code goes through the same linters, type checkers, and tests as human code. If the test suite catches bugs in human code, it catches bugs in agent code too.
+
+**"This is just a fad."** Fair concern. The response is pragmatic: "Even if agent tools change, the practices we are building -- better documentation, clearer conventions, faster feedback loops -- make the codebase better for humans too. There is no downside scenario."
+
+## Measuring Adoption Success
+
+You cannot manage what you do not measure. But the wrong metrics create perverse incentives. Avoid measuring "percentage of code written by agents" -- that encourages quantity over quality. Instead, track metrics that reflect genuine value.
+
+**Developer satisfaction** -- survey the team quarterly. Are agents reducing tedium? Do developers feel more productive? This is the leading indicator that matters most.
+
+**Tasks completed by agents** -- count discrete tasks (PRs merged, issues closed, tests written) that agents contributed to. This demonstrates concrete value to leadership without incentivizing volume.
+
+**Code review velocity** -- measure the time from PR opened to PR merged for agent-generated vs. human-generated PRs. Well-prepared agent PRs should review faster because they follow documented conventions.
+
+**Agent success rate** -- track what percentage of agent sessions produce usable output without significant human rework. A low success rate means the CLAUDE.md needs improvement, not that agents are failing.
+
+| Metric | What It Tells You | When to Worry |
+|--------|-------------------|---------------|
+| Developer satisfaction | Whether agents help or hinder | Score drops below neutral |
+| Tasks completed | Concrete value delivered | Count plateaus or drops |
+| Review velocity | Whether agent PRs are reviewable | Agent PRs take longer than human PRs |
+| Success rate | CLAUDE.md and tooling quality | Below 60% usable output |
+
+## Creating Internal Champions
+
+Champions do not appear spontaneously. You can cultivate them through specific actions:
+
+- **Pair with interested developers** -- sit down for 30 minutes and walk through using an agent on their actual codebase, not a demo project
+- **Start with pain points** -- ask "What task do you hate doing?" and demonstrate the agent on that specific task
+- **Celebrate wins publicly** -- when a developer's first agent PR merges cleanly, mention it in the team channel
+- **Remove friction** -- ensure tool access, licenses, and permissions are sorted before asking anyone to try agents
+- **Accept that some people will not adopt** -- and that is fine. Mandating usage undermines the voluntary adoption that produces genuine champions
+
+## Common Adoption Anti-Patterns
+
+Avoid these patterns that repeatedly derail adoption efforts:
+
+- **The Big Bang** -- trying to make every team agent-ready simultaneously. This overwhelms support capacity and dilutes focus
+- **The Demo Loop** -- running impressive demos without follow-up. Demos inspire but do not change workflows
+- **The Template-First Approach** -- creating a perfect template before anyone has used agents in production. The template will not match reality
+- **Measuring Lines of Code** -- using agent output volume as a success metric. This incentivizes the wrong behavior
+- **Ignoring Security Early** -- deferring security review until agents are already embedded in workflows. Address permissions and boundaries from Stage 2
+
+## Summary
+
+Successful adoption of agent-ready practices follows a predictable path: start with a single champion who produces evidence, expand to a team pilot where shared practices emerge, integrate agents into CI to formalize quality gates, and only then standardize across the organization. The critical insight is that adoption is a change management challenge, not a technical one. Show value before asking for commitment, measure outcomes that matter, and resist the temptation to mandate what should be demonstrated. In the next lesson, we will look at what to do when things go wrong -- a systematic approach to troubleshooting agent issues.

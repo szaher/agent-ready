@@ -1,0 +1,177 @@
+---
+title: Why Your Repo Needs a CLAUDE.md
+quiz:
+- question: What is the primary problem CLAUDE.md solves?
+  options:
+  - It gives AI agents the project-specific context they cannot infer from code alone
+  - It replaces your README.md with better formatting
+  - It enforces code style rules through automated linting
+  - It generates documentation from your source code
+  correctIndex: 0
+- question: Without a CLAUDE.md, what happens when an agent encounters an unfamiliar test command?
+  options:
+  - It reads the CI/CD config and extracts the command automatically
+  - It refuses to run any tests until you provide the command
+  - It guesses based on common conventions, which may be wrong for your project
+  - It always defaults to 'npm test' regardless of the project
+  correctIndex: 2
+- question: Why is CLAUDE.md considered the highest-leverage file for agent readiness?
+  options:
+  - It is the largest file in the repository
+  - It replaces the need for good code organization
+  - It is the only file AI agents can read
+  - It requires the least effort to create but eliminates the most common agent failures
+  correctIndex: 3
+---
+
+## Overview
+
+Every developer who joins a new team goes through onboarding. They learn the build commands, the test conventions, the deployment process, and the unwritten rules that live in people's heads. Without onboarding, even a senior engineer wastes hours guessing at things the team considers obvious.
+
+AI coding agents face the exact same problem -- except they join your team fresh on every single session. There is no institutional memory between conversations. There is no Slack history to search. There is no teammate to ask.
+
+**CLAUDE.md** is your agent's onboarding document. It is the single most impactful file you can add to make your codebase agent-ready, and this lesson explains why.
+
+## The Cold Start Problem
+
+When an AI agent opens your repository for the first time, it faces what we call the **cold start problem**. The agent has general knowledge about programming languages, frameworks, and common patterns -- but it knows nothing about *your* project's specific choices.
+
+Consider what the agent does not know:
+
+- **Build commands** -- Is it `make build`, `pnpm build`, `cargo build`, or `bazel build //...`?
+- **Test commands** -- Do you run `pytest -x`, `go test ./...`, or `pnpm vitest run`?
+- **Code style** -- Do you use tabs or spaces? Single quotes or double? Do you enforce a formatter?
+- **Architecture decisions** -- Why is there a `pkg/` and a `internal/` directory? What goes where?
+- **Forbidden patterns** -- Should the agent never use `any` in TypeScript? Should it avoid ORM magic methods?
+- **Deployment context** -- Is this a library, a CLI tool, a web app, or a Kubernetes operator?
+
+Without answers to these questions, the agent must guess. And guessing leads to wasted iterations, broken builds, and code that violates your team's conventions.
+
+<MermaidDiagram chart={`flowchart TD
+    A[Agent Opens Repository] --> B{CLAUDE.md exists?}
+    B -->|No| C[Guess build command]
+    C --> D[Guess test command]
+    D --> E[Guess conventions]
+    E --> F[Generate code]
+    F --> G{Build passes?}
+    G -->|No| H[Try different guess]
+    H --> C
+    G -->|Yes| I{Follows conventions?}
+    I -->|No| J[Developer rejects PR]
+    J --> C
+    I -->|Yes| K[Success after many iterations]
+
+    B -->|Yes| L[Read project context]
+    L --> M[Use correct commands]
+    M --> N[Follow stated conventions]
+    N --> O[Generate code]
+    O --> P[Success on first attempt]
+
+    style C fill:#fed7d7,stroke:#c53030
+    style D fill:#fed7d7,stroke:#c53030
+    style E fill:#fed7d7,stroke:#c53030
+    style H fill:#fed7d7,stroke:#c53030
+    style J fill:#fed7d7,stroke:#c53030
+    style L fill:#c6f6d5,stroke:#276749
+    style M fill:#c6f6d5,stroke:#276749
+    style N fill:#c6f6d5,stroke:#276749
+    style P fill:#c6f6d5,stroke:#276749
+`} />
+
+The flowchart above illustrates the difference starkly. Without CLAUDE.md, the agent enters a trial-and-error loop. With it, the agent gets things right on the first pass.
+
+## Why Existing Documentation Is Not Enough
+
+You might wonder: "We already have a README, a CONTRIBUTING.md, and plenty of inline comments. Why add another file?"
+
+The answer is **audience and purpose**. Each documentation file serves a different reader:
+
+<MermaidDiagram chart={`graph LR
+    subgraph Human["Human-Oriented Docs"]
+        A[README.md] --> A1["What the project does<br/>How to install it<br/>How to use it"]
+        B[CONTRIBUTING.md] --> B1["How to submit PRs<br/>Code of conduct<br/>Issue templates"]
+        C[Architecture.md] --> C1["Design rationale<br/>Historical context<br/>Trade-off discussions"]
+    end
+
+    subgraph Agent["Agent-Oriented Docs"]
+        D[CLAUDE.md] --> D1["Exact build/test commands<br/>Code style rules<br/>Do's and don'ts<br/>File structure hints"]
+    end
+
+    style Human fill:#ebf8ff,stroke:#3182ce
+    style Agent fill:#f0fff4,stroke:#276749
+`} />
+
+**README.md** is written for humans who want to *use* or *understand* the project. It contains narrative explanations, badges, screenshots, and getting-started guides. Much of this is noise for an AI agent that needs to *modify* the code.
+
+**CONTRIBUTING.md** covers social processes -- how to file issues, how to format commit messages, how the review process works. Agents do not file issues or participate in reviews.
+
+**CLAUDE.md** is purpose-built for an AI agent that is about to write, test, and debug code in your repository. It answers the questions the agent actually has:
+
+- "What exact command do I run to verify my changes?"
+- "What patterns should I follow when adding a new endpoint?"
+- "What should I never do in this codebase?"
+
+> **Key insight:** CLAUDE.md is not documentation *about* your project. It is instructions *for working in* your project. Think of it as a checklist, not a narrative.
+
+## The Cost of Not Having One
+
+Let us quantify the impact. Without a CLAUDE.md, each agent session typically encounters one or more of these friction points:
+
+- **Build failures** -- The agent runs the wrong build command or misses a prerequisite step. You spend a turn correcting it.
+- **Style violations** -- The agent writes valid code that violates your conventions. You either accept the inconsistency or spend time asking for revisions.
+- **Wrong test patterns** -- The agent writes tests using a different framework or runner than what your project uses.
+- **Architecture violations** -- The agent puts new code in the wrong directory or creates files that do not follow your naming conventions.
+- **Repeated mistakes** -- Because agents have no memory between sessions, the same mistakes happen every time a new session starts.
+
+Each of these costs 1-3 extra turns of conversation. Across a team running dozens of agent sessions per week, that adds up to hours of wasted time -- and hours of wasted compute.
+
+## Why CLAUDE.md Is Highest Leverage
+
+Of all the things you can do to make a codebase agent-ready -- writing tests, adding types, improving module boundaries -- CLAUDE.md stands out because of its **effort-to-impact ratio**.
+
+| Improvement | Effort | Impact | Time to Value |
+|---|---|---|---|
+| Add comprehensive tests | High (days to weeks) | High | Weeks |
+| Add type annotations | Medium (hours to days) | Medium | Days |
+| Refactor module boundaries | High (days) | Medium | Days |
+| Write CLAUDE.md | Low (30-60 minutes) | High | Immediate |
+
+Writing a CLAUDE.md takes less than an hour. The impact is immediate -- the very next agent session benefits from it. And the effect compounds: every team member who uses an agent, every agent session on every branch, every automated workflow that invokes an agent -- they all read the same CLAUDE.md and get the same context.
+
+> **Think of it this way:** CLAUDE.md is the one file where 30 minutes of your time saves 30 minutes in every future agent session. No other file in your repository has that multiplier.
+
+## What Makes CLAUDE.md Different from Prompting
+
+You might also wonder: "Can't I just tell the agent what to do in my prompt each time?"
+
+You can, and for one-off tasks that works fine. But **CLAUDE.md scales in ways that per-session prompting does not**:
+
+- **Consistency** -- Every agent session gets the same instructions, whether you start it or your teammate does.
+- **Version control** -- Your CLAUDE.md evolves with your codebase. When you change from Jest to Vitest, you update one file and every future session knows.
+- **No forgetting** -- You do not have to remember to include your project conventions in every prompt. The agent reads CLAUDE.md automatically.
+- **Composability** -- You can have nested CLAUDE.md files for different parts of a monorepo, each scoped to its subdirectory.
+- **Review and collaboration** -- Your team can review changes to CLAUDE.md in pull requests, just like any other code.
+
+## When to Create One
+
+The short answer: **now**. If your repository does not have a CLAUDE.md and you plan to use AI coding agents, creating one is the single highest-return investment of your next 30 minutes.
+
+You do not need to write a perfect CLAUDE.md on the first pass. Start with the essentials:
+
+1. **Build command** -- How to compile or bundle the project
+2. **Test command** -- How to run the test suite
+3. **Lint command** -- How to check code style
+4. **One key convention** -- The most important rule an agent should follow
+
+You can expand it over time as you notice the agent making mistakes. Each mistake is a signal that your CLAUDE.md is missing a piece of context.
+
+> **Tip:** After every agent session where you had to correct the agent, ask yourself: "Could I have prevented this correction by adding a line to CLAUDE.md?" If yes, add it.
+
+## Summary
+
+- AI agents face a **cold start problem** -- they know nothing about your project's specific conventions, commands, or architecture
+- Existing documentation (README, CONTRIBUTING) serves a different audience and purpose than what agents need
+- **CLAUDE.md** is purpose-built for AI agents: it provides the exact commands, rules, and patterns they need to work effectively in your codebase
+- It has the best **effort-to-impact ratio** of any agent-readiness improvement: 30 minutes of writing saves time in every future session
+- Unlike per-session prompting, CLAUDE.md is **version-controlled, consistent, and composable**
+- Start small with build, test, and lint commands -- then expand as you discover gaps

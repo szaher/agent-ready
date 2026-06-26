@@ -1,0 +1,260 @@
+---
+title: "MCP Architecture"
+quiz:
+  - question: "What are the two transport mechanisms MCP supports?"
+    options:
+      - "WebSocket and gRPC"
+      - "stdio and HTTP with Server-Sent Events (SSE)"
+      - "TCP sockets and UDP datagrams"
+      - "REST and GraphQL"
+    correctIndex: 1
+  - question: "In MCP, what is the role of the MCP client?"
+    options:
+      - "It hosts the language model and generates text"
+      - "It is a standalone database that stores tool results"
+      - "It replaces the agent's planning and reasoning capabilities"
+      - "It lives inside the agent application and manages connections to MCP servers"
+    correctIndex: 3
+  - question: "What message format does MCP use for communication?"
+    options:
+      - "Protocol Buffers"
+      - "XML-RPC"
+      - "JSON-RPC 2.0"
+      - "MessagePack"
+    correctIndex: 2
+  - question: "What happens during the MCP initialization handshake?"
+    options:
+      - "The server sends its full database to the client"
+      - "The language model fine-tunes itself on the server's data"
+      - "The client downloads and installs the server's source code"
+      - "The client and server exchange capabilities, agreeing on protocol version and supported features"
+    correctIndex: 3
+---
+
+## Overview
+
+Understanding how the pieces of MCP fit together is essential before you configure or build servers. This lesson breaks down the architecture: the relationship between hosts, clients, and servers; the lifecycle of an MCP connection; the message format that makes it all work; and the two transport mechanisms that carry messages between components. By the end, you will have a clear mental model of how an agent's request becomes a tool call and how the result flows back.
+
+## The Big Picture
+
+An MCP system has three main components that form a clear hierarchy:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Host["Host Application"]
+        LM["Language Model"]
+        subgraph Client["MCP Client"]
+            CM["Connection Manager"]
+        end
+        LM <-->|"tool calls"| Client
+    end
+    Client <-->|"JSON-RPC\nstdio or SSE"| S1["MCP Server A\n(GitHub)"]
+    Client <-->|"JSON-RPC\nstdio or SSE"| S2["MCP Server B\n(Database)"]
+    Client <-->|"JSON-RPC\nstdio or SSE"| S3["MCP Server C\n(Custom)"]
+    style Host fill:#ebf8ff,stroke:#3182ce
+    style Client fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style LM fill:#e9d8fd,stroke:#805ad5,color:#1a202c
+    style S1 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style S2 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style S3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+`} />
+
+The **host application** is the program you interact with -- Claude Code, Cursor, or a custom agent. The host contains the language model and the user interface. It is the outermost boundary.
+
+The **MCP client** lives inside the host. It manages one or more connections to MCP servers. When the language model decides it needs to call a tool, the client is responsible for routing that call to the correct server, sending the request, and returning the response. A single host can have many clients, each connected to a different server, though in practice most implementations use one client that manages multiple server connections.
+
+The **MCP server** is a standalone process that wraps an external service and exposes it through the MCP protocol. A GitHub MCP server translates MCP tool calls into GitHub API requests. A database MCP server translates them into SQL queries. The server handles authentication, error handling, and data transformation for its specific domain.
+
+## Client-Server Communication
+
+The communication between client and server follows a strict pattern built on **JSON-RPC 2.0**, a lightweight remote procedure call protocol. Every message is a JSON object that falls into one of three categories:
+
+- **Requests** -- messages that expect a response (identified by an `id` field)
+- **Responses** -- answers to requests (carrying the same `id`)
+- **Notifications** -- one-way messages that do not expect a response
+
+Here is what a typical tool call looks like at the wire level:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Agent as Host / Agent
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant Service as External Service
+
+    Agent->>Client: "Call search_issues with query='bug'"
+    Client->>Server: JSON-RPC Request<br/>method: tools/call<br/>params: {name: "search_issues", arguments: {query: "bug"}}
+    Server->>Service: GitHub API: GET /search/issues?q=bug
+    Service-->>Server: API Response (JSON)
+    Server-->>Client: JSON-RPC Response<br/>result: {content: [{type: "text", text: "..."}]}
+    Client-->>Agent: Tool result displayed to model
+`} />
+
+The agent never talks directly to GitHub. It talks to the MCP client, which talks to the MCP server, which talks to GitHub. Each layer has a single, well-defined responsibility.
+
+## The Connection Lifecycle
+
+An MCP connection goes through four phases: initialization, operation, and shutdown, with an optional capability negotiation step.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+
+    Note over Client,Server: Phase 1: Initialize
+    Client->>Server: initialize {protocolVersion, capabilities, clientInfo}
+    Server-->>Client: initialize response {protocolVersion, capabilities, serverInfo}
+    Client->>Server: notifications/initialized
+
+    Note over Client,Server: Phase 2: Discovery
+    Client->>Server: tools/list
+    Server-->>Client: {tools: [{name, description, inputSchema}]}
+    Client->>Server: resources/list
+    Server-->>Client: {resources: [{uri, name, description}]}
+
+    Note over Client,Server: Phase 3: Operation
+    Client->>Server: tools/call {name, arguments}
+    Server-->>Client: {content: [...]}
+    Client->>Server: resources/read {uri}
+    Server-->>Client: {contents: [...]}
+
+    Note over Client,Server: Phase 4: Shutdown
+    Client->>Server: close connection
+`} />
+
+**Phase 1 -- Initialize.** The client sends an `initialize` request containing its protocol version, supported capabilities, and identity. The server responds with its own protocol version, capabilities, and identity. The client then sends an `initialized` notification to confirm the handshake is complete. This is where the two sides agree on what they can do together.
+
+**Phase 2 -- Discovery.** The client asks the server what it offers by calling `tools/list`, `resources/list`, and optionally `prompts/list`. The server responds with descriptions and schemas for each item. This is how the agent learns what tools are available -- their names, descriptions, and input parameters.
+
+**Phase 3 -- Operation.** The agent operates normally. When the language model decides to use a tool, the client sends a `tools/call` request. When it needs data, the client sends a `resources/read` request. The server processes each request and returns results. This phase can last as long as the session is active.
+
+**Phase 4 -- Shutdown.** The client closes the connection. For stdio transport, this means terminating the server process. For SSE transport, this means closing the HTTP connection.
+
+## Transport Mechanisms
+
+MCP supports two ways to carry messages between client and server: **stdio** and **HTTP with Server-Sent Events**.
+
+### Stdio Transport
+
+With **stdio transport**, the MCP server runs as a child process of the host application. The client writes JSON-RPC messages to the server's standard input (stdin) and reads responses from its standard output (stdout). Each message is a single line of JSON terminated by a newline.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Host["Host Process"]
+        Client["MCP Client"]
+    end
+    subgraph Child["Child Process"]
+        Server["MCP Server"]
+    end
+    Client -->|"stdin: JSON-RPC requests"| Server
+    Server -->|"stdout: JSON-RPC responses"| Client
+    style Host fill:#ebf8ff,stroke:#3182ce
+    style Child fill:#c6f6d5,stroke:#38a169
+    style Client fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style Server fill:#9ae6b4,stroke:#38a169,color:#1a202c
+`} />
+
+Stdio is the most common transport for local development. It is simple, requires no network configuration, and provides natural process lifecycle management -- when the host exits, the child process exits too. Claude Code and most desktop MCP clients use stdio by default.
+
+### HTTP with SSE Transport
+
+With **SSE transport**, the MCP server runs as an HTTP server. The client connects via HTTP, and the server uses **Server-Sent Events** to push messages back to the client. This transport is designed for remote servers, multi-client scenarios, and production deployments.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Local["Local Machine"]
+        Client["MCP Client"]
+    end
+    subgraph Remote["Remote Server"]
+        Server["MCP Server\n(HTTP)"]
+    end
+    Client -->|"HTTP POST: requests"| Server
+    Server -->|"SSE stream: responses"| Client
+    style Local fill:#ebf8ff,stroke:#3182ce
+    style Remote fill:#c6f6d5,stroke:#38a169
+    style Client fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style Server fill:#9ae6b4,stroke:#38a169,color:#1a202c
+`} />
+
+SSE transport is appropriate when the server needs to run on a different machine, when multiple clients need to connect to the same server, or when you need to deploy the server behind a load balancer or API gateway.
+
+> **When to use which:** Start with stdio for local development and single-user scenarios. Move to SSE when you need remote access, centralized servers, or multi-tenant deployments.
+
+## Capability Negotiation
+
+Not every server supports every feature, and not every client needs every feature. During initialization, both sides advertise their **capabilities** -- a structured declaration of what they support.
+
+A server might advertise:
+
+- `tools` -- it exposes callable tools
+- `resources` -- it exposes readable resources (with optional `subscribe` support for real-time updates)
+- `prompts` -- it exposes prompt templates
+- `logging` -- it can emit structured log messages
+
+A client might advertise:
+
+- `roots` -- it can tell the server about workspace directories
+- `sampling` -- it can ask the language model to generate text on the server's behalf
+
+This negotiation ensures that both sides have a shared understanding of what is possible. A client will not try to list tools from a server that did not advertise the `tools` capability. A server will not try to use `sampling` if the client did not offer it.
+
+## How the Agent Sees MCP
+
+From the language model's perspective, MCP tools look identical to any other tools. During the discovery phase, the client collects tool descriptions and input schemas from all connected MCP servers and presents them to the model as available functions. The model does not know or care whether a tool is built into the agent or provided by an MCP server.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Model["Language Model's View"]
+        T1["read_file\n(built-in)"]
+        T2["search_code\n(built-in)"]
+        T3["create_issue\n(MCP: GitHub)"]
+        T4["run_query\n(MCP: Database)"]
+        T5["send_message\n(MCP: Slack)"]
+    end
+    style Model fill:#ebf8ff,stroke:#3182ce
+    style T1 fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style T2 fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style T3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style T4 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style T5 fill:#c6f6d5,stroke:#38a169,color:#1a202c
+`} />
+
+This transparency is a key design principle. The model reasons about `create_issue` the same way it reasons about `read_file`. The fact that one goes through MCP and the other is a native function is invisible at the reasoning layer. This means adding new capabilities via MCP does not require retraining or fine-tuning the model -- you just connect a new server.
+
+## The Schema Contract
+
+Every MCP tool declares an **input schema** using JSON Schema. This schema serves three purposes:
+
+- **For the model** -- it describes what arguments the tool accepts, so the model can construct valid calls
+- **For the client** -- it enables input validation before sending the request to the server
+- **For the developer** -- it serves as self-documenting API reference
+
+A well-written tool schema includes not just the structure of the input, but descriptions of each parameter, required fields, and constraints. The better the schema, the more accurately the model will use the tool.
+
+## Putting It All Together
+
+Here is the complete flow when an agent uses an MCP tool, from human request to final result:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Human
+    participant Agent as Agent (Host)
+    participant LM as Language Model
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant API as External API
+
+    Human->>Agent: "Find open bugs in the auth module"
+    Agent->>LM: User message + available tools
+    LM->>Agent: Tool call: search_issues({query: "auth bug", state: "open"})
+    Agent->>Client: Route tool call to GitHub server
+    Client->>Server: JSON-RPC: tools/call
+    Server->>API: GET /repos/.../issues?q=auth+bug&state=open
+    API-->>Server: JSON response
+    Server-->>Client: JSON-RPC response with formatted results
+    Client-->>Agent: Tool result
+    Agent->>LM: Tool result + continue reasoning
+    LM->>Agent: Natural language summary
+    Agent->>Human: "I found 3 open bugs in the auth module..."
+`} />
+
+The human asks a question. The model decides it needs to search for issues. The MCP client routes the request to the GitHub MCP server. The server calls the GitHub API. The result flows back up through each layer. The model synthesizes a natural language response. The human sees the answer.
+
+Every step in this chain is standardized by MCP, except the external API call (which is the server's responsibility) and the model's reasoning (which is the host's responsibility).
+
+## Summary
+
+The MCP architecture is built on a clear separation of concerns: the **host** manages the user experience and language model, the **MCP client** manages connections and message routing, and **MCP servers** wrap external services in a standard interface. Communication uses **JSON-RPC 2.0** over either **stdio** (for local servers) or **HTTP with SSE** (for remote servers). The connection lifecycle follows four phases -- initialize, discover, operate, and shut down -- with capability negotiation ensuring both sides agree on supported features. From the model's perspective, MCP tools are indistinguishable from built-in tools, making the protocol transparent at the reasoning layer. In the next lesson, we will put this architecture to work by configuring and using existing MCP servers.

@@ -1,0 +1,270 @@
+---
+title: "Using MCP Servers"
+quiz:
+  - question: "Where do you configure MCP servers for a Claude Code project so that all team members get the same servers?"
+    options:
+      - "In the user's home directory at ~/.claude/settings.json"
+      - "In the project's .claude/settings.json file, committed to version control"
+      - "In a global environment variable"
+      - "In the agent's system prompt"
+    correctIndex: 1
+  - question: "What is the correct way to pass sensitive credentials to an MCP server?"
+    options:
+      - "Hardcode them in .claude/settings.json"
+      - "Include them in the CLAUDE.md file"
+      - "Use environment variables referenced in the server configuration"
+      - "Pass them as command-line arguments in plain text"
+    correctIndex: 2
+  - question: "What happens when you add an MCP server configuration to a project?"
+    options:
+      - "The agent automatically installs and starts the server on every machine"
+      - "The server replaces the agent's built-in tools"
+      - "The project's source code is uploaded to the MCP server"
+      - "The agent discovers the server's tools during initialization and makes them available for use"
+    correctIndex: 3
+---
+
+## Overview
+
+You do not need to build MCP servers to benefit from MCP. The ecosystem already offers dozens of pre-built servers for popular services -- GitHub, Jira, PostgreSQL, Slack, filesystem access, and more. This lesson shows you how to find, configure, and use existing MCP servers with Claude Code and other agent tools. By the end, you will know how to extend your agent's capabilities by adding a few lines of configuration.
+
+## Finding MCP Servers
+
+The MCP ecosystem has grown rapidly since the protocol's release. There are several places to discover available servers:
+
+- **Official MCP server registry** -- the `modelcontextprotocol` GitHub organization maintains a collection of reference servers
+- **npm registry** -- search for packages under the `@modelcontextprotocol` scope
+- **Community repositories** -- many developers publish MCP servers for niche services
+- **Your agent's documentation** -- Claude Code, Cursor, and other tools often list recommended servers
+
+Some of the most commonly used servers include:
+
+| Server | What It Does |
+|--------|-------------|
+| `@modelcontextprotocol/server-github` | Interact with GitHub repos, issues, PRs |
+| `@modelcontextprotocol/server-postgres` | Query PostgreSQL databases |
+| `@modelcontextprotocol/server-filesystem` | Read and write files outside the project |
+| `@modelcontextprotocol/server-slack` | Send and read Slack messages |
+| Community Jira servers | Create and manage Jira tickets |
+| Community search servers | Web search, documentation search |
+
+## Configuration Anatomy
+
+MCP server configuration lives in a JSON settings file. The exact location depends on your agent, but the structure is consistent. Here is the anatomy of a server configuration entry:
+
+<CodeBlock code={`{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "your-token-here"
+      }
+    }
+  }
+}`} language="json" filename="settings.json" />
+
+Each entry in `mcpServers` has:
+
+- **Key** (`server-name`) -- a unique identifier you choose; this is how you refer to the server in logs and diagnostics
+- **`command`** -- the executable to run (e.g., `npx`, `node`, `python`)
+- **`args`** -- command-line arguments passed to the executable
+- **`env`** -- environment variables set for the server process (this is where credentials go)
+
+For SSE-based remote servers, the configuration uses a `url` field instead of `command`:
+
+<CodeBlock code={`{
+  "mcpServers": {
+    "remote-server": {
+      "url": "https://mcp.example.com/sse",
+      "headers": {
+        "Authorization": "Bearer your-token-here"
+      }
+    }
+  }
+}`} language="json" filename="settings.json (SSE transport)" />
+
+## Configuration Scopes in Claude Code
+
+Claude Code supports three levels of MCP configuration, each with a different scope:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Scopes["Configuration Scopes"]
+        U["User Settings\n~/.claude/settings.json\nAll projects, just you"]
+        P["Project Settings\n.claude/settings.json\nThis project, all team members"]
+        L["Project Local Settings\n.claude/settings.local.json\nThis project, just you"]
+    end
+    U --> M["Merged Configuration"]
+    P --> M
+    L --> M
+    M --> A["Agent sees all servers\nfrom all scopes"]
+    style Scopes fill:#ebf8ff,stroke:#3182ce
+    style U fill:#e9d8fd,stroke:#805ad5,color:#1a202c
+    style P fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style L fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style M fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style A fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+`} />
+
+**User settings** (`~/.claude/settings.json`) apply to every project you work on. Put personal utility servers here -- things like a web search server or a personal note-taking tool.
+
+**Project settings** (`.claude/settings.json`) are committed to version control. Every team member who clones the repo gets these servers automatically. This is the right place for project-specific servers like a database connector or a Jira integration.
+
+**Project local settings** (`.claude/settings.local.json`) are gitignored. They override project settings on your machine only. Use this for credentials, personal preferences, or servers you are testing before sharing with the team.
+
+> **Best practice:** Put server configurations in project settings (`.claude/settings.json`) so the whole team benefits, and put sensitive credentials in environment variables or project local settings (`.claude/settings.local.json`).
+
+## Connecting to GitHub
+
+Let us walk through a concrete example: configuring the GitHub MCP server so your agent can create issues, read pull requests, and search code.
+
+**Step 1: Create a GitHub personal access token** with the scopes you need (typically `repo`, `issues`, and `pull_requests`).
+
+**Step 2: Add the server configuration** to your project settings:
+
+<CodeBlock code={`{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "$GITHUB_TOKEN"
+      }
+    }
+  }
+}`} language="json" filename=".claude/settings.json" />
+
+**Step 3: Set the environment variable** in your shell profile or `.env` file:
+
+<CodeBlock code={`# Add to ~/.zshrc or ~/.bashrc
+export GITHUB_TOKEN="ghp_your_token_here"`} language="bash" filename="~/.zshrc" />
+
+**Step 4: Restart your agent.** Claude Code will detect the new server configuration, start the server process, and discover its tools during initialization.
+
+Now your agent can do things like:
+
+- "Create an issue for the login timeout bug"
+- "Show me the open pull requests"
+- "Search for all files that import the auth module"
+
+The agent sees these as regular tools and uses them naturally during conversation.
+
+## Connecting to a Database
+
+Database MCP servers let your agent query your development or staging databases directly. This is powerful for debugging, data exploration, and understanding schema relationships.
+
+<CodeBlock code={`{
+  "mcpServers": {
+    "project-db": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres"
+      ],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "$DEV_DATABASE_URL"
+      }
+    }
+  }
+}`} language="json" filename=".claude/settings.json" />
+
+Once configured, you can ask your agent things like:
+
+- "Show me the schema for the users table"
+- "How many orders were placed yesterday?"
+- "Find all customers who signed up but never made a purchase"
+
+> **Warning:** Be cautious connecting agents to production databases. Use read-only credentials and connect to development or staging environments. Some database MCP servers support a read-only mode that blocks all write operations.
+
+## Connecting Multiple Servers
+
+The real power of MCP emerges when you connect multiple servers. An agent with access to GitHub, a database, and Jira can handle complex workflows that span multiple systems:
+
+<CodeBlock code={`{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "$GITHUB_TOKEN" }
+    },
+    "project-db": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "POSTGRES_CONNECTION_STRING": "$DEV_DATABASE_URL" }
+    },
+    "jira": {
+      "command": "npx",
+      "args": ["-y", "mcp-jira-server"],
+      "env": {
+        "JIRA_URL": "$JIRA_URL",
+        "JIRA_EMAIL": "$JIRA_EMAIL",
+        "JIRA_API_TOKEN": "$JIRA_API_TOKEN"
+      }
+    }
+  }
+}`} language="json" filename=".claude/settings.json" />
+
+With this configuration, the agent can handle requests like "Find the Jira ticket for the payment bug, look at the related pull request on GitHub, and check the database to see how many users are affected." The agent orchestrates across all three servers seamlessly.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Human
+    participant Agent
+    participant Jira as MCP: Jira
+    participant GitHub as MCP: GitHub
+    participant DB as MCP: Database
+
+    Human->>Agent: "How many users hit the payment bug from PROJ-423?"
+    Agent->>Jira: get_issue("PROJ-423")
+    Jira-->>Agent: Issue details with PR link
+    Agent->>GitHub: get_pull_request(repo, pr_number)
+    GitHub-->>Agent: PR with affected code paths
+    Agent->>DB: run_query("SELECT COUNT(*) FROM errors WHERE type='payment_timeout'")
+    DB-->>Agent: {count: 1847}
+    Agent->>Human: "PROJ-423 affects 1,847 users based on the error logs..."
+`} />
+
+## Telling Agents About MCP Servers in CLAUDE.md
+
+Configuration alone makes MCP servers available. But to make the agent use them effectively, you should document the servers in your `CLAUDE.md` file. This connects the server capabilities to your project's specific workflows:
+
+<CodeBlock code={`## Available MCP Servers
+
+This project has the following MCP servers configured:
+
+- **github** -- use this for creating issues, reading PRs, and code search
+- **project-db** -- connects to the dev database (read-only); use for schema
+  exploration and data queries. The main tables are: users, orders, products,
+  and payments
+- **jira** -- connects to our PROJ board; use for looking up tickets and
+  creating new issues
+
+When investigating a bug, check Jira for the ticket first, then use the
+database to assess impact, and finally check GitHub for related PRs.`} language="markdown" filename="CLAUDE.md" />
+
+This is where the lessons from earlier modules converge. Your `CLAUDE.md` provides the context. Your MCP configuration provides the capabilities. Together, they give the agent both the knowledge of what to do and the tools to do it.
+
+## Troubleshooting Common Issues
+
+When an MCP server is not working as expected, check these common failure points:
+
+- **Server not starting** -- verify the command and args are correct by running them manually in your terminal. Check that the package is installable (`npx -y @modelcontextprotocol/server-github --help`).
+
+- **Authentication failures** -- confirm environment variables are set. Remember that `$GITHUB_TOKEN` in settings.json means "read from the environment variable `GITHUB_TOKEN`" -- the actual value must be set in your shell.
+
+- **Tools not appearing** -- restart your agent after changing configuration. The server is only initialized once at startup. Check your agent's logs for initialization errors.
+
+- **Permission errors** -- some agents require you to explicitly allow MCP server commands. In Claude Code, you may need to approve the server's command the first time it runs.
+
+- **Conflicting servers** -- if two servers expose tools with the same name, the agent may get confused. Use distinct server names and check for tool name collisions.
+
+> **Debugging tip:** Most MCP clients can show you the list of connected servers and their discovered tools. In Claude Code, the startup output shows which servers were initialized and how many tools each one provides.
+
+## Summary
+
+Using existing MCP servers is the fastest way to extend your agent's capabilities. Configure servers in your project's `.claude/settings.json` to share them across the team, keep credentials in environment variables, and document the available servers in your `CLAUDE.md` so agents know when and how to use them. The combination of multiple servers -- GitHub for code, a database for data, Jira for project management -- enables agents to handle complex, cross-system workflows that would otherwise require manual orchestration. In the next lesson, we will move from using servers to building your own.

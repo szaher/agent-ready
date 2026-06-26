@@ -1,0 +1,225 @@
+---
+title: The Agent Definition Format
+quiz:
+- question: Where do custom agent definition files live in a repository?
+  options:
+  - In .claude/agents/ as markdown files
+  - In the root directory as .agent files
+  - Inside CLAUDE.md as YAML blocks
+  - In a dedicated agents/ directory at the project root
+  correctIndex: 0
+- question: What is the purpose of the system prompt section in an agent definition?
+  options:
+  - It replaces CLAUDE.md entirely for that agent
+  - It defines the API key the agent should use
+  - It provides role-specific instructions that are combined with the project's CLAUDE.md
+  - It lists the files the agent is allowed to read
+  correctIndex: 2
+- question: Why should the agent filename use a descriptive slug like 'code-reviewer.md'?
+  options:
+  - The system requires kebab-case filenames to parse correctly
+  - It must match a corresponding entry in CLAUDE.md
+  - Markdown files with spaces in the name cannot be parsed
+  - It becomes the identifier developers use to invoke the agent, so clarity matters
+  correctIndex: 3
+---
+
+## Overview
+
+You know why custom agents matter. Now you need to know how to build one. Every custom agent is defined by a single **markdown file** placed in the `.claude/agents/` directory of your repository. This file is the complete specification for the agent's identity, behavior, and capabilities. In this lesson, you will learn the anatomy of an agent definition file -- its structure, fields, and conventions -- so you can start creating agents with confidence.
+
+## The Agent File Location
+
+Custom agents live in a specific location within the **`.claude/` directory** at the root of your repository. The convention is straightforward:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Repo["Repository Root"]
+        A[".claude/"] --> B["agents/"]
+        B --> C["code-reviewer.md"]
+        B --> D["test-writer.md"]
+        B --> E["doc-generator.md"]
+        B --> F["security-auditor.md"]
+        A --> G["settings.json"]
+        H["CLAUDE.md"]
+    end
+    style Repo fill:#f7fafc,stroke:#4a5568
+    style B fill:#b794f4,stroke:#6b46c1,color:#ffffff
+    style C fill:#ebf8ff,stroke:#3182ce
+    style D fill:#ebf8ff,stroke:#3182ce
+    style E fill:#ebf8ff,stroke:#3182ce
+    style F fill:#ebf8ff,stroke:#3182ce
+    style G fill:#e2e8f0,stroke:#4a5568
+    style H fill:#63b3ed,stroke:#3182ce,color:#ffffff
+`} />
+
+Each `.md` file in `.claude/agents/` defines one agent. The filename becomes the identifier you use to invoke the agent, so choose descriptive, kebab-case names: `code-reviewer.md`, `test-writer.md`, `security-auditor.md`.
+
+> Check your agent definitions into version control. They are part of your project's infrastructure, just like CLAUDE.md.
+
+## Anatomy of an Agent Definition
+
+An agent definition file has two main sections: the **body content** that serves as the agent's system prompt, providing its role-specific instructions. Let us look at a complete example and then break it apart.
+
+<CodeBlock code={`# Code Reviewer
+
+You are a senior code reviewer for this project.
+
+## Your Role
+
+- Review code changes for correctness, clarity, and adherence to project conventions
+- Flag potential bugs, security issues, and performance problems
+- Suggest improvements but do NOT implement them yourself
+- Be specific: reference file names, line numbers, and function names
+
+## What to Look For
+
+1. **Correctness** -- does the code do what it claims?
+2. **Edge cases** -- are boundary conditions handled?
+3. **Naming** -- do variable and function names communicate intent?
+4. **Tests** -- are new code paths tested?
+5. **Security** -- are inputs validated? Are secrets hardcoded?
+
+## Output Format
+
+Structure your review as:
+- **Summary**: one paragraph overview of the change
+- **Issues**: numbered list of problems found (Critical / Warning / Nit)
+- **Suggestions**: optional improvements that are not blocking
+
+## Constraints
+
+- NEVER modify any files -- you are read-only
+- NEVER run tests or shell commands
+- If you are unsure about something, say so rather than guessing
+`} language="markdown" filename=".claude/agents/code-reviewer.md" />
+
+This single file contains everything the agent needs to know about its role. Let us examine each part.
+
+## The Agent Name
+
+The top-level heading (using `#`) at the start of the file serves as the **agent's display name**. This is what developers see when they select the agent:
+
+<CodeBlock code={`# Code Reviewer
+`} language="markdown" filename="Agent name section" />
+
+Keep the name short and descriptive. It should immediately communicate what the agent does.
+
+## The System Prompt Body
+
+Everything after the name heading is the **system prompt** -- the instructions that define how the agent behaves. This is where you encode the agent's personality, expertise, rules, and output format.
+
+The system prompt is composed alongside your project's CLAUDE.md, not instead of it. Think of the relationship like this:
+
+<MermaidDiagram chart={`graph LR
+    A["CLAUDE.md\nProject context\nConventions\nArchitecture"] --> C["Agent's Effective Prompt"]
+    B["Agent Definition\nRole-specific instructions\nBehavior rules\nOutput format"] --> C
+    C --> D["Agent Behavior"]
+    style A fill:#63b3ed,stroke:#3182ce,color:#ffffff
+    style B fill:#b794f4,stroke:#6b46c1,color:#ffffff
+    style C fill:#fefcbf,stroke:#d69e2e
+    style D fill:#c6f6d5,stroke:#38a169
+`} />
+
+Your CLAUDE.md tells the agent about the project. The agent definition tells the agent about its role. Together, they produce an agent that understands both what it is working on and what it is supposed to do.
+
+## Writing Effective Agent Prompts
+
+The system prompt body follows the same principles you learned in Module 3 for writing CLAUDE.md instructions, but scoped to a specific role. Here are the key sections to include:
+
+**Role definition** -- Tell the agent what it is and what it does. Be explicit about the persona:
+
+<CodeBlock code={`## Your Role
+
+You are a test engineer specializing in this project's test suite.
+Your job is to write comprehensive tests for new and changed code.
+You prioritize edge cases and error paths over happy-path testing.
+`} language="markdown" filename="Role definition section" />
+
+**Behavioral rules** -- Define what the agent should and should not do. Use imperative language:
+
+<CodeBlock code={`## Rules
+
+- Write tests in the same language as the source code
+- Follow the existing test patterns in the __tests__/ directory
+- NEVER modify source code -- only create or update test files
+- Use descriptive test names that explain the expected behavior
+- Include both positive and negative test cases
+`} language="markdown" filename="Behavioral rules section" />
+
+**Output format** -- If the agent produces structured output (like a review or a report), define the format explicitly:
+
+<CodeBlock code={`## Output Format
+
+For each file reviewed, produce:
+
+### filename.ext
+- **Line N**: [Critical|Warning|Nit] Description of the issue
+- **Suggestion**: How to fix it (but do NOT apply the fix)
+
+End with a summary: "X critical, Y warnings, Z nits found."
+`} language="markdown" filename="Output format section" />
+
+**Constraints** -- Explicit boundaries prevent the agent from overstepping:
+
+<CodeBlock code={`## Constraints
+
+- NEVER modify files outside the tests/ directory
+- NEVER delete existing tests
+- Ask for clarification if the function's expected behavior is ambiguous
+- Do not mock external services unless the existing test suite already does
+`} language="markdown" filename="Constraints section" />
+
+## A Complete Minimal Agent
+
+Here is the simplest useful agent -- a documentation helper with a focused role:
+
+<CodeBlock code={`# Doc Helper
+
+You help maintain this project's documentation.
+
+## Your Role
+
+- Review and improve markdown documentation files
+- Ensure code examples in docs match the actual codebase
+- Fix formatting, grammar, and clarity issues
+- Add missing documentation for public APIs
+
+## Rules
+
+- Only modify files with .md or .mdx extensions
+- Preserve the existing documentation structure and style
+- When adding examples, verify they match current function signatures
+- Use American English spelling conventions
+`} language="markdown" filename=".claude/agents/doc-helper.md" />
+
+This agent is effective because it is focused. It knows exactly what it does (documentation), what files it touches (markdown only), and what style to follow (American English, existing structure).
+
+## Common Agent Archetypes
+
+While you can create agents for any purpose, most teams start with a few common archetypes:
+
+| Archetype | Primary Action | Key Constraint |
+|-----------|---------------|----------------|
+| Code Reviewer | Analyze and comment | Read-only, no modifications |
+| Test Writer | Create test files | No source code changes |
+| Refactorer | Restructure code | No behavior changes |
+| Doc Generator | Write documentation | Markdown files only |
+| Security Auditor | Find vulnerabilities | Read-only, report format |
+| Migration Helper | Update APIs/patterns | Specific file scopes |
+
+Each archetype translates into a focused agent definition file with role-appropriate instructions and constraints.
+
+## Naming Conventions and Organization
+
+As your agent collection grows, good naming and organization become important:
+
+- Use **kebab-case** for filenames: `code-reviewer.md`, not `CodeReviewer.md` or `code reviewer.md`
+- Start the filename with the **action or role**: `review-security.md`, `write-tests.md`, `generate-docs.md`
+- Keep agent definitions **under 200 lines** -- if the prompt is longer, you are probably trying to do too much in one agent
+- Consider **grouping by concern** when you have many agents -- though the flat directory structure works well for most teams
+
+> A well-named agent file is self-documenting. When a developer runs `ls .claude/agents/`, the filenames alone should communicate what each agent does.
+
+## Summary
+
+Every custom agent is a **markdown file** in `.claude/agents/` with a clear structure: a name heading, a role definition, behavioral rules, output format expectations, and constraints. The agent definition works alongside CLAUDE.md -- project instructions provide shared context, while the agent definition provides role-specific behavior. In the next lesson, you will learn how to control what tools and permissions each agent has access to, turning the behavioral boundaries in your system prompt into enforced technical constraints.

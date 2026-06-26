@@ -1,0 +1,246 @@
+---
+title: Writing Effective Instructions
+quiz:
+- question: Which instruction is most effective for an AI agent?
+  options:
+  - Run pytest -x --tb=short to verify changes. Fix any failures before committing.
+  - Make sure to test your code properly
+  - Tests are important in this project
+  - Please run the test suite when you are done
+  correctIndex: 0
+- question: What is the main risk of including too many instructions in CLAUDE.md?
+  options:
+  - The file becomes hard to read for humans
+  - Git will reject commits with large CLAUDE.md files
+  - Excessive instructions waste context window tokens and dilute the important rules
+  - The agent will refuse to follow more than ten instructions
+  correctIndex: 2
+- question: Which of the following is an anti-pattern in CLAUDE.md instructions?
+  options:
+  - 'Using imperative mood: ''Run pytest -x before committing'''
+  - Providing examples of incorrect code alongside correct alternatives
+  - Listing exact file paths for key utilities
+  - Writing vague instructions like 'Follow best practices for error handling'
+  correctIndex: 3
+---
+
+## Overview
+
+Having the right sections in your CLAUDE.md is only half the battle. The other half is writing instructions that agents actually follow correctly. Poorly written instructions -- vague, ambiguous, or contradictory -- lead to the same guessing behavior you would see without a CLAUDE.md at all.
+
+This lesson covers the craft of writing instructions that are **specific enough to be actionable, concise enough to fit in context, and clear enough to leave no room for misinterpretation**.
+
+## The Specificity Spectrum
+
+Instructions exist on a spectrum from vague to precise. Agents perform best with instructions near the precise end.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Vague["Vague (Ineffective)"]
+        A["'Write good tests'"]
+        B["'Follow our conventions'"]
+        C["'Handle errors properly'"]
+    end
+
+    subgraph Better["Better"]
+        D["'Write unit tests for<br/>new functions'"]
+        E["'Use camelCase for<br/>variables'"]
+        F["'Wrap errors with<br/>context messages'"]
+    end
+
+    subgraph Precise["Precise (Effective)"]
+        G["'Write tests using vitest.<br/>Place test files adjacent:<br/>foo.ts → foo.test.ts'"]
+        H["'Use camelCase for variables,<br/>PascalCase for types.<br/>Never abbreviate names.'"]
+        I["'Use tryCatch() from<br/>src/lib/result.ts.<br/>Never throw raw exceptions.'"]
+    end
+
+    A --> D --> G
+    B --> E --> H
+    C --> F --> I
+
+    style Vague fill:#fed7d7,stroke:#c53030
+    style Better fill:#fefcbf,stroke:#975a16
+    style Precise fill:#c6f6d5,stroke:#276749
+`} />
+
+The key difference is **actionability**. A vague instruction like "write good tests" forces the agent to decide what "good" means. A precise instruction like "write tests using vitest, place test files adjacent to source" leaves no ambiguity.
+
+## Rule 1: Use Imperative Mood with Exact Commands
+
+**Imperative mood** means giving direct commands: "Run this," "Use that," "Never do this." Avoid passive or descriptive language.
+
+<CodeBlock code={`# Bad — descriptive, not actionable
+The project uses ESLint for linting. Tests are run with Jest.
+Code should be formatted with Prettier.
+
+# Good — imperative, with exact commands
+Run \`pnpm lint\` to check for style issues.
+Run \`pnpm test\` to execute the test suite.
+Run \`pnpm format\` to auto-format code before committing.
+`} language="markdown" filename="CLAUDE.md" />
+
+The bad version *describes* the project. The good version *tells the agent what to do*. The agent does not need to know that you use ESLint -- it needs to know to run `pnpm lint`.
+
+## Rule 2: Include the "Why" for Non-Obvious Rules
+
+Most rules are self-explanatory: "run `pnpm test` before committing" needs no justification. But some rules are surprising or counterintuitive. For these, include a brief **why** to prevent the agent from "optimizing away" the rule.
+
+<CodeBlock code={`# Without why — agent may ignore this as unnecessary
+Do NOT use index files (index.ts) for re-exporting modules.
+
+# With why — agent understands the reason and respects it
+Do NOT use index files (index.ts) for re-exporting. They cause circular
+dependency issues with our build system and make tree-shaking less effective.
+`} language="markdown" filename="CLAUDE.md" />
+
+The "why" does not need to be long -- one sentence is usually enough. The goal is to signal that the rule exists for a specific technical reason, not an arbitrary preference.
+
+## Rule 3: Show Examples of What NOT to Do
+
+For code style rules, showing a **bad example alongside the good** is more effective than describing the rule in prose. Agents learn patterns well from examples.
+
+<CodeBlock code={`# Error Handling
+
+Use the Result pattern from \`src/lib/result.ts\`. Never throw exceptions.
+
+Bad:
+\`\`\`typescript
+async function getUser(id: string): Promise<User> {
+  const user = await db.users.find(id);
+  if (!user) throw new Error("User not found");
+  return user;
+}
+\`\`\`
+
+Good:
+\`\`\`typescript
+async function getUser(id: string): Promise<Result<User, NotFoundError>> {
+  const user = await db.users.find(id);
+  if (!user) return err(new NotFoundError("User", id));
+  return ok(user);
+}
+\`\`\`
+`} language="markdown" filename="CLAUDE.md" />
+
+This format -- bad then good with real code -- is especially effective because the agent can pattern-match against it. When it encounters a situation requiring error handling, it has a concrete template to follow.
+
+## Rule 4: Be Specific About Scope
+
+When a rule applies only to certain parts of the codebase, state the scope explicitly. Otherwise the agent will apply it everywhere.
+
+<CodeBlock code={`# Overly broad — applies this rule to all code
+Always use server components.
+
+# Properly scoped — clear boundaries
+Files in \`src/app/\` are Server Components by default. Only add "use client"
+when the component needs interactivity (event handlers, useState, useEffect).
+Files in \`src/components/ui/\` are always Client Components.
+`} language="markdown" filename="CLAUDE.md" />
+
+Scope is especially important in monorepos where different packages may have different conventions. A rule that is correct for your API package might be wrong for your frontend package.
+
+## Rule 5: Keep It DRY -- Reference, Don't Repeat
+
+If a convention is already encoded in a config file, do not duplicate it in CLAUDE.md. Instead, **reference the config file**.
+
+<CodeBlock code={`# Bad — duplicates what's already in tsconfig.json and .prettierrc
+Use strict TypeScript mode. Set target to ES2022. Use 2-space indentation.
+Use single quotes. Add trailing commas.
+
+# Good — references existing configs
+TypeScript config is in \`tsconfig.json\` (strict mode). Formatting rules are
+in \`.prettierrc\`. Run \`pnpm format\` to apply formatting automatically.
+Do NOT manually fix formatting issues — let Prettier handle it.
+`} language="markdown" filename="CLAUDE.md" />
+
+This approach has two benefits: it keeps CLAUDE.md shorter (saving context window), and it avoids the risk of CLAUDE.md contradicting the config file when one gets updated but not the other.
+
+## Common Anti-Patterns
+
+Here are the most common mistakes people make when writing CLAUDE.md instructions, and how to fix them.
+
+### Anti-Pattern 1: The Wall of Text
+
+<CodeBlock code={`# Anti-pattern: paragraph-style instructions
+This project is a web application built with Next.js. We use TypeScript
+throughout the codebase. The testing framework is Vitest and we prefer
+to write unit tests alongside the source files. When writing tests, make
+sure to mock external dependencies using vi.mock() and to test both the
+happy path and error cases. Our CI runs all tests on every pull request
+so it is important that tests pass before submitting code for review.
+
+# Fix: structured, scannable format
+## Testing
+- Framework: Vitest
+- Test location: adjacent to source (\`foo.ts\` → \`foo.test.ts\`)
+- Mock external deps with \`vi.mock()\`
+- Cover both happy path and error cases
+- Run \`pnpm test\` before submitting — CI will also run tests on PR
+`} language="markdown" filename="CLAUDE.md" />
+
+Agents parse structured, bulleted instructions better than dense paragraphs. Use headings, bullet points, and whitespace to make the document scannable.
+
+### Anti-Pattern 2: Stale Instructions
+
+<CodeBlock code={`# Stale — references tools/patterns that no longer exist
+Run \`npm run test:jest\` to run tests.
+Use the \`withAuth()\` HOC for protected pages.
+
+# Current — matches what the codebase actually uses today
+Run \`pnpm vitest run\` to run tests.
+Use the \`auth()\` middleware from \`src/lib/auth/middleware.ts\` for protected routes.
+`} language="markdown" filename="CLAUDE.md" />
+
+Stale instructions are worse than no instructions -- they actively mislead the agent. When you update a tool, framework, or pattern, update the CLAUDE.md in the same commit.
+
+> **Tip:** Add "update CLAUDE.md" to your migration checklists. When switching from Jest to Vitest, from npm to pnpm, or from one pattern to another, updating CLAUDE.md should be part of the migration.
+
+### Anti-Pattern 3: Contradictory Rules
+
+<CodeBlock code={`# Contradictory — which rule wins?
+Always use arrow functions for component definitions.
+...
+(50 lines later)
+...
+Use function declarations for components to enable better stack traces.
+`} language="markdown" filename="CLAUDE.md" />
+
+When CLAUDE.md contains contradictory rules, the agent may follow either one unpredictably. Review your CLAUDE.md periodically for internal consistency, especially after multiple people have contributed to it.
+
+### Anti-Pattern 4: Context Window Waste
+
+<CodeBlock code={`# Wasteful — information the agent does not need
+## Project History
+This project started in 2019 as a hackathon prototype. In 2021, we
+rewrote it in TypeScript. The original author was Jane. We migrated
+from Heroku to AWS in 2023...
+
+## Team Structure
+The frontend team owns src/components. The backend team owns src/api.
+Contact @alice for database questions and @bob for auth questions...
+`} language="markdown" filename="CLAUDE.md" />
+
+Project history and team structure are valuable for humans but useless for agents. Every line in CLAUDE.md consumes context window tokens. Be ruthless about removing content that does not help the agent write correct code.
+
+## A Checklist for Good Instructions
+
+Before adding an instruction to your CLAUDE.md, run it through this mental checklist:
+
+- **Is it actionable?** -- Can the agent do something specific based on this instruction?
+- **Is it unambiguous?** -- Is there only one way to interpret it?
+- **Is it current?** -- Does it reflect the codebase as it exists today?
+- **Is it necessary?** -- Would the agent make a mistake without this instruction?
+- **Is it scoped?** -- Is it clear where this instruction applies?
+- **Is it concise?** -- Can you say it in fewer words without losing meaning?
+
+If an instruction fails any of these checks, revise it before adding it. A shorter CLAUDE.md with high-quality instructions outperforms a longer one with mixed quality.
+
+## Summary
+
+- Write instructions in **imperative mood** with exact commands -- "Run `pnpm test`" not "tests should be run"
+- Be **specific and actionable** -- vague instructions like "follow best practices" are effectively invisible
+- Include the **"why"** for non-obvious rules so the agent does not discard them
+- Show **bad and good examples** side by side for code style rules
+- **Scope your rules** explicitly when they apply only to certain directories or file types
+- **Reference config files** instead of duplicating their contents
+- Avoid anti-patterns: walls of text, stale instructions, contradictions, and context window waste
+- Use the **six-point checklist** (actionable, unambiguous, current, necessary, scoped, concise) before adding any instruction

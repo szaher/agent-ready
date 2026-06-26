@@ -1,0 +1,254 @@
+---
+title: Context Windows Explained
+quiz:
+- question: If a model has a 200,000 token context window, approximately how many lines of code can fit in it?
+  options:
+  - About 50,000-60,000 lines
+  - About 20,000 lines
+  - About 2,000 lines
+  - About 200,000 lines
+  correctIndex: 0
+- question: What happens when an agent's conversation exceeds the context window limit?
+  options:
+  - The agent automatically saves everything to disk
+  - The model switches to a larger context window automatically
+  - Older messages are truncated or summarized, losing detail from earlier in the session
+  - The conversation pauses until the user clears the history
+  correctIndex: 2
+- question: Why is a well-structured project easier for agents to work with, even if it has more total code?
+  options:
+  - Smaller files mean the agent needs fewer tokens to load the relevant context
+  - Agents can only read files that are under 100 lines
+  - Agents skip files that are too large to fit in the context window
+  correctIndex: 0
+- question: What is the 'lost in the middle' effect?
+  options:
+  - The agent forgets the user's original request after too many tool calls
+  - Information placed in the middle of a long context window receives less attention than information at the beginning or end
+  - The agent loses track of which file it is currently editing
+  correctIndex: 1
+---
+
+## Overview
+
+The **context window** is the single most important constraint governing how AI coding agents work. It determines what the agent can see, how much code it can reason about at once, and ultimately how effective it is at understanding your codebase.
+
+Think of the context window as the agent's working memory -- a fixed-size desk where everything the agent needs to think about must fit at the same time. When the desk is full, something has to fall off. Understanding this constraint will change how you structure your code and documentation.
+
+## What Is a Context Window?
+
+A context window is the total amount of text (measured in **tokens**) that a large language model can process in a single conversation. Everything the agent needs to reason about must fit within this window:
+
+- The **system prompt** (agent instructions, tool definitions)
+- The **conversation history** (every message, tool call, and tool result)
+- The **current input** (the latest tool output or user message)
+- The **output space** (room for the model to generate its response)
+
+<MermaidDiagram chart={`graph TD
+    subgraph ContextWindow["Context Window (e.g., 200K tokens)"]
+        direction TB
+        A["System Prompt<br/>~2,000-5,000 tokens"]
+        B["Project Docs (CLAUDE.md)<br/>~500-3,000 tokens"]
+        C["Conversation History<br/>Grows with each turn"]
+        D["Recent Tool Results<br/>(file contents, search results)"]
+        E["Output Space<br/>~4,000-8,000 tokens reserved"]
+    end
+
+    style ContextWindow fill:#ebf8ff,stroke:#3182ce
+    style A fill:#f0fff4,stroke:#38a169
+    style B fill:#f0fff4,stroke:#38a169
+    style C fill:#fef3c7,stroke:#d69e2e
+    style D fill:#fef3c7,stroke:#d69e2e
+    style E fill:#fff5f5,stroke:#e53e3e
+`} />
+
+## Tokens: The Unit of Measurement
+
+Models do not count characters or words -- they count **tokens**. A token is a chunk of text, roughly corresponding to:
+
+- **1 token** is approximately 4 characters or 0.75 words in English
+- **1 line of code** is approximately 3-5 tokens
+- **A typical source file** (200 lines) is approximately 600-1,000 tokens
+- **A large source file** (1,000 lines) is approximately 3,000-5,000 tokens
+
+Here is a concrete example of how tokenization works:
+
+<CodeBlock code={`# This function definition is about 25 tokens
+def calculate_total(items: list[dict], tax_rate: float = 0.08) -> float:
+    subtotal = sum(item["price"] * item["quantity"] for item in items)
+    return subtotal * (1 + tax_rate)
+
+# This comment alone is about 8 tokens
+`} language="python" filename="tokenization-example.py" />
+
+A model with a 200,000 token context window sounds enormous -- and it is. But consider a real project:
+
+<CodeBlock code={`# Token budget for a typical agent session
+# Model context window:          200,000 tokens
+
+# Fixed costs (always present):
+#   System prompt + tools:         -4,000 tokens
+#   CLAUDE.md + project docs:      -2,000 tokens
+#   Output reservation:            -8,000 tokens
+# Available for conversation:    186,000 tokens
+
+# Each agent loop consumes:
+#   Tool call (agent's request):     ~200 tokens
+#   File read (avg 300 lines):     ~1,200 tokens
+#   Search results:                  ~800 tokens
+#   Agent reasoning:                 ~500 tokens
+# Per loop total:                  ~2,700 tokens
+
+# So 186,000 / 2,700 = ~69 loops before context is full
+
+# But if reading large files (1000+ lines):
+#   Per loop total:               ~5,000+ tokens
+#   Available loops:              ~37 loops
+`} language="bash" filename="token-budget.sh" />
+
+This is why 200,000 tokens still is not enough for large codebases. The context fills up not because of the code you want to change, but because of all the code the agent needs to *understand* to make that change.
+
+## How Agents Fill the Context Window
+
+Let us trace how the context window fills during a real task:
+
+<MermaidDiagram chart={`graph LR
+    subgraph Phase1["Turn 1-3: Exploration"]
+        A1["Read README<br/>+800 tokens"]
+        A2["Search for function<br/>+600 tokens"]
+        A3["Read target file<br/>+1,200 tokens"]
+    end
+
+    subgraph Phase2["Turn 4-7: Understanding"]
+        B1["Read related file<br/>+1,500 tokens"]
+        B2["Read test file<br/>+900 tokens"]
+        B3["Read types file<br/>+700 tokens"]
+        B4["Read config<br/>+400 tokens"]
+    end
+
+    subgraph Phase3["Turn 8-10: Acting"]
+        C1["Edit target file<br/>+800 tokens"]
+        C2["Run tests<br/>+2,000 tokens"]
+        C3["Fix test failure<br/>+600 tokens"]
+    end
+
+    Phase1 --> Phase2 --> Phase3
+
+    style Phase1 fill:#f0fff4,stroke:#38a169
+    style Phase2 fill:#fef3c7,stroke:#d69e2e
+    style Phase3 fill:#fff5f5,stroke:#e53e3e
+`} />
+
+After just 10 turns, the agent has consumed roughly 9,500 tokens of conversation history. That is manageable. But consider what happens during a complex feature implementation with 40+ turns, large files, and verbose test outputs -- the context can fill rapidly.
+
+## What Happens When Context Overflows
+
+When the conversation approaches the context limit, the agent framework must make a choice. Different agents handle this differently, but the common strategies are:
+
+- **Truncation**: Older messages are dropped from the beginning of the conversation. The agent loses its memory of early exploration and decisions.
+- **Summarization**: Earlier parts of the conversation are compressed into a summary. Details are lost, but the gist is preserved.
+- **Sliding window**: Only the most recent N messages are kept. Everything older is discarded.
+
+All of these strategies have the same consequence: **the agent forgets**.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Before["Before Truncation"]
+        A1["Turn 1: Read architecture docs"]
+        A2["Turn 2: Understand module structure"]
+        A3["Turn 3: Read target file"]
+        A4["Turn 4: Read related types"]
+        A5["Turn 5-15: Implementation work"]
+        A6["Turn 16: Current turn"]
+    end
+
+    subgraph After["After Truncation"]
+        B1["Turn 1-4: LOST"]
+        B2["Summary: 'Explored architecture<br/>and module structure'"]
+        B3["Turn 5-15: Implementation work"]
+        B4["Turn 16: Current turn"]
+    end
+
+    Before -->|"Context full"| After
+
+    style A1 fill:#fff5f5,stroke:#e53e3e
+    style A2 fill:#fff5f5,stroke:#e53e3e
+    style A3 fill:#fff5f5,stroke:#e53e3e
+    style A4 fill:#fff5f5,stroke:#e53e3e
+    style B1 fill:#fff5f5,stroke:#e53e3e
+    style B2 fill:#fef3c7,stroke:#d69e2e
+`} />
+
+When an agent forgets its early observations, it might:
+
+- **Re-read files** it already read, wasting more tokens
+- **Contradict earlier decisions**, introducing inconsistency
+- **Lose track of the overall plan**, solving the wrong problem
+- **Forget constraints** it discovered, like "don't modify the public API"
+
+## The "Lost in the Middle" Effect
+
+Even before the context overflows, there is another problem. Research has shown that LLMs pay **uneven attention** to different parts of the context window. Information at the **beginning** (system prompt, early instructions) and the **end** (recent messages) gets the most attention. Information in the **middle** receives less.
+
+This is called the **lost in the middle** effect, and it has practical consequences:
+
+- A file read 20 turns ago is partially "forgotten" even if it is technically still in the context
+- Critical instructions buried in the middle of a long CLAUDE.md may be overlooked
+- The agent may ask for information it already has, because that information is in a low-attention zone
+
+> **Practical tip**: Keep your CLAUDE.md concise and front-load the most important instructions. The agent pays the most attention to the beginning and end of its context.
+
+## How Code Structure Affects Context Efficiency
+
+This is where agent-readiness becomes practical. The way you structure your code directly impacts how efficiently agents use their context window.
+
+**A 2,000-line file** forces the agent to load 6,000-10,000 tokens just to read one file. If the agent only needs to understand one function in that file, 90% of those tokens are wasted.
+
+**A 200-line file** with a single responsibility costs only 600-1,000 tokens. The agent loads exactly what it needs.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Monolith["Monolithic Structure"]
+        M1["utils.py<br/>2,000 lines<br/>~7,000 tokens"]
+        M2["Agent reads entire file<br/>to find one function"]
+    end
+
+    subgraph Modular["Modular Structure"]
+        S1["validation.py<br/>150 lines<br/>~500 tokens"]
+        S2["formatting.py<br/>120 lines<br/>~400 tokens"]
+        S3["parsing.py<br/>180 lines<br/>~600 tokens"]
+        S4["Agent reads only<br/>the file it needs"]
+    end
+
+    style Monolith fill:#fff5f5,stroke:#e53e3e
+    style Modular fill:#f0fff4,stroke:#38a169
+`} />
+
+The same principle applies to:
+
+- **Function length**: A 200-line function is harder for agents than five 40-line functions
+- **Module organization**: Flat file structures force agents to read more files to find things
+- **Import structure**: Clear, explicit imports help agents trace dependencies without reading everything
+- **Documentation placement**: Inline docstrings mean the agent gets context for free when it reads the code
+
+## Strategies for Staying Within Budget
+
+Given the context window constraint, here are concrete strategies for making agent interactions more efficient:
+
+- **Keep files focused**: One module, one responsibility. Aim for under 300 lines per file.
+- **Write descriptive names**: Functions called `process_data` force the agent to read the body. Functions called `validate_email_format` tell the agent what they do from the name alone.
+- **Front-load documentation**: Put the most important information at the top of CLAUDE.md and README files.
+- **Use explicit exports**: An `__init__.py` or `index.ts` that re-exports public APIs helps agents find what they need without reading every file.
+- **Structure for searchability**: Consistent naming patterns let agents find things with search instead of reading entire directories.
+
+> **Key insight**: Every token you save through better code organization is a token the agent can spend on understanding, reasoning, and producing better edits.
+
+## Summary
+
+The context window is the finite working memory every AI agent operates within. Understanding it reveals why some codebases are easier for agents to work with:
+
+- **Tokens are the currency**: Every file read, every search result, every tool output costs tokens
+- **Context overflow causes forgetting**: When the window fills, the agent loses its earliest observations
+- **The middle gets less attention**: Front-load important information in docs and code
+- **Code structure is context efficiency**: Smaller, focused files mean the agent loads less to understand more
+- **Budget your tokens**: Treat context like a scarce resource and design your codebase accordingly
+
+In the next lesson, we will examine the specific **tools** agents use to interact with your code -- and how understanding tool mechanics will help you write more agent-friendly code.

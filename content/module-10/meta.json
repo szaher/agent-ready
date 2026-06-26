@@ -1,0 +1,53 @@
+{
+  "id": 10,
+  "title": "Advanced Patterns and Scaling",
+  "description": "Production-grade patterns for scaling agent-ready practices across teams, orgs, and complex codebases",
+  "color": "#b794f4",
+  "lessons": [
+    {
+      "slug": "01-team-adoption-strategies",
+      "title": "Team Adoption Strategies",
+      "description": "Rolling out agent-ready practices from one developer to an entire engineering org",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "architecture"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-troubleshooting-agent-issues",
+      "title": "Troubleshooting Agent Issues",
+      "description": "A systematic approach to debugging when agents produce wrong, incomplete, or harmful changes",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-security-audit",
+      "title": "Security Audit for Agent-Ready Repos",
+      "description": "A security checklist for repos where agents have write access to code and infrastructure",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["flowchart", "architecture"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-performance-optimization",
+      "title": "Performance Optimization",
+      "description": "Making agents faster, more accurate, and less expensive through prompt and context tuning",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["comparison", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-future-of-agent-ready",
+      "title": "The Future of Agent-Ready",
+      "description": "Emerging patterns, upcoming capabilities, and where the ecosystem is heading",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["architecture"],
+      "hasCode": false,
+      "hasQuiz": false
+    }
+  ]
+}

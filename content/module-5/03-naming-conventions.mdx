@@ -1,0 +1,327 @@
+---
+title: Naming Conventions That Help Agents
+quiz:
+- question: Why is 'user-auth-service.ts' a better file name than 'service.ts' for AI agents?
+  options:
+  - The descriptive name lets the agent determine the file's purpose from the file tree without reading its contents
+  - Shorter file names cause parsing errors in language models
+  - Agents can only open files that contain a hyphen in the name
+  - It makes the file sort alphabetically before other files
+  correctIndex: 0
+- question: What is the main problem with a function named 'process()' from an agent's perspective?
+  options:
+  - It is too short to be a valid function name
+  - Agents cannot call functions with generic names
+  - The name does not convey what is being processed, what the inputs are, or what the output is, forcing the agent to read the implementation
+  - The name conflicts with a reserved keyword in most languages
+  correctIndex: 2
+- question: Which naming practice provides the MOST context to an agent navigating a codebase?
+  options:
+  - Using single-letter variable names for brevity
+  - Prefixing every file with the project name
+  - Numbering files sequentially (001-file.ts, 002-file.ts)
+  - Consistent suffixes that indicate the role of each file (e.g., .service.ts, .controller.ts, .test.ts)
+  correctIndex: 3
+- question: How should boolean variables and functions be named for maximum agent clarity?
+  options:
+  - With single-word names like 'active' or 'valid'
+  - With is/has/can/should prefixes that make the true/false meaning explicit (e.g., isActive, hasPermission)
+  - With a 'b' prefix to indicate boolean type (e.g., bActive)
+  - Using all-caps to distinguish them from other variables
+  correctIndex: 1
+---
+
+## Overview
+
+Structure determines where an agent looks. Naming determines what the agent understands when it gets there. A directory tree full of files named `service.ts`, `helper.ts`, and `utils.ts` is like a filing cabinet where every drawer is labeled "stuff." In this lesson, we examine how naming conventions at every level -- files, directories, functions, variables, and types -- either accelerate or block an agent's ability to comprehend your code without reading every line.
+
+## Why Names Are Agent Context
+
+When an agent lists a directory, every file name becomes a piece of context. The agent uses these names to decide which files are relevant to its current task and which can be skipped. This decision happens **before the agent reads a single line of code**, making file names the cheapest form of documentation in your project.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Vague["Vague Names"]
+        V1["src/services/"]
+        V1 --> V2["service.ts"]
+        V1 --> V3["helper.ts"]
+        V1 --> V4["utils.ts"]
+        V1 --> V5["manager.ts"]
+        V5 --> V6["Agent: which one\nhandles billing?"]
+    end
+    subgraph Clear["Descriptive Names"]
+        C1["src/billing/"]
+        C1 --> C2["billing.service.ts"]
+        C1 --> C3["invoice-generator.ts"]
+        C1 --> C4["payment-processor.ts"]
+        C1 --> C5["billing.test.ts"]
+        C5 --> C6["Agent: billing.service.ts\nis the entry point"]
+    end
+    style Vague fill:#fed7d7,stroke:#e53e3e
+    style Clear fill:#c6f6d5,stroke:#38a169
+    style V6 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style C6 fill:#bee3f8,stroke:#3182ce,color:#1a202c
+`} />
+
+> A descriptive name is a free token. A vague name costs tokens to investigate.
+
+## File Naming Rules
+
+### Rule 1: Names Should Reveal Purpose
+
+Every file name should answer the question "what does this file do?" without opening it.
+
+<CodeBlock code={`# Bad — agent must open the file to learn its purpose
+service.ts
+handler.ts
+index.ts      (when not a barrel file)
+data.ts
+core.ts
+base.ts
+
+# Good — purpose is clear from the name
+user-auth.service.ts
+payment-webhook.handler.ts
+order-status.types.ts
+email-template.renderer.ts
+database-connection.config.ts
+`} language="bash" filename="file-naming-examples" />
+
+### Rule 2: Use Consistent Suffixes
+
+**Role suffixes** tell the agent what kind of code a file contains. When every service file ends in `.service.ts`, every controller in `.controller.ts`, and every test in `.test.ts`, the agent can filter files by role without reading them.
+
+<CodeBlock code={`# Consistent suffix convention
+src/billing/
+├── billing.service.ts        # Business logic
+├── billing.controller.ts     # HTTP handlers
+├── billing.repository.ts     # Database access
+├── billing.types.ts          # Type definitions
+├── billing.constants.ts      # Magic values / enums
+├── billing.test.ts           # Unit tests
+└── billing.e2e-test.ts       # Integration tests
+`} language="bash" filename="suffix-convention" />
+
+The agent learns this pattern from one module and applies it everywhere. When it needs the database layer for billing, it goes straight to `billing.repository.ts` without scanning every file.
+
+### Rule 3: Match Case Convention to Language Ecosystem
+
+Use the casing convention your language community expects. Agents are trained on millions of repositories and have strong priors about what casing means:
+
+<CodeBlock code={`# TypeScript / JavaScript — kebab-case for files
+user-profile.service.ts
+payment-method.controller.ts
+
+# Python — snake_case for files
+user_profile_service.py
+payment_method_controller.py
+
+# Go — lowercase, no separators for packages
+userprofile/service.go
+paymentmethod/controller.go
+
+# Java / Kotlin — PascalCase matching class names
+UserProfileService.java
+PaymentMethodController.kt
+
+# CSS / SCSS — kebab-case
+user-profile.module.css
+payment-form.styles.scss
+`} language="bash" filename="casing-by-language" />
+
+When you break the convention (e.g., using PascalCase for a Python file), the agent may misinterpret the file's role or generate code that follows the wrong style.
+
+## Directory Naming Rules
+
+### Rule 4: Directory Names Should Be Plural Nouns or Domain Concepts
+
+Directories group related files. Their names should communicate what category those files belong to.
+
+<CodeBlock code={`# Good — clear grouping
+src/
+├── users/           # Everything about users
+├── billing/         # Everything about billing
+├── notifications/   # Everything about notifications
+├── shared/          # Cross-cutting utilities
+└── infrastructure/  # Framework and platform code
+
+# Bad — ambiguous or meaningless
+src/
+├── core/            # Core of what?
+├── modules/         # All code is a module
+├── lib/             # Library of what?
+├── common/          # Common to whom?
+└── v2/              # Version of what?
+`} language="bash" filename="directory-naming" />
+
+### Rule 5: Avoid Deeply Qualified Directory Names
+
+Long directory names with multiple qualifiers often indicate that the directory is trying to communicate too much hierarchy. Flatten when possible.
+
+<CodeBlock code={`# Bad — overqualified
+src/modules/user-management/domain/entities/
+
+# Good — direct
+src/users/entities/
+
+# Even better — flat enough that entities are just files
+src/users/
+├── user.entity.ts
+├── user-profile.entity.ts
+└── user.types.ts
+`} language="bash" filename="directory-qualification" />
+
+## Function and Variable Naming
+
+Agents do not just navigate file trees -- they also read function signatures to understand what code does. Function and variable names serve as inline documentation that tells the agent what to call, what arguments to pass, and what to expect back.
+
+### Rule 6: Functions Should Describe Their Action and Subject
+
+<CodeBlock code={`# Bad — agent must read the implementation
+def process(data):
+    ...
+
+def handle(request):
+    ...
+
+def run():
+    ...
+
+# Good — intent is clear from the name
+def validate_payment_method(payment_data: PaymentInput) -> ValidationResult:
+    ...
+
+def send_verification_email(user: User, token: str) -> bool:
+    ...
+
+def calculate_monthly_invoice(account_id: str, billing_period: DateRange) -> Invoice:
+    ...
+`} language="python" filename="function-naming.py" />
+
+The well-named functions tell the agent three things without reading the body: what the function does (validate, send, calculate), what it operates on (payment method, verification email, monthly invoice), and what it returns (ValidationResult, bool, Invoice).
+
+### Rule 7: Booleans Should Read as Questions
+
+Boolean variables and functions should use prefixes that make their true/false semantics explicit: **is**, **has**, **can**, **should**, **was**.
+
+<CodeBlock code={`// Bad — is this a noun? a verb? what does true mean?
+const active = user.status === 'active';
+const admin = user.role === 'admin';
+function validate(token) { ... }
+
+// Good — reads as a yes/no question
+const isActive = user.status === 'active';
+const hasAdminRole = user.role === 'admin';
+function isTokenValid(token: string): boolean { ... }
+function canUserAccessResource(user: User, resource: Resource): boolean { ... }
+`} language="typescript" filename="boolean-naming.ts" />
+
+When an agent sees `if (canUserAccessResource(currentUser, targetResource))`, it understands the condition without reading the function body. When it sees `if (validate(token))`, it must investigate to understand what is being validated and what the return value means.
+
+### Rule 8: Avoid Abbreviations and Acronyms
+
+Agents handle full words better than abbreviations. They have been trained on enough code to understand `getUserById` instantly, but `getUsrById` or `getUBI` introduces ambiguity.
+
+<CodeBlock code={`# Bad — abbreviations require decoding
+def calc_inv_ttl(inv_items):
+    ...
+
+usr_mgr = UserMgr()
+btn_clk_hndlr = lambda e: ...
+
+# Good — full words are unambiguous
+def calculate_invoice_total(invoice_items):
+    ...
+
+user_manager = UserManager()
+button_click_handler = lambda event: ...
+`} language="python" filename="abbreviation-examples.py" />
+
+> The only acceptable abbreviations are universally understood ones: `id`, `url`, `http`, `api`, `db`, `config`. Everything else should be spelled out.
+
+## Naming Anti-Patterns
+
+### The Generic Trap
+
+Certain names are so generic that they communicate nothing:
+
+- `utils.ts` -- could contain anything
+- `helpers.py` -- helps with what?
+- `common/` -- common to whom?
+- `misc.ts` -- miscellaneous is the opposite of organized
+- `core.ts` -- core of what functionality?
+- `base.ts` -- base for what derived classes?
+
+Every one of these forces the agent to open the file and read it to determine relevance. Replace them with specific names: `string-formatters.ts`, `date-calculations.py`, `shared/http-errors/`, `validation-rules.ts`.
+
+### The Numbering Trap
+
+Numbered files like `handler1.ts`, `handler2.ts` give the agent no information about what distinguishes them. Use descriptive names instead: `webhook-handler.ts`, `scheduled-job-handler.ts`.
+
+### The Inconsistency Trap
+
+Using `userService.ts` in one module and `billing-service.ts` in another and `NotificationSvc.ts` in a third forces the agent to treat each module as an independent puzzle. Pick one convention and enforce it everywhere.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Inconsistent["Inconsistent Naming"]
+        I1["userService.ts"] 
+        I2["billing-service.ts"]
+        I3["NotificationSvc.ts"]
+        I4["order_service.ts"]
+        I1 --> Q["Agent: is there\na pattern here?"]
+        I2 --> Q
+        I3 --> Q
+        I4 --> Q
+    end
+    subgraph Consistent["Consistent Naming"]
+        C1["users.service.ts"]
+        C2["billing.service.ts"]
+        C3["notifications.service.ts"]
+        C4["orders.service.ts"]
+        C1 --> A["Agent: every service\nis {feature}.service.ts"]
+        C2 --> A
+        C3 --> A
+        C4 --> A
+    end
+    style Inconsistent fill:#fed7d7,stroke:#e53e3e
+    style Consistent fill:#c6f6d5,stroke:#38a169
+    style Q fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style A fill:#bee3f8,stroke:#3182ce,color:#1a202c
+`} />
+
+## A Naming Convention Template
+
+Here is a complete naming convention you can adopt and document in your project's CLAUDE.md:
+
+<CodeBlock code={`## Naming Conventions
+
+### Files
+- Services: {feature}.service.ts
+- Controllers: {feature}.controller.ts
+- Repositories: {feature}.repository.ts
+- Types/Interfaces: {feature}.types.ts
+- Constants: {feature}.constants.ts
+- Tests: {feature}.test.ts
+- E2E Tests: {feature}.e2e-test.ts
+
+### Directories
+- Feature modules: plural nouns (users/, billing/, notifications/)
+- Shared code: shared/{specific-purpose}/
+- Infrastructure: infrastructure/{technology}/
+
+### Functions
+- Actions: verb + subject (createUser, sendEmail, calculateTotal)
+- Booleans: is/has/can/should + condition (isValid, hasPermission)
+- Factories: create + thing (createDatabaseConnection)
+- Handlers: handle + event (handlePaymentWebhook)
+
+### Variables
+- Collections: plural nouns (users, invoices, pendingOrders)
+- Singles: singular nouns (user, invoice, currentOrder)
+- Booleans: is/has/can prefix (isLoading, hasErrors)
+`} language="markdown" filename="CLAUDE.md (naming section)" />
+
+Document this in your CLAUDE.md so the agent reads it at the start of every session and follows it consistently.
+
+## Summary
+
+Naming conventions are the most cost-effective form of agent context. Descriptive file names let agents filter by relevance without reading contents. Consistent suffixes let agents predict file roles across modules. Clear function names communicate intent, inputs, and outputs without requiring the agent to read implementations. Avoid generic names (`utils`, `helpers`, `misc`), abbreviations, and inconsistent patterns -- all of which force the agent to spend tokens on investigation instead of action. In the next lesson, we will explore how documentation, type annotations, and inline comments serve as additional navigation aids for agents.

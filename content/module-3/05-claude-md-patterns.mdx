@@ -1,0 +1,317 @@
+---
+title: "Real-World CLAUDE.md Patterns"
+---
+
+## Overview
+
+Theory is valuable, but seeing real CLAUDE.md files in action is where the concepts click. In this lesson, we walk through four annotated examples -- a Python API, a React web application, a Go CLI tool, and a monorepo -- each demonstrating the patterns and principles from the previous lessons applied to production codebases.
+
+For each example, we highlight **what makes it effective**, **why specific instructions are included**, and **patterns you can borrow** for your own projects.
+
+## Pattern 1: Python API (FastAPI)
+
+This example shows a CLAUDE.md for a production FastAPI backend with PostgreSQL, Alembic migrations, and a service-layer architecture.
+
+<CodeBlock code={`# CLAUDE.md
+
+## Build & Test
+pip install -e ".[dev]"          # Install package with dev dependencies
+pytest -x --tb=short             # Run tests, stop on first failure
+pytest tests/unit/               # Run only unit tests (fast)
+pytest tests/integration/ -k "not slow"  # Integration tests (skip slow ones)
+ruff check . --fix               # Lint and auto-fix
+ruff format .                    # Format code
+mypy src/                        # Type check
+
+## Code Style
+- Python 3.12+. Use modern syntax: \`match\` statements, \`type\` aliases, \`|\` union syntax.
+- All functions must have type annotations for parameters and return values.
+- Use Pydantic v2 \`BaseModel\` for all request/response schemas. Define schemas in \`src/schemas/\`.
+- Use \`Annotated[T, Depends(...)]\` for dependency injection, never positional \`Depends()\`.
+- Docstrings: use Google style. Required for all public functions and classes.
+- Imports: stdlib → third-party → local, separated by blank lines. Use absolute imports only.
+
+## Architecture
+- \`src/routes/\` — FastAPI routers. Each file handles one resource (users, orders, etc.)
+- \`src/services/\` — Business logic. Routes call services, never the database directly.
+- \`src/models/\` — SQLAlchemy 2.0 models (mapped_column style)
+- \`src/schemas/\` — Pydantic request/response schemas
+- \`src/core/\` — Config, security, database session management
+
+Data flow: Route → Service → Repository → Database
+Routes handle HTTP concerns. Services handle business logic. Never mix these.
+
+## Database
+- Alembic for migrations. Migration files are in \`alembic/versions/\`.
+- To create a migration: \`alembic revision --autogenerate -m "description"\`
+- To apply migrations: \`alembic upgrade head\`
+- Do NOT write raw SQL in routes or services. Use SQLAlchemy queries.
+- Do NOT modify existing migration files — create new ones.
+
+## Rules
+- Run \`pytest -x\` and \`mypy src/\` before considering a task done.
+- New routes MUST have corresponding tests in \`tests/unit/routes/\`.
+- All database queries go through service functions, never called from routes.
+- Use \`HTTPException\` from FastAPI for error responses, with appropriate status codes.
+- Do NOT use \`*\` imports.
+- Do NOT add new dependencies to \`pyproject.toml\` without mentioning it first.
+`} language="markdown" filename="CLAUDE.md" />
+
+**What makes this effective:**
+
+- **Multiple test commands** with different scopes -- the agent can run fast unit tests during iteration and the full suite for final verification
+- **Explicit Python version** -- tells the agent to use modern syntax features
+- **Architecture with data flow** -- one line (`Route → Service → Repository → Database`) conveys the entire request lifecycle
+- **Database section** -- migration workflows are a common source of agent mistakes; documenting them prevents errors
+- **Dependency guard** -- "Do NOT add dependencies without mentioning it" prevents surprise additions in PRs
+
+## Pattern 2: React Web Application (Next.js)
+
+This example shows a CLAUDE.md for a Next.js 14 application with App Router, Tailwind CSS, and a component library.
+
+<CodeBlock code={`# CLAUDE.md
+
+## Build & Test
+pnpm build                       # Production build (catches type errors)
+pnpm dev                         # Dev server at localhost:3000
+pnpm vitest run                  # Run unit/component tests
+pnpm vitest run --grep "Button"  # Run tests matching a pattern
+pnpm playwright test             # E2E tests (requires \`pnpm exec playwright install\`)
+pnpm lint                        # ESLint
+pnpm tsc --noEmit                # Type check without emitting
+
+## Code Style
+- TypeScript strict mode. Never use \`any\` — use \`unknown\` with type guards.
+- Named exports only. No default exports except for Next.js pages/layouts.
+- Tailwind CSS for all styling. Do NOT use CSS modules, styled-components, or inline styles.
+- Use \`cn()\` from \`src/lib/utils.ts\` to merge Tailwind classes conditionally.
+- Component props: define as a \`type\` (not \`interface\`) with descriptive names. Destructure in params.
+
+## Architecture
+- \`src/app/\` — App Router pages and layouts. Server Components by default.
+- \`src/components/ui/\` — Primitive components (Button, Input, Dialog). Based on shadcn/ui.
+- \`src/components/features/\` — Feature-specific composed components.
+- \`src/lib/\` — Utilities, hooks, server actions, and type definitions.
+- \`src/lib/db/\` — Drizzle ORM schema and queries (PostgreSQL).
+- \`src/lib/actions/\` — Server Actions. File names match the feature: \`user-actions.ts\`.
+
+## Component Guidelines
+- Server Components: use for data fetching, static content, SEO. No useState/useEffect.
+- Client Components: add "use client" ONLY when component needs interactivity.
+- Colocate: keep component, test, and types together. \`Button.tsx\`, \`Button.test.tsx\`.
+- New UI primitives go in \`src/components/ui/\`. Feature components go in \`src/components/features/\`.
+
+## Data Fetching
+- Server Components: fetch data directly using \`db.query.*\` or server actions.
+- Client Components: use server actions via \`useAction()\` hook from \`src/lib/hooks/use-action.ts\`.
+- Do NOT use \`fetch()\` for internal API calls — use server actions instead.
+- Do NOT use React Query, SWR, or other client-side data fetching libraries.
+
+## Rules
+- Run \`pnpm build\` (not just \`pnpm tsc\`) — the build catches issues tsc alone misses.
+- All new components need a \`.test.tsx\` file with at least a render test.
+- Accessibility: all interactive elements need aria labels. Images need alt text.
+- Do NOT install new packages without asking. We are intentionally minimal on dependencies.
+- Do NOT create API route handlers (\`route.ts\`). Use Server Actions for mutations.
+- Do NOT use \`useEffect\` for data fetching. Use server components or server actions.
+`} language="markdown" filename="CLAUDE.md" />
+
+**What makes this effective:**
+
+- **Component guidelines** section clearly separates Server vs Client component rules -- this is the most common source of Next.js agent errors
+- **Data fetching rules** prevent the agent from falling back to familiar patterns (fetch, React Query) that do not fit this architecture
+- **"Do NOT create API route handlers"** -- a strong, specific prohibition that prevents the agent from defaulting to a common Next.js pattern the team has deliberately rejected
+- **Build vs tsc distinction** -- explaining why `pnpm build` is required instead of just type-checking catches subtle issues
+
+## Pattern 3: Go CLI Tool
+
+This example shows a CLAUDE.md for a Go CLI application built with Cobra, with a focus on the Go-specific conventions that agents sometimes get wrong.
+
+<CodeBlock code={`# CLAUDE.md
+
+## Build & Test
+go build ./cmd/mytool/           # Build the CLI binary
+go test ./...                    # Run all tests
+go test ./internal/parser/ -v    # Run tests for one package (verbose)
+go test -race ./...              # Run tests with race detector
+golangci-lint run                # Lint (config in .golangci.yml)
+go vet ./...                     # Go vet checks
+
+## Project Structure
+- \`cmd/mytool/\` — Main entrypoint. Contains only \`main.go\`.
+- \`internal/\` — All application logic. Not importable by external packages.
+  - \`internal/cmd/\` — Cobra command definitions (root, run, validate, etc.)
+  - \`internal/parser/\` — Input parsing logic
+  - \`internal/engine/\` — Core processing engine
+  - \`internal/output/\` — Output formatting (JSON, table, YAML)
+- \`pkg/\` — Reusable library code importable by other projects.
+- \`testdata/\` — Test fixtures. Subdirectories mirror the package they test.
+
+## Code Style
+- Follow Effective Go and the Go Code Review Comments wiki.
+- Error handling: return errors, never panic. Wrap errors with \`fmt.Errorf("context: %w", err)\`.
+- Naming: short variable names in small scopes (\`r\`, \`w\`, \`ctx\`), descriptive in larger scopes.
+- No package-level \`init()\` functions. Initialize explicitly in constructors.
+- Interfaces: define in the consuming package, not the implementing package.
+- Tests: use table-driven tests with \`t.Run()\` subtests.
+
+## Cobra Commands
+When adding a new CLI command:
+1. Create \`internal/cmd/<name>.go\` with a \`New<Name>Cmd()\` function returning \`*cobra.Command\`.
+2. Register it in \`internal/cmd/root.go\` with \`rootCmd.AddCommand()\`.
+3. Add a test file \`internal/cmd/<name>_test.go\`.
+4. Flag names use kebab-case: \`--output-format\`, not \`--outputFormat\`.
+
+## Rules
+- Run \`go test ./...\` and \`golangci-lint run\` before completing a task.
+- Do NOT use third-party logging libraries. Use \`log/slog\` from the stdlib.
+- Do NOT add dependencies without discussion. Run \`go mod tidy\` after any go.mod changes.
+- Do NOT put application logic in \`cmd/\` — it belongs in \`internal/\`.
+- Do NOT use global variables for state. Pass dependencies through function parameters or structs.
+`} language="markdown" filename="CLAUDE.md" />
+
+**What makes this effective:**
+
+- **Go-specific patterns** like error wrapping with `%w`, interface placement, and table-driven tests address the most common Go mistakes agents make
+- **Step-by-step for adding commands** -- Cobra commands follow a specific pattern, and spelling it out prevents structural mistakes
+- **Explicit stdlib preference** for logging -- without this, agents often reach for `logrus` or `zap`
+- **`internal/` vs `pkg/` distinction** -- a Go-specific convention that agents sometimes violate
+
+## Pattern 4: Monorepo
+
+This example shows the root CLAUDE.md for a TypeScript monorepo using Turborepo, alongside one package-level CLAUDE.md.
+
+<CodeBlock code={`# CLAUDE.md (monorepo root)
+
+This is a TypeScript monorepo managed with Turborepo and pnpm workspaces.
+
+## Build & Test
+pnpm install                     # Install all dependencies
+turbo build                      # Build all packages
+turbo test                       # Test all packages
+turbo lint                       # Lint all packages
+turbo build --filter=@myorg/api  # Build a specific package
+
+## Monorepo Structure
+- \`apps/web/\` — Next.js frontend (@myorg/web)
+- \`apps/api/\` — Express.js backend (@myorg/api)
+- \`packages/ui/\` — Shared component library (@myorg/ui)
+- \`packages/config/\` — Shared ESLint and TypeScript configs
+- \`packages/types/\` — Shared TypeScript type definitions (@myorg/types)
+
+## Cross-Package Rules
+- Import shared types from \`@myorg/types\`, never duplicate type definitions.
+- Import UI components from \`@myorg/ui\`, never copy component code between apps.
+- Each package has its own \`package.json\`, \`tsconfig.json\`, and test setup.
+- Add new dependencies to the specific package that needs them, not the root.
+
+## Rules
+- Before submitting: run \`turbo build\` from the root to verify nothing is broken.
+- Do NOT add dependencies to the root \`package.json\` (dev tools only: turbo, prettier).
+- Do NOT use relative imports across package boundaries. Use package names.
+- Do NOT create circular dependencies between packages.
+- When modifying \`@myorg/types\`, check all packages that import from it.
+`} language="markdown" filename="CLAUDE.md" />
+
+And the package-level CLAUDE.md for the API:
+
+<CodeBlock code={`# apps/api/CLAUDE.md
+
+Express.js REST API with PostgreSQL.
+
+## Build & Test
+pnpm build                       # Compile TypeScript
+pnpm test                        # Run Jest tests
+pnpm test -- --testPathPattern="auth"  # Run specific test files
+pnpm dev                         # Dev server with hot reload
+
+## Architecture
+- \`src/routes/\` — Express route handlers grouped by resource
+- \`src/middleware/\` — Auth, validation, error handling middleware
+- \`src/services/\` — Business logic layer
+- \`src/db/\` — Knex.js queries and migrations
+
+## Conventions
+- Route handlers are thin: validate input, call service, return response.
+- All responses use \`sendSuccess()\` or \`sendError()\` from \`src/lib/response.ts\`.
+- Request validation: use Zod schemas in \`src/schemas/\`. Validate in middleware, not handlers.
+- New routes: add to \`src/routes/index.ts\` router registry.
+
+## Rules
+- Do NOT use \`res.json()\` directly — use the response helpers.
+- Do NOT write raw SQL — use Knex.js query builder.
+- Migrations: create with \`pnpm knex migrate:make <name>\`. Do NOT edit existing migrations.
+`} language="markdown" filename="apps/api/CLAUDE.md" />
+
+**What makes this effective:**
+
+- **Clear separation** between root-level and package-level concerns
+- **Root CLAUDE.md** focuses on monorepo-wide rules: cross-package imports, build orchestration, and dependency management
+- **Package CLAUDE.md** provides the specific tooling, architecture, and conventions for that package alone
+- **`--filter` syntax** documented in the root so agents know how to build a single package
+- **Package names** (`@myorg/api`, `@myorg/types`) used consistently so agents use the correct import paths
+
+## Comparing the Patterns
+
+Let us look at what these four examples have in common and where they differ:
+
+<MermaidDiagram chart={`graph LR
+    subgraph Common["Shared Across All Patterns"]
+        A["Build & test commands<br/>listed first"]
+        B["Code style rules<br/>specific to the language"]
+        C["Architecture section with<br/>directory explanations"]
+        D["Explicit 'Do NOT' rules<br/>for known failure modes"]
+        E["Dependency management<br/>policy stated"]
+    end
+
+    subgraph Varies["Varies by Project Type"]
+        F["Framework-specific patterns<br/><i>Cobra commands, Server Components,<br/>migration workflows</i>"]
+        G["Data layer conventions<br/><i>ORM choice, query patterns,<br/>migration tools</i>"]
+        H["Testing scope commands<br/><i>Single file, single package,<br/>single pattern</i>"]
+    end
+
+    style Common fill:#c6f6d5,stroke:#276749
+    style Varies fill:#ebf8ff,stroke:#3182ce
+`} />
+
+Every effective CLAUDE.md, regardless of language or framework, shares these traits:
+
+- **Commands first** -- the agent's verification loop depends on knowing the right commands
+- **Language-idiomatic style rules** -- not generic advice but specific patterns for the language
+- **Explicit prohibitions** -- preventing known agent mistakes is more reliable than hoping for correct defaults
+- **Dependency awareness** -- agents frequently try to install packages; a policy prevents surprise additions
+
+## Patterns to Borrow
+
+Here is a reference table of reusable patterns you can adapt for your own CLAUDE.md:
+
+| Pattern | Example | Why It Works |
+|---|---|---|
+| Scoped test commands | `pytest tests/unit/` | Lets the agent iterate fast on focused tests |
+| Step-by-step for adding features | "1. Create file. 2. Register it. 3. Add test." | Prevents structural mistakes in repetitive tasks |
+| Framework-specific prohibitions | "Do NOT use useEffect for data fetching" | Prevents falling back to familiar but wrong patterns |
+| Explicit stdlib preferences | "Use log/slog, not logrus" | Prevents unnecessary dependency additions |
+| Migration workflow | "Create with X. Never edit existing." | Prevents database-breaking changes |
+| Response pattern enforcement | "Use sendSuccess(), not res.json()" | Ensures consistency across the codebase |
+| Dependency policy | "Do NOT add deps without discussion" | Keeps the dependency tree intentional |
+
+## Building Your Own CLAUDE.md
+
+After seeing these examples, here is a practical approach to building your own:
+
+1. **Start with the template** -- Copy the build/test/lint commands section from whichever example most closely matches your project
+2. **Add your language's gotchas** -- What mistakes do developers new to your codebase make in the first week? Those are your "Do NOT" rules
+3. **Document the architecture** -- List the top-level directories with one-line descriptions and the data flow pattern
+4. **Run an agent session** -- Use the CLAUDE.md in a real task. Note where the agent stumbles
+5. **Iterate** -- Add missing context after each session. Remove instructions that proved unnecessary
+
+> **Remember:** The best CLAUDE.md is one that evolves with your project. The four examples above were not written in one sitting -- they grew through dozens of agent sessions, each one surfacing a missing instruction or an unnecessary rule.
+
+## Summary
+
+- Real-world CLAUDE.md files share common patterns: **commands first, language-specific style rules, architecture maps, and explicit prohibitions**
+- **Python APIs** benefit from documenting migration workflows, the service-layer pattern, and typing requirements
+- **React apps** need clear Server vs Client component rules, data fetching conventions, and component organization guidelines
+- **Go CLIs** should document error handling patterns, interface placement, and step-by-step instructions for adding commands
+- **Monorepos** use nested CLAUDE.md files: root for cross-package rules, subdirectories for package-specific conventions
+- Build your own CLAUDE.md by starting with commands, adding language gotchas, mapping the architecture, and iterating through real agent sessions

@@ -1,0 +1,53 @@
+{
+  "id": 3,
+  "title": "CLAUDE.md — Your Agent's Playbook",
+  "description": "Master the single most impactful file for agent readiness: project instructions that guide every agent session",
+  "color": "#63b3ed",
+  "lessons": [
+    {
+      "slug": "01-why-claude-md",
+      "title": "Why Your Repo Needs a CLAUDE.md",
+      "description": "The problem CLAUDE.md solves and why it's the highest-leverage agent-ready investment",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["comparison", "flowchart"],
+      "hasCode": false,
+      "hasQuiz": true
+    },
+    {
+      "slug": "02-anatomy-of-claude-md",
+      "title": "Anatomy of a CLAUDE.md",
+      "description": "Structure, sections, and the mental model behind an effective CLAUDE.md",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["architecture"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "03-writing-effective-instructions",
+      "title": "Writing Effective Instructions",
+      "description": "How to write instructions that agents actually follow — specificity, scope, and anti-patterns",
+      "estimatedMinutes": 12,
+      "diagramTypes": ["comparison"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "04-scoping-instructions",
+      "title": "Scoping Instructions",
+      "description": "Project vs user vs global settings — when to put instructions where",
+      "estimatedMinutes": 10,
+      "diagramTypes": ["architecture", "flowchart"],
+      "hasCode": true,
+      "hasQuiz": true
+    },
+    {
+      "slug": "05-claude-md-patterns",
+      "title": "Real-World CLAUDE.md Patterns",
+      "description": "Annotated examples from open-source repos and production codebases",
+      "estimatedMinutes": 15,
+      "diagramTypes": ["comparison"],
+      "hasCode": true,
+      "hasQuiz": false
+    }
+  ]
+}

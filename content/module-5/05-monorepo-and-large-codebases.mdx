@@ -1,0 +1,397 @@
+---
+title: Monorepos and Large Codebases
+quiz:
+- question: What is the primary challenge AI agents face in codebases with 1000+ files?
+  options:
+  - The context window is too small to hold the entire codebase, so agents must navigate selectively and can miss relevant code
+  - The agents cannot parse files larger than a certain size
+  - Large codebases always have more bugs, which confuse agents
+  - Agents refuse to work on repositories above a certain file count
+  correctIndex: 0
+- question: In a monorepo, where should package-specific CLAUDE.md instructions live?
+  options:
+  - Only in the repository root — one file for the entire monorepo
+  - In a separate documentation repository that agents reference externally
+  - In each package directory, with the root CLAUDE.md covering cross-cutting conventions and each package CLAUDE.md covering package-specific instructions
+  - Package-specific instructions should be embedded in package.json files
+  correctIndex: 2
+- question: Why are clear package boundaries important for agent effectiveness in monorepos?
+  options:
+  - They prevent the agent from reading too many files and running up costs
+  - They make the repository compatible with more version control systems
+  - They are required by all monorepo build tools
+  - They allow the agent to scope its work to a single package, reducing the surface area it needs to understand
+  correctIndex: 3
+- question: What is the recommended approach for shared code in an agent-ready monorepo?
+  options:
+  - Duplicate shared code in every package that needs it
+  - Create explicit shared packages with their own barrel files, types, and README, imported through the workspace dependency system
+  - Place all shared code in a single utils/ directory at the repository root
+  - Avoid shared code entirely — each package should be fully self-contained
+  correctIndex: 1
+---
+
+## Overview
+
+Everything we have covered so far -- structure, naming, documentation -- becomes exponentially more important as codebase size increases. A 50-file project with mediocre structure is navigable. A 5,000-file monorepo with mediocre structure is a maze. AI agents working in large codebases face a fundamental constraint: their context window cannot hold the entire codebase, so they must navigate selectively, and every wrong turn wastes tokens that could have been spent writing correct code. This lesson addresses the specific patterns that make monorepos and large codebases agent-ready.
+
+## The Scale Problem
+
+When an agent opens a small repository, it can often read the entire file tree and key files within its token budget. But at scale, this strategy breaks down:
+
+<MermaidDiagram chart={`graph TD
+    subgraph Small["Small Repo: 50 files"]
+        S1["List all files\n~200 tokens"] --> S2["Read 10 key files\n~5,000 tokens"]
+        S2 --> S3["Full understanding\n~5,200 tokens total"]
+    end
+    subgraph Large["Large Repo: 5,000 files"]
+        L1["List all files\n~20,000 tokens"] --> L2["Read 10 key files\n~5,000 tokens"]
+        L2 --> L3["Partial understanding\n~25,000 tokens\nand still missing context"]
+    end
+    style Small fill:#c6f6d5,stroke:#38a169
+    style Large fill:#fed7d7,stroke:#e53e3e
+`} />
+
+In a large repository, the file listing alone can consume a significant portion of the context window. The agent must make strategic decisions about what to explore and what to skip -- and without strong structural signals, those decisions are often wrong.
+
+> In small codebases, agents can compensate for poor structure. In large codebases, poor structure is a showstopper.
+
+## Monorepo Fundamentals
+
+A **monorepo** stores multiple packages, services, or applications in a single repository. Common monorepo tools include Turborepo, Nx, Lerna, pnpm workspaces, Go modules, and Bazel. From an agent's perspective, a monorepo is a codebase with multiple entry points and multiple sets of conventions -- which makes clear boundaries essential.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Monorepo["Monorepo Structure"]
+        Root["Root"] --> Packages["packages/"]
+        Root --> Apps["apps/"]
+        Root --> Config["Root Config\ntsconfig, eslint, CLAUDE.md"]
+        Packages --> P1["packages/shared-ui/"]
+        Packages --> P2["packages/auth-sdk/"]
+        Packages --> P3["packages/db-client/"]
+        Apps --> A1["apps/web/"]
+        Apps --> A2["apps/api/"]
+        Apps --> A3["apps/worker/"]
+        P1 -.->|"imported by"| A1
+        P2 -.->|"imported by"| A1
+        P2 -.->|"imported by"| A2
+        P3 -.->|"imported by"| A2
+        P3 -.->|"imported by"| A3
+    end
+    style Monorepo fill:#ebf8ff,stroke:#3182ce
+    style Root fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+`} />
+
+## Pattern 1: Hierarchical CLAUDE.md Files
+
+In a monorepo, a single root CLAUDE.md cannot cover the specific conventions of every package. The solution is a **hierarchy of CLAUDE.md files**: a root file for cross-cutting conventions and package-level files for specific instructions.
+
+<CodeBlock code={`monorepo/
+├── CLAUDE.md                    # Cross-cutting conventions
+├── apps/
+│   ├── web/
+│   │   ├── CLAUDE.md            # Web app conventions
+│   │   └── src/
+│   ├── api/
+│   │   ├── CLAUDE.md            # API conventions
+│   │   └── src/
+│   └── worker/
+│       ├── CLAUDE.md            # Worker conventions
+│       └── src/
+└── packages/
+    ├── shared-ui/
+    │   ├── CLAUDE.md            # UI component conventions
+    │   └── src/
+    └── auth-sdk/
+        ├── CLAUDE.md            # Auth SDK conventions
+        └── src/
+`} language="bash" filename="monorepo-claude-md-hierarchy" />
+
+The root CLAUDE.md covers what applies everywhere:
+
+<CodeBlock code={`# Monorepo Conventions
+
+## Structure
+- Apps live in apps/, shared packages in packages/
+- Each package has its own package.json, tsconfig.json, and README.md
+
+## Cross-Cutting Rules
+- All code uses TypeScript strict mode
+- Tests use Vitest (not Jest)
+- Imports between packages use workspace aliases (@repo/package-name)
+- Never import from another package's src/ directly — use the barrel export
+
+## Build
+- pnpm build — builds all packages in dependency order
+- pnpm test — runs all tests
+- pnpm lint — lints all packages
+
+## Package-Specific Instructions
+Each package has its own CLAUDE.md with specific conventions. Read the
+CLAUDE.md in the package you are working on before making changes.
+`} language="markdown" filename="CLAUDE.md (root)" />
+
+A package-level CLAUDE.md covers what is specific to that package:
+
+<CodeBlock code={`# API Service (apps/api)
+
+## Stack
+- Fastify web framework
+- Drizzle ORM with PostgreSQL
+- Zod for request/response validation
+
+## Conventions
+- Route handlers go in src/routes/{feature}/
+- Each route file exports a Fastify plugin
+- Database queries go through repository files, never in route handlers
+- Request validation uses Zod schemas in {feature}.schemas.ts
+
+## Testing
+- Integration tests use a test database (see docker-compose.test.yml)
+- Run: pnpm --filter @repo/api test
+
+## Common Mistakes
+- Do NOT import from @repo/shared-ui — this is a backend service
+- Do NOT use raw SQL — always use the Drizzle query builder
+- Do NOT add routes to app.ts directly — register them as plugins
+`} language="markdown" filename="apps/api/CLAUDE.md" />
+
+When an agent starts working on the API service, it reads the root CLAUDE.md first (learning cross-cutting rules), then the API-specific CLAUDE.md (learning the stack, conventions, and common mistakes). This hierarchical approach gives the agent precisely the context it needs without overwhelming it with irrelevant information about other packages.
+
+## Pattern 2: Clear Package Boundaries
+
+In a well-structured monorepo, each package is a self-contained unit with a defined public API. The agent should be able to work within a single package without needing to understand the internals of other packages.
+
+<CodeBlock code={`// packages/auth-sdk/index.ts — barrel file defines the public API
+
+// Public types
+export type { User, Session, AuthToken, LoginCredentials } from './types';
+
+// Public functions
+export { createAuthClient } from './client';
+export { validateToken } from './validation';
+export { AuthError, TokenExpiredError } from './errors';
+
+// Do NOT export internal implementation details
+// Internal: tokenStore, refreshLoop, cryptoUtils
+`} language="typescript" filename="packages/auth-sdk/index.ts" />
+
+The barrel file draws a clear line between public and private. When an agent in the `web` app needs authentication, it imports from `@repo/auth-sdk` and sees only the public API. It does not need to understand the internal token storage mechanism or the refresh loop.
+
+<CodeBlock code={`// apps/web/src/auth/login.ts
+// The agent knows exactly what's available from the auth SDK
+
+import {
+  createAuthClient,
+  validateToken,
+  AuthError,
+  type LoginCredentials,
+  type Session,
+} from '@repo/auth-sdk';
+
+async function handleLogin(credentials: LoginCredentials): Promise<Session> {
+  const client = createAuthClient({
+    baseUrl: process.env.AUTH_API_URL!,
+  });
+
+  try {
+    return await client.login(credentials);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      // Handle known auth errors
+    }
+    throw error;
+  }
+}
+`} language="typescript" filename="apps/web/src/auth/login.ts" />
+
+### Enforcing Boundaries
+
+Document and enforce import rules so agents do not bypass package boundaries:
+
+<CodeBlock code={`// eslint.config.js — enforce package boundaries
+
+export default [
+  {
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['@repo/*/src/*'],
+            message: 'Import from package root (@repo/package), not from src/ directly.',
+          },
+          {
+            group: ['../../packages/*'],
+            message: 'Use workspace alias (@repo/package) instead of relative paths.',
+          },
+        ],
+      }],
+    },
+  },
+];
+`} language="javascript" filename="eslint.config.js" />
+
+When an agent attempts to import from `@repo/auth-sdk/src/internal/tokenStore`, the linter catches it. This feedback loop teaches the agent the correct import pattern.
+
+## Pattern 3: Workspace Configuration
+
+A well-configured workspace helps agents understand the dependency graph and build order without manual exploration.
+
+<CodeBlock code={`{
+  "name": "@repo/root",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "dev": "turbo dev",
+    "build:api": "turbo build --filter=@repo/api...",
+    "test:api": "turbo test --filter=@repo/api",
+    "build:web": "turbo build --filter=@repo/web..."
+  }
+}
+`} language="json" filename="package.json (root)" />
+
+The `--filter` scripts give agents a way to build and test a single package and its dependencies. This is crucial for large monorepos where building everything takes too long for the agent's iteration loop.
+
+## Pattern 4: Shared Code as Explicit Packages
+
+In large codebases, shared code tends to accumulate in a `shared/` or `common/` directory that grows without clear ownership. For agents, this becomes a black hole of undifferentiated utility functions.
+
+The agent-ready approach is to treat shared code as explicit packages with defined scopes:
+
+<CodeBlock code={`packages/
+├── shared-ui/              # Reusable React components
+│   ├── CLAUDE.md
+│   ├── package.json
+│   ├── index.ts            # Barrel: Button, Modal, Form, etc.
+│   └── src/
+├── shared-types/           # Cross-package TypeScript types
+│   ├── package.json
+│   ├── index.ts            # Barrel: User, Order, ApiResponse, etc.
+│   └── src/
+├── shared-utils/           # Pure utility functions
+│   ├── package.json
+│   ├── index.ts            # Barrel: formatDate, slugify, retry, etc.
+│   └── src/
+│       ├── date.utils.ts
+│       ├── string.utils.ts
+│       └── async.utils.ts
+└── db-client/              # Database connection and query utilities
+    ├── CLAUDE.md
+    ├── package.json
+    ├── index.ts
+    └── src/
+`} language="bash" filename="shared-packages-structure" />
+
+Each shared package has a focused purpose, a barrel file, and -- for complex packages -- its own CLAUDE.md. When an agent needs date utilities, it imports from `@repo/shared-utils` and finds `formatDate` in the barrel file. It never has to search through an unstructured `utils/` directory.
+
+## Navigating at Scale: Search-Friendly Structure
+
+In codebases with thousands of files, agents rely heavily on **text search** (grep, ripgrep) to find relevant code. Your structure should be optimized for search:
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent receives task:\nFix billing webhook timeout"] --> B["Search for 'webhook'\nin file names"]
+    B --> C{"Results found?"}
+    C -->|"Yes: billing/webhook.controller.ts"| D["Read the file"]
+    C -->|"No results"| E["Search for 'webhook'\nin file contents"]
+    E --> F{"Results manageable?"}
+    F -->|"< 10 results"| G["Read each result"]
+    F -->|"100+ results"| H["Narrow search:\n'billing.*webhook'"]
+    H --> G
+    D --> I["Understand and fix"]
+    G --> I
+    style A fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style I fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style H fill:#fed7d7,stroke:#e53e3e,color:#1a202c
+`} />
+
+Structure decisions that improve searchability:
+
+- **Include domain terms in file names** so `grep -r "webhook"` in file names returns the right files immediately
+- **Avoid re-exporting with renamed symbols** which breaks the agent's ability to trace a name across files
+- **Use consistent terminology** across the codebase -- if one module calls it "customer" and another calls it "client" and a third calls it "user," agents searching for the right code will miss results
+- **Keep import paths readable** so the agent can trace dependencies by searching for the import path
+
+<CodeBlock code={`# Searchable: agent finds all billing code by searching file names
+grep -rl "billing" --include="*.ts" src/
+# Returns:
+#   src/billing/billing.service.ts
+#   src/billing/billing.controller.ts
+#   src/billing/billing.types.ts
+#   src/billing/billing.test.ts
+
+# Not searchable: billing logic hidden in generic names
+grep -rl "billing" --include="*.ts" src/
+# Returns:
+#   src/services/service.ts         (which service?)
+#   src/controllers/controller3.ts  (why 3?)
+#   src/utils/helpers.ts            (billing is in helpers?)
+`} language="bash" filename="search-comparison" />
+
+## Dependency Graphs for Agent Orientation
+
+In large monorepos, a dependency graph in the root README or CLAUDE.md helps agents understand which packages depend on which. This prevents the agent from introducing circular dependencies or importing from the wrong layer.
+
+<CodeBlock code={`## Package Dependency Rules
+
+apps/ can import from packages/ (never the reverse)
+packages/ can import from other packages/ (no circular deps)
+
+Dependency graph:
+  apps/web       → packages/shared-ui, packages/auth-sdk, packages/shared-types
+  apps/api       → packages/auth-sdk, packages/db-client, packages/shared-types
+  apps/worker    → packages/db-client, packages/shared-types
+  packages/auth-sdk   → packages/shared-types
+  packages/db-client  → packages/shared-types
+  packages/shared-ui  → packages/shared-types
+  packages/shared-types → (no dependencies)
+`} language="markdown" filename="CLAUDE.md (dependency section)" />
+
+This simple text representation tells the agent the dependency direction and prevents it from, for example, importing `shared-ui` components into the backend API.
+
+## Large Codebase Survival Patterns
+
+Beyond monorepo-specific patterns, these practices help agents work effectively in any codebase with more than a few hundred files:
+
+### Consistent Entry Points
+
+Every package, service, or module should have a predictable entry point. In a Node.js project, this is typically `index.ts`. In Python, it is `__init__.py`. In Go, it is the package name itself. Agents look for these entry points first -- if they do not exist, the agent must scan every file to determine where to start.
+
+### Feature Flags and Configuration
+
+When features are controlled by feature flags, document them centrally. An agent modifying a feature needs to know whether it is behind a flag and how to test both states:
+
+<CodeBlock code={`# Feature Flags (CLAUDE.md section)
+
+## Active Feature Flags
+- ENABLE_NEW_CHECKOUT — new checkout flow (apps/web only)
+  - ON: uses src/checkout/v2/
+  - OFF: uses src/checkout/legacy/
+  - Test both states in integration tests
+
+- ENABLE_BATCH_PROCESSING — batch mode for worker
+  - ON: processes items in groups of 100
+  - OFF: processes items individually
+  - Controlled via environment variable
+`} language="markdown" filename="feature-flags-documentation" />
+
+### Code Ownership Files
+
+A `CODEOWNERS` file tells the agent which team owns each part of the codebase. While primarily a GitHub feature, agents can read this file to understand organizational boundaries:
+
+<CodeBlock code={`# CODEOWNERS
+apps/web/              @frontend-team
+apps/api/              @backend-team
+apps/worker/           @platform-team
+packages/shared-ui/    @frontend-team
+packages/auth-sdk/     @security-team
+packages/db-client/    @backend-team
+`} language="bash" filename="CODEOWNERS" />
+
+## Summary
+
+Large codebases and monorepos amplify every structural decision. An agent that can navigate a 50-file project by brute force must navigate a 5,000-file project strategically -- and strategy requires clear signals. **Hierarchical CLAUDE.md files** give agents scoped context for each package. **Clear package boundaries** with barrel files let agents work within one package without understanding the internals of others. **Explicit shared packages** replace unstructured utility directories. **Search-friendly naming** ensures text search returns relevant results quickly. **Dependency documentation** prevents agents from introducing circular imports or crossing architectural boundaries. These patterns do not just help agents -- they are the structural foundations that make any large codebase maintainable. The difference is that agents expose structural weaknesses immediately, while human developers work around them silently until the cost becomes unbearable.

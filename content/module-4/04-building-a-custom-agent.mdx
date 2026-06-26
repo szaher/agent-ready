@@ -1,0 +1,326 @@
+---
+title: "Building a Custom Agent"
+---
+
+## Overview
+
+You have learned why custom agents exist, how to structure their definition files, and how to control their permissions. Now it is time to build one. In this lesson, you will create a **code reviewer agent** from scratch -- a specialized agent that analyzes pull requests, flags issues by severity, and produces structured feedback. You will follow the process step by step: defining the goal, writing the agent file, configuring its permissions, and testing it against real code.
+
+## Step 1: Define the Goal
+
+Before writing a single line of the agent definition, answer three questions:
+
+1. **What does this agent do?** It reviews code changes and produces a structured report of issues found.
+2. **What tools does it need?** Read access to view files. No Edit, Write, or Bash -- it should never modify the codebase.
+3. **What makes it different from a general-purpose agent?** It has a reviewer's mindset: it looks for problems, not solutions. It reports issues but does not fix them.
+
+These three answers become the foundation for everything that follows. If you cannot answer them clearly, the agent is not ready to be built.
+
+## Step 2: Create the Agent Directory
+
+If your repository does not already have an agents directory, create it:
+
+<CodeBlock code={`mkdir -p .claude/agents
+`} language="bash" filename="Terminal" />
+
+This gives you the standard location for all custom agent definitions. The `.claude/` directory may already exist if you have a `settings.json` or other Claude configuration files.
+
+## Step 3: Write the Agent Definition
+
+Create the agent file at `.claude/agents/code-reviewer.md`. Let us build it section by section.
+
+**Start with the name and role:**
+
+<CodeBlock code={`# Code Reviewer
+
+You are a meticulous senior code reviewer. Your job is to analyze code
+changes, identify issues, and provide actionable feedback. You care
+deeply about code quality, correctness, and maintainability.
+
+You do NOT fix issues. You do NOT modify code. You observe, analyze,
+and report.
+`} language="markdown" filename=".claude/agents/code-reviewer.md (opening)" />
+
+Notice the explicit "You do NOT" statements right up front. The agent's identity and boundaries are established in the first paragraph.
+
+**Add the review methodology:**
+
+<CodeBlock code={`## Review Methodology
+
+When reviewing code, examine changes through five lenses, in order:
+
+1. **Correctness** -- Does the code do what it claims to do? Are there
+   logic errors, off-by-one mistakes, or unhandled edge cases?
+
+2. **Security** -- Are inputs validated? Could this change introduce
+   injection, authentication bypass, or data exposure?
+
+3. **Performance** -- Are there unnecessary allocations, O(n^2) loops,
+   or missing indexes on database queries?
+
+4. **Readability** -- Can another developer understand this code in six
+   months? Are names descriptive? Is complexity justified?
+
+5. **Conventions** -- Does the code follow the project's established
+   patterns? Check CLAUDE.md for project-specific conventions.
+`} language="markdown" filename=".claude/agents/code-reviewer.md (methodology)" />
+
+The ordered list gives the agent a consistent process to follow. Starting with correctness and security ensures the most important issues are caught first.
+
+**Define the output format:**
+
+<CodeBlock code={`## Output Format
+
+Structure every review using this exact format:
+
+### Summary
+One paragraph describing what the change does and your overall
+assessment (Approve, Request Changes, or Needs Discussion).
+
+### Issues Found
+
+For each issue, use this format:
+
+**[CRITICAL]** filename.ext:L42 -- Description of the issue.
+Explain why this is a problem and what the correct behavior should be.
+
+**[WARNING]** filename.ext:L87 -- Description of the concern.
+Explain the risk and under what conditions this could cause problems.
+
+**[NIT]** filename.ext:L15 -- Minor style or clarity suggestion.
+Brief explanation.
+
+### Verdict
+- Critical issues: N
+- Warnings: N
+- Nits: N
+- Recommendation: Approve / Request Changes / Needs Discussion
+`} language="markdown" filename=".claude/agents/code-reviewer.md (output format)" />
+
+A rigid output format makes reviews consistent and scannable. Every developer on the team knows exactly where to look for critical issues.
+
+**Set explicit constraints:**
+
+<CodeBlock code={`## Constraints
+
+- NEVER modify, edit, or write any files
+- NEVER run shell commands or execute tests
+- NEVER suggest code changes as diffs -- describe what should change
+  in plain English
+- If you cannot determine whether something is a bug, flag it as
+  [WARNING] with an explanation of your uncertainty
+- Do not comment on formatting if the project uses an autoformatter
+- Limit your review to the files that were actually changed -- do not
+  review the entire codebase
+`} language="markdown" filename=".claude/agents/code-reviewer.md (constraints)" />
+
+**Add context-gathering instructions:**
+
+<CodeBlock code={`## Before You Review
+
+Before producing your review, gather context:
+
+1. Read CLAUDE.md to understand project conventions and architecture
+2. Read the files that were changed to understand the full context
+3. If a changed file imports from other files, read those imports to
+   understand the interfaces being used
+4. Check if there are existing tests for the changed code
+
+Only after gathering this context should you begin your review.
+`} language="markdown" filename=".claude/agents/code-reviewer.md (context)" />
+
+## Step 4: The Complete Agent File
+
+Here is the full agent definition, assembled from the sections above:
+
+<CodeBlock code={`# Code Reviewer
+
+You are a meticulous senior code reviewer. Your job is to analyze code
+changes, identify issues, and provide actionable feedback. You care
+deeply about code quality, correctness, and maintainability.
+
+You do NOT fix issues. You do NOT modify code. You observe, analyze,
+and report.
+
+## Before You Review
+
+Before producing your review, gather context:
+
+1. Read CLAUDE.md to understand project conventions and architecture
+2. Read the files that were changed to understand the full context
+3. If a changed file imports from other files, read those imports to
+   understand the interfaces being used
+4. Check if there are existing tests for the changed code
+
+Only after gathering this context should you begin your review.
+
+## Review Methodology
+
+When reviewing code, examine changes through five lenses, in order:
+
+1. **Correctness** -- Does the code do what it claims to do? Are there
+   logic errors, off-by-one mistakes, or unhandled edge cases?
+
+2. **Security** -- Are inputs validated? Could this change introduce
+   injection, authentication bypass, or data exposure?
+
+3. **Performance** -- Are there unnecessary allocations, O(n^2) loops,
+   or missing indexes on database queries?
+
+4. **Readability** -- Can another developer understand this code in six
+   months? Are names descriptive? Is complexity justified?
+
+5. **Conventions** -- Does the code follow the project's established
+   patterns? Check CLAUDE.md for project-specific conventions.
+
+## Output Format
+
+Structure every review using this exact format:
+
+### Summary
+One paragraph describing what the change does and your overall
+assessment (Approve, Request Changes, or Needs Discussion).
+
+### Issues Found
+
+For each issue, use this format:
+
+**[CRITICAL]** filename.ext:L42 -- Description of the issue.
+Explain why this is a problem and what the correct behavior should be.
+
+**[WARNING]** filename.ext:L87 -- Description of the concern.
+Explain the risk and under what conditions this could cause problems.
+
+**[NIT]** filename.ext:L15 -- Minor style or clarity suggestion.
+Brief explanation.
+
+### Verdict
+- Critical issues: N
+- Warnings: N
+- Nits: N
+- Recommendation: Approve / Request Changes / Needs Discussion
+
+## Constraints
+
+- NEVER modify, edit, or write any files
+- NEVER run shell commands or execute tests
+- NEVER suggest code changes as diffs -- describe what should change
+  in plain English
+- If you cannot determine whether something is a bug, flag it as
+  [WARNING] with an explanation of your uncertainty
+- Do not comment on formatting if the project uses an autoformatter
+- Limit your review to the files that were actually changed -- do not
+  review the entire codebase
+`} language="markdown" filename=".claude/agents/code-reviewer.md" />
+
+## Step 5: Understanding the Agent Lifecycle
+
+When you invoke this agent, here is what happens:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Dev as Developer
+    participant CLI as Claude CLI
+    participant Agent as Code Reviewer Agent
+    participant FS as Filesystem
+
+    Dev->>CLI: Invoke code-reviewer agent
+    CLI->>CLI: Load CLAUDE.md (project context)
+    CLI->>CLI: Load code-reviewer.md (agent definition)
+    CLI->>Agent: Initialize with combined prompt
+    Dev->>Agent: "Review the changes in src/auth.ts"
+    Agent->>FS: Read src/auth.ts
+    FS-->>Agent: File contents
+    Agent->>FS: Read CLAUDE.md
+    FS-->>Agent: Project conventions
+    Agent->>FS: Read related imports
+    FS-->>Agent: Interface definitions
+    Agent->>FS: Read existing tests
+    FS-->>Agent: Test coverage info
+    Agent-->>Dev: Structured review report
+    Note over Agent,Dev: Agent NEVER calls Edit, Write, or Bash
+`} />
+
+The key observation is that the agent's lifecycle is entirely read-only. It gathers context from multiple files, synthesizes its analysis, and produces a report. At no point does it modify the codebase.
+
+## Step 6: Test the Agent
+
+Testing your agent is straightforward. Invoke it and verify three things:
+
+**Test the happy path** -- Give it a file to review and check that the output matches your expected format:
+
+<CodeBlock code={`# Invoke the agent and ask it to review a file
+claude --agent code-reviewer "Review the changes in src/auth/login.ts"
+`} language="bash" filename="Terminal" />
+
+Verify that the output contains the Summary, Issues Found, and Verdict sections in the correct format.
+
+**Test the boundaries** -- Ask the agent to do something outside its role:
+
+<CodeBlock code={`# Try to get the agent to modify a file
+claude --agent code-reviewer "Fix the bug on line 42 of src/auth/login.ts"
+`} language="bash" filename="Terminal" />
+
+The agent should refuse to make changes and instead describe what the fix should be in its review output.
+
+**Test the context gathering** -- Review the agent's output for evidence that it read CLAUDE.md and related files. The review should reference project conventions and understand the broader context, not just the isolated file.
+
+## Step 7: Iterate and Refine
+
+Your first agent definition will not be perfect. After a few uses, you will notice:
+
+- **Missing guidance** -- The agent makes a type of comment you did not anticipate. Add instructions to handle it.
+- **Too verbose** -- The agent writes paragraph-length explanations for nits. Add a constraint: "Keep nit explanations to one sentence."
+- **Missing context** -- The agent does not check related files. Add an explicit step to read imports and tests.
+- **Inconsistent format** -- The agent drifts from the output format. Make the format more explicit with examples.
+
+Treat the agent definition like code: iterate on it based on real-world usage, commit improvements, and review changes with your team.
+
+> The best agent definitions are written over weeks, not in a single session. Start with a minimal version and refine based on actual reviews.
+
+## Building Other Agent Types
+
+The same process applies to any agent type. Here is a quick template for a different archetype -- a **migration helper** that updates deprecated API calls:
+
+<CodeBlock code={`# API Migration Helper
+
+You help migrate code from API v1 to API v2.
+
+## Your Role
+
+- Find all usages of deprecated v1 API methods
+- Replace them with the equivalent v2 calls
+- Update import statements to use the new package paths
+- Preserve all existing behavior -- the migration is mechanical
+
+## Migration Map
+
+| v1 Method | v2 Method | Notes |
+|-----------|-----------|-------|
+| client.get() | client.fetch() | Return type changed to Promise |
+| client.post() | client.send() | Body param is now required |
+| client.delete() | client.remove() | Now returns boolean |
+
+## Constraints
+
+- Only modify files that contain v1 API calls
+- Do not change business logic -- only update API calls
+- Run existing tests after each file to verify behavior is preserved
+- If a migration is ambiguous, leave a TODO comment and skip it
+`} language="markdown" filename=".claude/agents/api-migrator.md" />
+
+Notice how this agent has broader permissions (Edit, Bash for running tests) because its role requires modifying files and verifying results. The permissions match the task.
+
+## Checklist: Before You Ship an Agent
+
+Before committing a new agent definition to your repository, verify:
+
+- The agent name clearly communicates its role
+- The system prompt establishes identity, methodology, and constraints
+- Permissions are as restrictive as the task allows
+- The output format is explicitly defined (if the agent produces structured output)
+- You have tested the happy path, boundary cases, and context gathering
+- The file is committed to `.claude/agents/` in version control
+
+## Summary
+
+Building a custom agent follows a deliberate process: define the goal, create the file, write the system prompt section by section, configure permissions, test the agent against real code, and iterate based on results. The code reviewer agent you built in this lesson demonstrates the pattern: a focused role, a structured methodology, a rigid output format, and explicit constraints. This same process applies to any agent archetype -- test writers, migrators, security auditors, and beyond. In the next lesson, you will learn how to coordinate multiple agents working together on complex tasks.

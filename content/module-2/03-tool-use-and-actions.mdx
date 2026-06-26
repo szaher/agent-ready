@@ -1,0 +1,277 @@
+---
+title: Tool Use and Actions
+quiz:
+- question: How does an AI coding agent actually execute a tool call?
+  options:
+  - The LLM generates a structured tool call request, and the agent framework executes it in the real environment
+  - The LLM directly accesses the filesystem and runs commands
+  - The LLM sends code to a separate AI model that executes it
+  - The LLM simulates the tool execution internally and returns the predicted result
+  correctIndex: 0
+- question: Why is the Read tool typically the most frequently used tool in an agent session?
+  options:
+  - Because reading is faster than writing
+  - Because the Read tool is the only tool that does not require user permission
+  - Because agents must understand existing code before they can safely modify it
+  - Because agents prefer reading over editing
+  correctIndex: 2
+- question: What is the key difference between the Edit tool and the Write tool?
+  options:
+  - Edit is for code files, Write is for documentation
+  - There is no difference; they are aliases for the same operation
+  - Edit works on text files, Write works on binary files
+  - Edit modifies a specific part of an existing file using search-and-replace, while Write replaces the entire file contents
+  correctIndex: 3
+- question: Why might running a long-running Bash command be problematic for an agent?
+  options:
+  - Bash commands cannot be run by agents
+  - The output consumes context window tokens, and timeouts may kill the process before it completes
+  - Bash commands always require root permissions
+  correctIndex: 1
+---
+
+## Overview
+
+AI coding agents do not write code by magic. They interact with your codebase through a defined set of **tools** -- structured functions the agent can invoke to read files, make edits, run commands, and search for information.
+
+Understanding these tools is not just academic curiosity. When you know exactly *how* an agent reads your file, *what* it sees when it searches, and *how* it applies edits, you can structure your code to make every tool invocation more effective.
+
+## How Tool Use Works
+
+At the LLM level, tools are **function calls**. The model does not execute anything directly. Instead, it generates a structured request that says "I want to call this tool with these arguments." The agent framework receives that request, executes the actual operation, and sends the result back to the model.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant LLM as LLM (Reasoning)
+    participant Framework as Agent Framework
+    participant FS as Filesystem / Shell
+
+    LLM->>Framework: Tool call: Read("src/auth.ts")
+    Framework->>FS: Read file from disk
+    FS-->>Framework: File contents (raw text)
+    Framework-->>LLM: Tool result: "export class AuthService..."
+
+    Note over LLM: Reasons about file contents
+
+    LLM->>Framework: Tool call: Edit("src/auth.ts", old, new)
+    Framework->>FS: Apply string replacement
+    FS-->>Framework: Edit applied successfully
+    Framework-->>LLM: Tool result: "Edit successful"
+
+    Note over LLM: Decides to verify
+
+    LLM->>Framework: Tool call: Bash("npm test")
+    Framework->>FS: Execute command
+    FS-->>Framework: Test output (stdout + stderr)
+    Framework-->>LLM: Tool result: "4 passed, 0 failed"
+`} />
+
+This separation is critical to understand. The LLM is a reasoning engine that decides *what* to do. The framework is the execution engine that *does* it. The LLM never touches your files directly.
+
+## The Core Tool Set
+
+While different agent platforms name and organize tools differently, they all provide the same fundamental capabilities. Here are the core tools every coding agent uses.
+
+### Read: Loading Files into Context
+
+The **Read** tool loads a file's contents into the conversation so the agent can reason about it. This is the most frequently used tool in any agent session -- agents typically spend 60-70% of their tool calls on reading.
+
+<CodeBlock code={`// What the agent sends to the framework:
+{
+  "tool": "Read",
+  "arguments": {
+    "file_path": "/project/src/services/auth.ts"
+  }
+}
+
+// What the framework returns to the agent:
+{
+  "result": "1\timport { hash } from '../utils/crypto';\n2\timport { UserStore } from '../stores/user';\n3\t\n4\texport class AuthService {\n5\t  private store: UserStore;\n6\t..."
+}
+`} language="json" filename="read-tool-call.json" />
+
+Key behaviors of the Read tool:
+
+- Returns the **entire file** by default (some tools support line ranges)
+- Each line is prefixed with its **line number**, which is essential for the Edit tool
+- The full contents go into the context window, consuming tokens proportional to file size
+- Reading a file the agent has already read wastes tokens (the same content appears twice in the history)
+
+> **Why this matters for your codebase**: Every file the agent reads costs tokens. A 500-line file costs 3x the tokens of a 150-line file. If the agent only needs one function from that file, the extra lines are pure waste.
+
+### Edit: Modifying Existing Code
+
+The **Edit** tool modifies an existing file by replacing a specific string with a new string. It is a **search-and-replace** operation, not a line-number-based edit.
+
+<CodeBlock code={`// What the agent sends:
+{
+  "tool": "Edit",
+  "arguments": {
+    "file_path": "/project/src/services/auth.ts",
+    "old_string": "  async login(email: string, password: string) {\n    const user = await this.store.findByEmail(email);\n    return user;\n  }",
+    "new_string": "  async login(email: string, password: string) {\n    if (!email || !password) {\n      throw new ValidationError('Email and password are required');\n    }\n    const user = await this.store.findByEmail(email);\n    if (!user) {\n      throw new AuthenticationError('Invalid credentials');\n    }\n    return user;\n  }"
+  }
+}
+`} language="json" filename="edit-tool-call.json" />
+
+Key behaviors of the Edit tool:
+
+- The `old_string` must **exactly match** the text in the file, including whitespace and indentation
+- If the old string appears multiple times, the edit fails (the match must be unique)
+- The agent must have **previously read** the file to know the exact text to replace
+- Failed edits return an error, and the agent must retry with the correct text
+
+This is why **consistent formatting matters**. If your codebase has inconsistent indentation (tabs vs. spaces, 2-space vs. 4-space), the agent's edits are more likely to fail because the string match will not work. Linters and formatters that enforce consistency directly improve agent reliability.
+
+### Write: Creating or Replacing Files
+
+The **Write** tool creates a new file or completely replaces an existing file's contents. Unlike Edit (which modifies a specific part), Write replaces **everything**.
+
+<CodeBlock code={`// What the agent sends:
+{
+  "tool": "Write",
+  "arguments": {
+    "file_path": "/project/src/services/validation.ts",
+    "content": "import { z } from 'zod';\n\nexport const userSchema = z.object({\n  email: z.string().email(),\n  name: z.string().min(1).max(100),\n  role: z.enum(['admin', 'user', 'viewer']),\n});\n\nexport type User = z.infer<typeof userSchema>;\n"
+  }
+}
+`} language="json" filename="write-tool-call.json" />
+
+Agents use Write for:
+
+- Creating new files that do not exist yet
+- Replacing files that need major rewrites (when Edit would require too many changes)
+- Generating configuration files, test files, or boilerplate
+
+### Bash: Running Commands
+
+The **Bash** tool executes shell commands and returns the output. This is how agents run tests, check build output, inspect the filesystem, and execute any command-line operation.
+
+<CodeBlock code={`// Running tests:
+{
+  "tool": "Bash",
+  "arguments": {
+    "command": "cd /project && npm test -- --testPathPattern='auth' 2>&1"
+  }
+}
+
+// Searching for patterns:
+{
+  "tool": "Bash",
+  "arguments": {
+    "command": "grep -rn 'AuthService' /project/src/ --include='*.ts'"
+  }
+}
+
+// Checking git status:
+{
+  "tool": "Bash",
+  "arguments": {
+    "command": "cd /project && git diff --stat"
+  }
+}
+`} language="json" filename="bash-tool-calls.json" />
+
+Key behaviors of Bash:
+
+- Returns **stdout and stderr** combined, all of which enters the context window
+- Long outputs consume large amounts of tokens (a verbose test suite output can be thousands of tokens)
+- Commands have **timeouts** -- long-running processes may be killed before completion
+- The agent can chain commands with `&&` and `;`
+- Each Bash invocation starts in a fresh shell (environment variables do not persist)
+
+> **Practical tip**: Configure your test runner to produce concise output. Verbose test logs that print every assertion consume agent context without adding value.
+
+### Search: Finding Code Across the Codebase
+
+Many agents have dedicated **search tools** (like grep, ripgrep, or AST-based search) that find patterns across the codebase without reading every file.
+
+<CodeBlock code={`// Symbol search:
+{
+  "tool": "Search",
+  "arguments": {
+    "query": "createUser",
+    "scope": "symbol"
+  }
+}
+
+// Result:
+{
+  "result": [
+    {"file": "src/services/user.ts", "line": 42, "text": "export async function createUser(data: CreateUserInput)"},
+    {"file": "src/routes/users.ts", "line": 18, "text": "const user = await createUser(validated)"},
+    {"file": "tests/user.test.ts", "line": 7, "text": "describe('createUser', () => {"}
+  ]
+}
+`} language="json" filename="search-tool-call.json" />
+
+Search is the most **token-efficient** way for agents to navigate code. A search returns just the matching lines and locations, consuming far fewer tokens than reading every file in a directory.
+
+## The Tool Call Lifecycle
+
+Every tool call follows a lifecycle with multiple points where things can go right or wrong:
+
+<MermaidDiagram chart={`flowchart TD
+    A[Agent decides to call a tool] --> B{Permission check}
+    B -->|Denied| C[Agent informed: permission denied]
+    B -->|Allowed| D[Framework executes tool]
+    D --> E{Execution result}
+    E -->|Success| F[Result returned to agent]
+    E -->|Error| G[Error message returned to agent]
+    F --> H[Agent processes result]
+    G --> H
+    H --> I{More work needed?}
+    I -->|Yes| A
+    I -->|No| J[Agent responds to user]
+
+    style B fill:#fef3c7,stroke:#d69e2e
+    style E fill:#ebf8ff,stroke:#3182ce
+    style G fill:#fff5f5,stroke:#e53e3e
+`} />
+
+The **permission check** is an important step. Many agent frameworks ask the user to approve certain actions (especially edits and command execution). This is a safety mechanism, but it also means the agent's flow can be interrupted by permission prompts.
+
+## How Tool Choice Affects Quality
+
+The order and selection of tools matters enormously. Compare these two approaches to the same task:
+
+**Approach A (Poor tool use):**
+1. Read a file that might contain the target function
+2. It is not there. Read another file
+3. Not there either. Read a third file
+4. Found it. Make the edit
+5. Do not run tests
+
+**Approach B (Good tool use):**
+1. Search for the function name across the codebase
+2. Read the specific file where the function lives
+3. Read the test file for that function
+4. Make the edit
+5. Run the relevant tests
+6. Confirm tests pass
+
+Approach B uses search before read (saving tokens), reads the test file (understanding expectations), and verifies with tests (catching regressions). The total token cost is lower, and the result is better.
+
+> **Key insight**: Agents that search before they read, read before they edit, and test after they edit produce the best results. This is the ideal tool sequence, and you can encourage it through good code organization and documentation.
+
+## What Agents Cannot Do
+
+Understanding tool limitations is as important as understanding capabilities:
+
+- **Agents cannot see images** in your codebase (diagrams, screenshots) through file reading alone
+- **Agents cannot interact with GUIs** -- they work through text-based tools only
+- **Agents cannot access external services** unless given explicit tools for it (database queries, API calls)
+- **Agents cannot run indefinitely** -- timeouts, token limits, and rate limits all constrain execution
+- **Agents cannot undo** -- there is no built-in rollback. If an edit breaks something, the agent must fix it forward
+
+## Summary
+
+Tools are the hands and eyes of an AI coding agent. Understanding how they work reveals actionable ways to make your codebase more agent-friendly:
+
+- **Read is the dominant tool**: Structure code so agents load less to understand more
+- **Edit uses exact string matching**: Consistent formatting improves edit reliability
+- **Bash output fills context**: Keep test and build output concise
+- **Search is the most efficient navigator**: Consistent naming patterns make search effective
+- **The ideal sequence is search, read, edit, test**: Good code organization encourages this flow
+- **Tools have limitations**: Design workflows with tool constraints in mind
+
+Next, we will explore how agents *decide* which tool to call and what strategy to follow -- the decision-making process that turns tool capabilities into coherent actions.

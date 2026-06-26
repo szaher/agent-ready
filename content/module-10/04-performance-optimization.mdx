@@ -1,0 +1,286 @@
+---
+title: Performance Optimization
+quiz:
+- question: What is the most effective way to reduce an agent's token consumption per session?
+  options:
+  - Write a lean, prioritized CLAUDE.md and structure the codebase so the agent reads fewer irrelevant files
+  - Remove all comments from the codebase
+  - Use a smaller AI model
+  - Limit the agent to one tool call per session
+  correctIndex: 0
+- question: Why is 'search-first' file access more efficient than reading files sequentially?
+  options:
+  - Search tools are faster than file read tools
+  - Sequential reads cause the agent to crash
+  - The agent uses grep or AST search to find relevant code without loading entire files into context
+  - Search-first is only useful for very large repositories
+  correctIndex: 2
+- question: When should you use a smaller, cheaper model instead of the most capable one?
+  options:
+  - Never -- always use the best model available
+  - For all tasks, since smaller models are always faster
+  - Only when running out of API budget
+  - For well-defined, constrained tasks like formatting, linting, or simple code generation where the CLAUDE.md provides explicit patterns
+  correctIndex: 3
+---
+
+## Overview
+
+An agent that produces correct output but takes 15 minutes and costs twelve dollars per session is not a tool anyone will use regularly. Performance optimization for agents means three things: making them **faster** (fewer iterations to reach a correct result), more **accurate** (higher first-attempt success rate), and less **expensive** (fewer tokens consumed per task). These goals reinforce each other -- an agent that finds the right files immediately is faster, more accurate, and cheaper than one that reads half the codebase searching for context. This lesson covers the practical techniques that improve all three dimensions.
+
+## The Three Dimensions of Agent Performance
+
+Before optimizing, understand what you are optimizing for. Agent performance has three distinct dimensions, and different techniques target different dimensions.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Speed["Speed"]
+        S1["Fewer iterations"]
+        S2["Faster feedback loops"]
+        S3["Smaller context to process"]
+    end
+    subgraph Accuracy["Accuracy"]
+        A1["Higher first-attempt\nsuccess rate"]
+        A2["Fewer rework cycles"]
+        A3["Better convention\nadherence"]
+    end
+    subgraph Cost["Cost"]
+        C1["Fewer tokens per session"]
+        C2["Right model for\nthe task"]
+        C3["Avoid redundant\nfile reads"]
+    end
+    Speed --- Center["Optimized\nAgent"]
+    Accuracy --- Center
+    Cost --- Center
+    style Speed fill:#c6f6d5,stroke:#38a169
+    style Accuracy fill:#bee3f8,stroke:#3182ce
+    style Cost fill:#fefcbf,stroke:#d69e2e
+    style Center fill:#e9d8fd,stroke:#805ad5
+`} />
+
+The good news: most optimizations improve all three simultaneously. A lean CLAUDE.md that gets the agent to the right files immediately is faster (less searching), more accurate (more relevant context), and cheaper (fewer tokens reading irrelevant files).
+
+## Optimization 1: Write a Lean CLAUDE.md
+
+The CLAUDE.md is the single largest lever for agent performance. A bloated CLAUDE.md wastes tokens on every session and dilutes the agent's attention. A lean one focuses the agent immediately.
+
+**The problem with long CLAUDE.md files:**
+
+Every token in the CLAUDE.md is processed on every session. A 2,000-line CLAUDE.md with comprehensive documentation of every module, every convention, and every historical decision consumes context that could be used for actual code. Worse, critical instructions buried on line 1,800 receive less model attention than instructions on line 10.
+
+**How to slim it down:**
+
+<CodeBlock code={`# Before: 180 lines, everything in one file
+# CLAUDE.md
+
+## Project Overview
+... (40 lines of project history and philosophy)
+
+## Architecture
+... (60 lines describing every module)
+
+## Code Conventions
+... (50 lines covering every edge case)
+
+## Testing
+... (30 lines about test infrastructure)
+
+# After: 45 lines in root, details in sub-files
+# CLAUDE.md
+
+## Project: OrderFlow API (Go)
+REST API for order management. Monorepo, 3 services.
+
+## Build & Test
+- Build: make build
+- Test: make test (unit) | make test-integration
+- Lint: make lint
+
+## Critical Conventions (ALWAYS FOLLOW)
+- Error handling: return (result, error), never panic
+- Naming: snake_case files, CamelCase types, lowerCamel funcs
+- Imports: stdlib first, external second, internal third
+
+## Structure
+- cmd/ -- entrypoints (do not add business logic here)
+- internal/services/ -- business logic
+- internal/repo/ -- database layer
+- api/handlers/ -- HTTP handlers
+
+## For Details
+- See internal/services/CLAUDE.md for service patterns
+- See internal/repo/CLAUDE.md for database conventions
+- See api/CLAUDE.md for handler patterns
+`} language="markdown" filename="CLAUDE.md before vs after" />
+
+The optimized version gives the agent everything it needs to start working and points it to deeper context only when relevant. Sub-directory CLAUDE.md files are loaded only when the agent navigates to those directories.
+
+## Optimization 2: Search-First File Access
+
+One of the most wasteful agent behaviors is sequential file reading -- opening file after file looking for the right code. Each file read consumes tokens whether the content is relevant or not. The **search-first approach** uses targeted search to find relevant code before reading full files.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Sequential["Sequential Read"]
+        R1["Read file 1\n200 tokens"] --> R2["Read file 2\n350 tokens"]
+        R2 --> R3["Read file 3\n180 tokens"]
+        R3 --> R4["Read file 4\n500 tokens\n(relevant!)"]
+    end
+    subgraph SearchFirst["Search First"]
+        S1["Search: 'handleOrder'\n50 tokens"] --> S2["Read file 4\n500 tokens\n(relevant!)"]
+    end
+    style Sequential fill:#fed7d7,stroke:#e53e3e
+    style SearchFirst fill:#c6f6d5,stroke:#38a169
+`} />
+
+In the sequential approach, the agent consumes 1,230 tokens to find the relevant code. In the search-first approach, it consumes 550 tokens. Across an entire session, this difference compounds dramatically.
+
+**How to encourage search-first behavior:**
+
+Add explicit guidance in CLAUDE.md about how to find code efficiently.
+
+<CodeBlock code={`## Finding Code (READ THIS)
+- Use grep or ripgrep to locate functions before reading files
+- Use AST search tools when available
+- Do NOT read files sequentially hoping to find the right one
+- Key search patterns:
+  - Handlers: grep -r "func Handle" api/handlers/
+  - Services: grep -r "type.*Service struct" internal/services/
+  - Repo methods: grep -r "func.*Repository\)" internal/repo/
+`} language="markdown" filename="CLAUDE.md search guidance" />
+
+## Optimization 3: Batch Related Changes
+
+Agents work most efficiently when they can make related changes in a single pass. Sending five separate tasks that each touch the same module wastes context on repeatedly reading the same files.
+
+<CodeBlock code={`# Inefficient: 5 separate sessions
+# Session 1: "Add validation to CreateOrder"
+# Session 2: "Add validation to UpdateOrder"
+# Session 3: "Add validation to DeleteOrder"
+# Session 4: "Add validation to GetOrder"
+# Session 5: "Add tests for all validations"
+#
+# Each session re-reads the order handler file, the validation
+# library, and the test file. Total: ~5x context cost.
+
+# Efficient: 1-2 focused sessions
+# Session 1: "Add input validation to all order handlers
+#   (Create, Update, Delete, Get) using the validation
+#   patterns in internal/validation/. See user_handler.go
+#   for an example of correct validation implementation."
+#
+# Session 2: "Add tests for the order handler validations
+#   added in the previous commit. Follow the test patterns
+#   in api/handlers/user_handler_test.go."
+#
+# Total: ~1.5x context cost for the same output.
+`} language="markdown" filename="task-batching.md" />
+
+The key insight is that file reads are the largest token cost in most sessions. Any strategy that reduces the number of unique file reads reduces cost proportionally.
+
+## Optimization 4: Right-Size the Model
+
+Not every task requires the most capable (and most expensive) model. **Model selection** based on task complexity is one of the highest-impact cost optimizations.
+
+| Task Type | Recommended Model Tier | Why |
+|-----------|----------------------|-----|
+| Complex refactoring | Most capable | Requires understanding architecture and making coordinated changes |
+| Feature implementation | Most capable | Needs to understand design intent and write new logic |
+| Writing tests for existing code | Mid-tier | Pattern is clear: read function, write test. Less reasoning needed |
+| Code formatting and linting fixes | Smallest viable | Mechanical transformation with explicit rules |
+| Generating boilerplate | Mid-tier | Follows templates with minor adaptation |
+| Documentation updates | Mid-tier | Reads code and describes it -- moderate reasoning |
+
+<CodeBlock code={`# Example: Using different models for different tasks
+# in a CI pipeline or task runner
+
+# Complex task -- use the most capable model
+claude --model opus "Refactor the payment service to use 
+  the new event-driven architecture described in docs/adr-007.md"
+
+# Simple task -- use a faster, cheaper model
+claude --model haiku "Fix all ESLint errors in src/utils/"
+
+# Medium task -- balance capability and cost
+claude --model sonnet "Write unit tests for the functions
+  in src/services/order_service.ts following the patterns
+  in src/services/__tests__/user_service.test.ts"
+`} language="bash" filename="model-selection.sh" />
+
+> Do not default to the cheapest model "to save money." An underpowered model that fails three times before you switch to a capable one costs more than running the capable model once. Right-sizing means matching the model to the task, not minimizing the model.
+
+## Optimization 5: Reduce Feedback Loop Latency
+
+Every time an agent runs tests, waits for a linter, or builds the project, it is waiting. That wait time directly affects session duration and, in interactive sessions, developer patience. Faster feedback loops make agents more effective.
+
+**Practical techniques:**
+
+- **Run only relevant tests** -- instead of the full test suite, configure the agent to run tests related to the changed files. Most test runners support file-pattern or tag-based filtering
+- **Use incremental builds** -- if the build system supports it, ensure the agent uses incremental compilation rather than clean builds
+- **Parallelize checks** -- run linting, type checking, and tests in parallel rather than sequentially
+- **Cache dependencies** -- ensure `node_modules`, Go module cache, or Python virtual environments are pre-built so the agent does not reinstall dependencies on each session
+
+<CodeBlock code={`## Build & Test (PERFORMANCE NOTES)
+- Fast check: make lint (5 seconds)
+- Unit tests for one package: go test ./internal/services/order/...
+- Full test suite: make test (90 seconds -- use only for final verification)
+- Type check: npx tsc --noEmit (12 seconds)
+
+When implementing changes:
+1. Run lint after each file edit (fast feedback)
+2. Run package-level tests after completing a function
+3. Run full test suite only once, before submitting
+`} language="markdown" filename="CLAUDE.md build section" />
+
+## Optimization 6: Avoid Redundant File Reads
+
+Agents sometimes re-read files they have already read in the same session, especially during long sessions or when switching between tasks. While some re-reading is necessary (the file may have changed), much of it is waste.
+
+**Strategies to reduce redundant reads:**
+
+- **Keep sessions focused** -- one task per session means the agent builds context once and uses it throughout
+- **Structure tasks to minimize cross-cutting reads** -- if a task touches three modules, provide the relevant context upfront rather than letting the agent discover it through exploration
+- **Use task descriptions that reference specific files** -- "modify the `handleOrder` function in `api/handlers/order.go`" is more efficient than "find and modify the order creation endpoint"
+
+## Measuring Optimization Impact
+
+You cannot optimize what you do not measure. Track these metrics before and after applying optimizations:
+
+- **Tokens per session** -- total input and output tokens. This directly correlates with cost
+- **Session duration** -- wall-clock time from start to completion. Affected by both token count and feedback loop speed
+- **First-attempt success rate** -- percentage of sessions that produce usable output without retry. The most important accuracy metric
+- **Files read per session** -- a proxy for context efficiency. Fewer files read for the same quality output means better optimization
+
+<MermaidDiagram chart={`graph TD
+    subgraph Before["Before Optimization"]
+        B1["2,500 tokens/session avg"]
+        B2["8 minutes avg duration"]
+        B3["55% first-attempt success"]
+        B4["12 files read avg"]
+    end
+    subgraph After["After Optimization"]
+        A1["900 tokens/session avg"]
+        A2["3 minutes avg duration"]
+        A3["82% first-attempt success"]
+        A4["4 files read avg"]
+    end
+    Before -.->|"lean CLAUDE.md\nsearch-first\ntask batching"| After
+    style Before fill:#fed7d7,stroke:#e53e3e
+    style After fill:#c6f6d5,stroke:#38a169
+`} />
+
+These numbers are illustrative, but the proportions are realistic. Teams that apply the techniques in this lesson consistently see 50-70% reductions in token consumption and 20-30 percentage point improvements in first-attempt success rate.
+
+## The Optimization Checklist
+
+Apply these in priority order -- each one builds on the previous:
+
+1. **Lean CLAUDE.md** -- under 60 lines in root, details in sub-directory files
+2. **Explicit file pointers** -- tell the agent where to find code, do not let it search
+3. **Search-first instructions** -- teach the agent to grep before reading
+4. **Batch related tasks** -- one session per coherent change, not one session per file
+5. **Right-size models** -- match model capability to task complexity
+6. **Fast feedback loops** -- targeted tests, incremental builds, parallel checks
+7. **Focused sessions** -- one task per session, clear success criteria
+
+## Summary
+
+Agent performance optimization targets three dimensions: speed, accuracy, and cost. The highest-impact technique is writing a lean, prioritized CLAUDE.md that directs the agent to the right files immediately. Search-first file access, task batching, model right-sizing, and fast feedback loops each contribute incremental improvements that compound across sessions. Measure tokens per session, first-attempt success rate, and files read per session to quantify your progress. The final lesson in this module -- and this entire academy -- looks forward: where is the agent-ready ecosystem heading, and what patterns are emerging?

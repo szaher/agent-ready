@@ -1,0 +1,265 @@
+---
+title: Test-Driven Agent Development
+quiz:
+- question: Why is TDD particularly effective when working with AI coding agents?
+  options:
+  - Tests provide unambiguous, machine-verifiable success criteria that the agent can check without human involvement
+  - Agents write tests faster than humans do
+  - TDD eliminates the need for code review
+  - Agents cannot write code without tests to reference
+  correctIndex: 0
+- question: In the TDD-with-agents workflow, who typically writes the tests?
+  options:
+  - The agent writes both tests and implementation
+  - A separate testing agent writes the tests
+  - The human writes the tests, the agent writes the implementation to make them pass
+  - Tests are generated automatically from the type system
+  correctIndex: 2
+- question: What should you do when an agent's implementation passes your tests but uses an approach you did not intend?
+  options:
+  - Accept it -- if the tests pass, the implementation is correct
+  - Delete the implementation and try again with a different model
+  - Manually rewrite the entire implementation
+  - Add more tests that constrain the approach, then let the agent try again
+  correctIndex: 3
+- question: Why should tests in a TDD-with-agents workflow test behavior rather than implementation details?
+  options:
+  - Behavioral tests are shorter to write
+  - Implementation-detail tests over-constrain the agent, preventing valid alternative approaches
+  - Agents cannot read tests that reference internal functions
+  - Behavioral tests run faster in CI
+  correctIndex: 1
+---
+
+## Overview
+
+Every technique we have covered so far -- CLAUDE.md, structured prompts, review workflows -- gives the agent **guidance**. But guidance is inherently ambiguous. The agent might interpret "handle errors properly" differently than you do. **Test-driven development** solves this by giving the agent something better than guidance: a **machine-verifiable definition of done**. When you write tests first and then tell the agent to make them pass, there is no ambiguity about whether the implementation is correct. The tests say yes or no. This lesson covers why TDD and agents are a natural pairing, how to structure the workflow, and what makes tests effective as agent specifications.
+
+## Why TDD and Agents Are a Natural Fit
+
+In traditional TDD, the developer writes a test, then writes the implementation, then refactors. The cycle is fast but manual. With agents, the cycle changes in a powerful way:
+
+- **Human** writes the test (defines what "correct" means)
+- **Agent** writes the implementation (does the mechanical work)
+- **Test runner** validates the result (provides objective feedback)
+- **Agent** fixes failures if needed (iterates without human intervention)
+
+This division of labor plays to each party's strengths. Humans are good at defining requirements and judging correctness criteria. Agents are good at generating code that satisfies constraints. Test runners are good at providing fast, unambiguous feedback.
+
+<MermaidDiagram chart={`flowchart TD
+    H["Human writes test"] --> R["Tests run: RED"]
+    R --> A["Agent implements code"]
+    A --> G{"Tests pass?"}
+    G -->|"No"| F["Agent reads failures"]
+    F --> A
+    G -->|"Yes"| Rev["Human reviews implementation"]
+    Rev -->|"Needs refinement"| MT["Human adds more tests"]
+    MT --> R
+    Rev -->|"Accepted"| Done["Commit"]
+    
+    style H fill:#bee3f8,stroke:#3182ce
+    style A fill:#c6f6d5,stroke:#38a169
+    style R fill:#fed7d7,stroke:#e53e3e
+    style Done fill:#c6f6d5,stroke:#38a169
+`} />
+
+> Tests are the best specification language for agents. Unlike natural language, tests are precise, executable, and binary -- they pass or they fail.
+
+## The TDD-with-Agents Workflow
+
+Here is the workflow step by step:
+
+**Step 1: Write the test.** Define the behavior you want. Be specific about inputs, outputs, and edge cases. Do not worry about how the implementation will work -- focus on what it should do.
+
+**Step 2: Run the test and confirm it fails.** This is the "red" phase. The test should fail because the implementation does not exist yet. If it passes, your test is not testing anything new.
+
+**Step 3: Hand off to the agent.** Tell the agent which test file to make pass and any relevant constraints.
+
+**Step 4: Agent implements and iterates.** The agent writes code, runs the tests, reads failures, and fixes issues in a loop until all tests pass.
+
+**Step 5: Human reviews.** Even though tests pass, review the implementation for approach, readability, and architectural fit. If something is off, add more tests that constrain the approach and repeat from step 3.
+
+## Writing Tests the Agent Can Act On
+
+Here is an example. You want a function that calculates shipping cost based on weight and destination zone. You write the test first:
+
+<CodeBlock code={`import { calculateShipping } from '../src/shipping';
+
+describe('calculateShipping', () => {
+  it('returns base rate for packages under 1kg in zone 1', () => {
+    expect(calculateShipping({ weightKg: 0.5, zone: 1 })).toBe(5.99);
+  });
+
+  it('adds per-kg surcharge for packages over 1kg', () => {
+    expect(calculateShipping({ weightKg: 3.0, zone: 1 })).toBe(9.99);
+  });
+
+  it('multiplies rate by zone factor', () => {
+    expect(calculateShipping({ weightKg: 0.5, zone: 3 })).toBe(11.98);
+  });
+
+  it('throws for invalid weight', () => {
+    expect(() => calculateShipping({ weightKg: -1, zone: 1 }))
+      .toThrow('Weight must be positive');
+  });
+
+  it('throws for invalid zone', () => {
+    expect(() => calculateShipping({ weightKg: 1, zone: 0 }))
+      .toThrow('Zone must be between 1 and 5');
+  });
+
+  it('handles exact 1kg boundary', () => {
+    expect(calculateShipping({ weightKg: 1.0, zone: 1 })).toBe(5.99);
+  });
+});
+`} language="typescript" filename="tests/shipping.test.ts" />
+
+This test suite is effective for agents because:
+
+- It specifies exact inputs and expected outputs
+- It covers the happy path, edge cases, and error conditions
+- It reveals the business rules implicitly (base rate, per-kg surcharge, zone multiplier)
+- It tests boundary conditions (exactly 1kg)
+
+## Prompting the Agent for TDD
+
+With the test written, the prompt to the agent is straightforward:
+
+<CodeBlock code={`claude -p "The file tests/shipping.test.ts contains failing tests for a 
+calculateShipping function. 
+
+Your task:
+1. Read the test file to understand the expected behavior
+2. Create src/shipping.ts with the calculateShipping function
+3. Make all tests pass
+4. Run 'pnpm test tests/shipping.test.ts' to verify
+
+Constraints:
+- Do not modify the test file
+- Export the function as a named export
+- Use TypeScript with strict types"
+`} language="bash" filename="workflows/tdd-handoff.sh" />
+
+The beauty of this approach: the prompt does not need to explain the business logic. The tests already encode it. The agent reads the tests, reverse-engineers the requirements, and implements accordingly.
+
+## The Iteration Loop
+
+Here is what happens under the hood when the agent runs:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant A as Agent
+    participant FS as File System
+    participant T as Test Runner
+
+    A->>FS: Read tests/shipping.test.ts
+    A->>A: Analyze test expectations
+    A->>FS: Write src/shipping.ts (attempt 1)
+    A->>T: Run pnpm test
+    T-->>A: 4 passed, 2 failed
+    A->>A: Read failure messages
+    A->>FS: Update src/shipping.ts (attempt 2)
+    A->>T: Run pnpm test
+    T-->>A: 6 passed, 0 failed
+    A-->>A: All tests pass - done
+`} />
+
+The agent might not get it right on the first try. That is fine. The **iterative loop** is the mechanism that makes TDD with agents robust -- the agent keeps adjusting until the tests pass. This is qualitatively different from generating code in a single shot and hoping it works.
+
+## Writing Tests That Guide, Not Over-Constrain
+
+There is an art to writing tests for agent consumption. Tests that are too specific about implementation details prevent the agent from finding valid alternative solutions. Tests that are too vague do not provide enough signal.
+
+**Good: test behavior**
+- "Given this input, the output should be X"
+- "When this error occurs, the function should throw Y"
+- "The result should contain items sorted by date"
+
+**Problematic: test implementation**
+- "The function should use a for loop, not map"
+- "The function should call helperFunction exactly 3 times"
+- "The internal cache should have 5 entries after this call"
+
+The first set constrains **what** the code does. The second constrains **how** it does it. When working with agents, you want to constrain the what and let the agent figure out the how.
+
+> Write tests that describe the contract, not the mechanism. The agent needs freedom to choose its approach.
+
+## Scaling TDD with Agents
+
+For larger features, break the work into test-driven slices:
+
+<MermaidDiagram chart={`flowchart LR
+    subgraph Slice1["Slice 1: Data Model"]
+        T1["Write model tests"] --> I1["Agent implements"]
+    end
+    subgraph Slice2["Slice 2: Business Logic"]
+        T2["Write logic tests"] --> I2["Agent implements"]
+    end
+    subgraph Slice3["Slice 3: API Layer"]
+        T3["Write API tests"] --> I3["Agent implements"]
+    end
+    
+    Slice1 --> Slice2
+    Slice2 --> Slice3
+    
+    style Slice1 fill:#ebf8ff,stroke:#3182ce
+    style Slice2 fill:#c6f6d5,stroke:#38a169
+    style Slice3 fill:#fefcbf,stroke:#d69e2e
+`} />
+
+Each slice follows the same pattern: human writes tests, agent implements. The slices build on each other -- the data model tests pass before business logic tests are written, and business logic passes before API tests are added. This gives the agent a stable foundation to build on at each step.
+
+## Handling Surprising Agent Implementations
+
+Sometimes the agent's implementation passes all tests but takes an approach you did not expect. Perhaps it uses a lookup table where you expected a formula, or it flattens a nested structure you assumed would stay nested.
+
+When this happens, you have three options:
+
+1. **Accept it** -- if the tests pass and the approach is maintainable, the agent may have found a valid alternative you had not considered
+2. **Add constraining tests** -- write tests that make the unwanted approach fail. For example, if you need the formula approach for extensibility, add tests with inputs that a hardcoded table cannot cover
+3. **Add prompt constraints** -- tell the agent "implement this using a formula-based approach, not a lookup table"
+
+Option 2 is usually the best. It keeps the specification in tests (where it belongs) rather than in natural language (where it is ambiguous).
+
+## TDD in CI: The Automated Version
+
+TDD with agents can be fully automated in CI. When a developer pushes test files without implementations, a CI workflow can trigger the agent to fill in the gaps:
+
+<CodeBlock code={`name: TDD Agent Implementation
+
+on:
+  push:
+    paths:
+      - 'tests/**/*.test.ts'
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find unimplemented tests
+        run: |
+          # Run tests, capture failures from missing implementations
+          pnpm test --reporter=json 2>/dev/null | \
+            jq -r '.testResults[] | select(.numFailingTests > 0) | .testFilePath' \
+            > failing-test-files.txt
+
+      - name: Agent implements
+        env:
+          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          while IFS= read -r test_file; do
+            claude -p "Read $test_file and implement the source code 
+            to make all tests pass. Do not modify the test file. 
+            Run 'pnpm test $test_file' to verify."
+          done < failing-test-files.txt
+
+      - name: Verify all tests pass
+        run: pnpm test
+`} language="yaml" filename=".github/workflows/tdd-agent.yml" />
+
+This creates a workflow where developers write the specification (tests) and the agent does the implementation work, all within CI.
+
+## Summary
+
+**Test-driven agent development** is the most reliable way to get correct implementations from AI agents. Tests provide what natural language cannot: an **unambiguous, machine-verifiable definition of done**. The workflow is simple -- human writes tests, agent implements, test runner validates, agent iterates until green. The key to effective TDD with agents is writing tests that constrain **behavior** (what the code does) rather than **implementation** (how it does it), giving the agent freedom to find its own approach while ensuring correctness. Break large features into test-driven slices, and the agent can build complex systems one verified piece at a time. In the next lesson, we will close the loop by examining how to continuously improve your agent configuration based on real-world performance.

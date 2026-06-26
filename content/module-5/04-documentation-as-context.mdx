@@ -1,0 +1,338 @@
+---
+title: Documentation as Context
+quiz:
+- question: Why are type annotations considered the most efficient form of documentation for AI agents?
+  options:
+  - They provide machine-readable contracts about inputs, outputs, and data shapes that agents can use without reading implementations
+  - They make the code run faster, giving the agent more time to analyze
+  - Agents can only understand typed languages
+  - Type annotations are required by all modern build tools
+  correctIndex: 0
+- question: What should a directory-level README.md contain for maximum agent benefit?
+  options:
+  - A complete tutorial on how the module was built
+  - Only the module's version history and changelog
+  - The module's purpose, public API surface, key patterns, and what NOT to do
+  - A copy of the project's main README with the module name replaced
+  correctIndex: 2
+- question: Which type of inline comment is MOST helpful for AI agents?
+  options:
+  - Comments that restate what the code does line by line
+  - Comments marking TODO items for future work
+  - Comments that credit the original author
+  - Comments that explain WHY a non-obvious decision was made or what constraint drove the implementation
+  correctIndex: 3
+- question: What is the relationship between JSDoc/docstrings and type annotations?
+  options:
+  - They are redundant — you should only use one
+  - Type annotations define the contract (what), while docstrings explain the behavior, constraints, and edge cases (why and when)
+  - JSDoc replaces the need for type annotations entirely
+  - Docstrings are only for human developers, not for agents
+  correctIndex: 1
+---
+
+## Overview
+
+Structure tells an agent where to look. Names tell it what files contain. But documentation tells the agent **why** things work the way they do, **how** components connect, and **what** constraints must be respected. In this lesson, we explore the four layers of documentation that serve as navigation aids for AI agents: README files, type annotations, docstrings, and inline comments. Each layer operates at a different scope, and together they form a context stack that lets agents work confidently without guessing.
+
+## The Documentation Context Stack
+
+An agent builds its understanding of your code layer by layer, starting broad and narrowing down. Each documentation layer answers different questions.
+
+<MermaidDiagram chart={`graph TD
+    A["CLAUDE.md / Root README\n— Project purpose, architecture, conventions"] --> B["Directory README.md\n— Module purpose, API surface, patterns"]
+    B --> C["Type Annotations\n— Function contracts, data shapes"]
+    C --> D["Docstrings / JSDoc\n— Behavior, constraints, edge cases"]
+    D --> E["Inline Comments\n— Why non-obvious decisions were made"]
+    style A fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style B fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style C fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style D fill:#fed7e2,stroke:#d53f8c,color:#1a202c
+    style E fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+`} />
+
+The agent reads these layers in order: it starts with the project-level CLAUDE.md, drills into directory READMEs as it navigates, reads type signatures when it opens files, scans docstrings for functions it plans to call or modify, and finally reads inline comments when it needs to understand specific implementation decisions.
+
+> Documentation is not just for humans who read code. It is machine-readable context that directly determines agent accuracy.
+
+## Layer 1: Directory-Level READMEs
+
+A README.md in each feature directory gives the agent a briefing before it dives into the code. This is especially valuable for modules with complex internal structure or non-obvious patterns.
+
+<CodeBlock code={`# Billing Module
+
+## Purpose
+Handles subscription billing, invoice generation, and payment processing
+via Stripe. All monetary values use integer cents (not floats).
+
+## Public API
+- \`BillingService\` — main entry point for all billing operations
+- \`createInvoice()\` — generates an invoice for a billing period
+- \`processPayment()\` — charges a payment method via Stripe
+- \`InvoiceStatus\` — enum of invoice lifecycle states
+
+## Key Patterns
+- All Stripe API calls go through \`stripe-client.ts\` (never call Stripe directly)
+- Webhook handlers in \`webhook.controller.ts\` verify signatures before processing
+- Monetary calculations use the \`Money\` value object from \`shared/money/\`
+
+## Do NOT
+- Store raw credit card numbers (use Stripe tokens)
+- Call Stripe API directly — always use the wrapped client
+- Use floating-point arithmetic for money
+`} language="markdown" filename="src/billing/README.md" />
+
+This README answers the five questions every agent asks when entering a module:
+
+1. **What does this module do?** (Purpose)
+2. **What can I use from it?** (Public API)
+3. **How is it structured internally?** (Key Patterns)
+4. **What should I avoid?** (Do NOT section)
+5. **Where are the tricky parts?** (implicit in patterns and constraints)
+
+The "Do NOT" section is particularly powerful. Agents follow instructions well, and explicit prohibitions prevent the most common mistakes.
+
+## Layer 2: Type Annotations
+
+**Type annotations** are the most efficient form of documentation for agents. Unlike prose comments, types are machine-verifiable, always up to date (the compiler enforces them), and convey precise information about function contracts.
+
+Consider what an agent learns from this function signature alone:
+
+<CodeBlock code={`interface CreateOrderInput {
+  customerId: string;
+  items: OrderItem[];
+  shippingAddress: Address;
+  couponCode?: string;          // optional
+  metadata?: Record<string, string>;
+}
+
+interface OrderResult {
+  order: Order;
+  invoice: Invoice;
+  estimatedDelivery: Date;
+}
+
+async function createOrder(
+  input: CreateOrderInput,
+  options: { validateInventory: boolean; sendConfirmation: boolean }
+): Promise<OrderResult> {
+  // ...
+}
+`} language="typescript" filename="src/orders/orders.service.ts" />
+
+Without reading a single line of the implementation, the agent knows:
+- The function takes a structured input with required and optional fields
+- It accepts behavioral options as a second parameter
+- It returns a promise containing an order, an invoice, and a delivery estimate
+- The `customerId` is a string, not a number
+- The `couponCode` is optional (the `?` suffix)
+- The function is async
+
+This is **context for free**. The type system communicates the contract, and the agent can write calling code correctly without reading the function body.
+
+### Typing in Dynamic Languages
+
+In languages without a static type system, type hints serve the same purpose:
+
+<CodeBlock code={`from dataclasses import dataclass
+from datetime import date
+from typing import Optional
+
+
+@dataclass
+class CreateOrderInput:
+    customer_id: str
+    items: list["OrderItem"]
+    shipping_address: "Address"
+    coupon_code: Optional[str] = None
+    metadata: Optional[dict[str, str]] = None
+
+
+@dataclass
+class OrderResult:
+    order: "Order"
+    invoice: "Invoice"
+    estimated_delivery: date
+
+
+async def create_order(
+    input: CreateOrderInput,
+    *,
+    validate_inventory: bool = True,
+    send_confirmation: bool = True,
+) -> OrderResult:
+    ...
+`} language="python" filename="src/orders/order_service.py" />
+
+Python type hints, Go type signatures, and Rust's type system all serve the same agent-context purpose: they tell the agent what a function expects and returns without requiring it to read the implementation.
+
+> **Rule of thumb:** If your language supports types, use them everywhere. Every untyped function is a function the agent must read fully to understand.
+
+## Layer 3: Docstrings and JSDoc
+
+Types tell the agent **what** a function accepts and returns. Docstrings tell it **why**, **when**, and **what to watch out for**.
+
+<CodeBlock code={`/**
+ * Processes a refund for a completed order.
+ *
+ * Refunds are processed through Stripe and may take 5-10 business days
+ * to appear on the customer's statement. Partial refunds are supported.
+ *
+ * @param orderId - The order to refund. Must be in 'completed' status.
+ * @param amount - Refund amount in cents. If omitted, refunds the full order total.
+ * @param reason - Required by Stripe for chargeback protection.
+ * @returns The updated order with refund details attached.
+ * @throws {OrderNotFoundError} If the order ID does not exist.
+ * @throws {InvalidOrderStatusError} If the order is not in 'completed' status.
+ * @throws {StripeError} If the payment provider rejects the refund.
+ *
+ * @example
+ * const result = await processRefund('order_123', 5000, 'customer_request');
+ */
+async function processRefund(
+  orderId: string,
+  amount?: number,
+  reason: RefundReason
+): Promise<Order> {
+  // ...
+}
+`} language="typescript" filename="src/billing/refund.service.ts" />
+
+This docstring tells the agent critical things that types alone cannot convey:
+- The order must be in "completed" status (a **precondition**)
+- Partial refunds are supported (a **capability**)
+- The amount is in cents (a **unit convention**)
+- Three specific error types can be thrown (the **failure modes**)
+- There is a concrete usage example (a **template to follow**)
+
+### When to Write Docstrings
+
+Not every function needs a docstring. Focus on:
+
+- **Public API functions** that other modules call
+- **Functions with preconditions** (the order must be in a certain state)
+- **Functions with non-obvious side effects** (sends an email, writes to a queue)
+- **Functions where the name alone is insufficient** (complex business logic)
+
+Skip docstrings for trivial getters, simple utility functions, and private helpers whose purpose is clear from the name and types.
+
+## Layer 4: Inline Comments
+
+Inline comments are the most granular form of documentation. They explain **why** a specific line or block of code exists, not what it does (the code itself shows that).
+
+<CodeBlock code={`async function calculateShippingCost(order: Order): Promise<Money> {
+  const weight = order.items.reduce((sum, item) => sum + item.weight, 0);
+
+  // Carrier API has a 500g minimum — orders below this are charged at the minimum
+  // regardless of actual weight. Confirmed with FedEx rep on 2024-03-15.
+  const billableWeight = Math.max(weight, 500);
+
+  // Alaska and Hawaii use zone 8 pricing even though they are technically
+  // in zones 9-12. This was a business decision to keep shipping affordable
+  // for those regions. See JIRA SHIP-1234 for context.
+  const zone = isAlaskaOrHawaii(order.shippingAddress)
+    ? 8
+    : calculateShippingZone(order.shippingAddress);
+
+  const rate = await carrierApi.getRate(billableWeight, zone);
+
+  // Apply the promotional free shipping threshold AFTER calculating the
+  // base rate, because we still need the rate for insurance calculations
+  // even when shipping is free.
+  if (order.subtotal.isGreaterThan(FREE_SHIPPING_THRESHOLD)) {
+    return Money.zero();
+  }
+
+  return rate;
+}
+`} language="typescript" filename="src/shipping/shipping.service.ts" />
+
+Each comment in this example explains a **decision** that the agent would not be able to infer from the code alone:
+- Why there is a minimum weight (carrier requirement)
+- Why Alaska/Hawaii use a different zone (business decision)
+- Why the rate is calculated before checking the free shipping threshold (downstream dependency)
+
+Without these comments, an agent modifying this function might "optimize" away the minimum weight, apply the correct zone for Alaska, or move the free shipping check earlier -- all technically reasonable changes that would introduce bugs.
+
+### Comments to Avoid
+
+Not all comments help agents. Some actively mislead:
+
+<CodeBlock code={`// Bad — restates the code (the agent can read the code itself)
+const total = price * quantity; // multiply price by quantity
+
+// Bad — outdated comment that contradicts the code
+// Returns the user's email address
+function getUserName(userId: string): string { ... }
+
+// Bad — commented-out code (agents may try to resurrect it)
+// const oldImplementation = doThingTheOldWay();
+
+// Good — explains a constraint the code cannot express
+// Rate limit: Stripe allows max 100 requests/second per API key.
+// We batch webhooks to stay under this limit during peak hours.
+`} language="typescript" filename="comment-examples.ts" />
+
+> The best inline comment answers a question that starts with "why" -- not "what."
+
+## Connecting the Layers
+
+The documentation stack works best when each layer complements the others without duplicating them. Here is how information should flow:
+
+<MermaidDiagram chart={`flowchart TD
+    subgraph README["README.md"]
+        R1["Module purpose"]
+        R2["Public API list"]
+        R3["Key patterns"]
+        R4["Prohibitions"]
+    end
+    subgraph Types["Type Annotations"]
+        T1["Input shapes"]
+        T2["Output shapes"]
+        T3["Optional vs required"]
+        T4["Generic constraints"]
+    end
+    subgraph Docs["Docstrings"]
+        D1["Preconditions"]
+        D2["Side effects"]
+        D3["Error conditions"]
+        D4["Usage examples"]
+    end
+    subgraph Comments["Inline Comments"]
+        C1["Business decisions"]
+        C2["External constraints"]
+        C3["Non-obvious dependencies"]
+        C4["Historical context"]
+    end
+    README --> Types
+    Types --> Docs
+    Docs --> Comments
+    style README fill:#c6f6d5,stroke:#38a169
+    style Types fill:#bee3f8,stroke:#3182ce
+    style Docs fill:#fefcbf,stroke:#d69e2e
+    style Comments fill:#e2e8f0,stroke:#4a5568
+`} />
+
+- **README** tells the agent what a module is and how to use it (broad scope)
+- **Types** tell the agent what a function expects and returns (function scope)
+- **Docstrings** tell the agent about behavior, preconditions, and errors (function scope, semantic depth)
+- **Comments** tell the agent why specific implementation choices were made (line scope)
+
+No layer should repeat information from another. The README should not list every function parameter (that is what types and docstrings are for). Docstrings should not explain business decisions (that is what inline comments are for). Each layer adds unique context at its appropriate scope.
+
+## The Documentation Checklist
+
+Use this checklist to evaluate your project's documentation coverage:
+
+- Every feature directory has a README.md with purpose, public API, patterns, and prohibitions
+- All public functions have type annotations for parameters and return values
+- Functions with preconditions, side effects, or non-obvious behavior have docstrings
+- Non-obvious implementation decisions have inline comments explaining "why"
+- No comments restate what the code already says
+- No commented-out code blocks remain in production files
+- Type annotations cover all function signatures, not just some
+- The CLAUDE.md references documentation conventions so the agent follows them when writing new code
+
+## Summary
+
+Documentation is not separate from your code -- it is **context that agents consume** to work accurately. The four layers -- README files, type annotations, docstrings, and inline comments -- operate at decreasing scope and increasing specificity. Type annotations are the highest-leverage investment because they are machine-verifiable and always current. Directory READMEs provide module-level briefings that save agents from exploring blindly. Docstrings capture behavior that types cannot express. Inline comments preserve the "why" behind non-obvious decisions. Together, these layers give agents the context they need to write correct, convention-following code. In the next lesson, we will apply these principles to the unique challenges of monorepos and large codebases.

@@ -1,0 +1,179 @@
+---
+title: What Is Agent-Ready?
+quiz:
+- question: Which of the following is a core pillar of an agent-ready codebase?
+  options:
+  - Having a project instruction file like CLAUDE.md that provides context and conventions
+  - Using the latest programming language version
+  - Minimizing the number of files in the repository
+  - Avoiding the use of third-party dependencies
+  correctIndex: 0
+- question: What role do automated feedback loops play in agent readiness?
+  options:
+  - They replace the need for human code review entirely
+  - They slow down the agent by adding extra steps
+  - They allow the agent to verify its own work and self-correct without human intervention
+  - They are only useful for CI/CD pipelines, not for agents
+  correctIndex: 2
+- question: Why is explicit convention documentation important for AI agents?
+  options:
+  - Agents cannot read code, so they need written instructions
+  - Conventions reduce the repository size
+  - It is required by all AI agent vendors
+  - Agents lack the cultural context that human team members absorb over time and need conventions stated explicitly
+  correctIndex: 3
+---
+
+## Overview
+
+In the previous lesson, we explored how AI coding agents are reshaping software development. But what does it actually mean for a codebase to be "ready" for these agents? This lesson defines **agent-ready** as a concrete set of properties -- not vague aspirations but specific, actionable characteristics that determine whether an agent can work productively in your repository.
+
+## The Agent's Perspective
+
+To understand what makes a codebase agent-ready, put yourself in the agent's position. When an AI coding agent opens your repository for the first time, it faces the same challenge as a new developer on their first day -- except it has no institutional memory, no Slack history, and no colleague to tap on the shoulder.
+
+The agent needs to answer several questions quickly:
+
+- What is this project and what does it do?
+- How is the code organized?
+- What conventions does this team follow?
+- How do I run the tests? How do I build it?
+- What should I avoid breaking?
+
+<MermaidDiagram chart={`graph TD
+    subgraph Questions["Agent's First Questions"]
+        Q1["What is this project?"]
+        Q2["How is it structured?"]
+        Q3["What are the conventions?"]
+        Q4["How do I verify my work?"]
+        Q5["What are the constraints?"]
+    end
+    subgraph Answers["Where Answers Come From"]
+        A1["Project instruction files\nCLAUDE.md, AGENTS.md"]
+        A2["Directory structure\nNaming patterns"]
+        A3["Style guides\nLinter configs\nExamples"]
+        A4["Test suites\nCI pipelines\nType checkers"]
+        A5["Explicit rules\nPermission boundaries"]
+    end
+    Q1 --> A1
+    Q2 --> A2
+    Q3 --> A3
+    Q4 --> A4
+    Q5 --> A5
+    style Questions fill:#ebf8ff,stroke:#3182ce
+    style Answers fill:#c6f6d5,stroke:#38a169
+`} />
+
+An **agent-ready** codebase answers all of these questions clearly, explicitly, and in places where the agent knows to look.
+
+## The Four Pillars of Agent Readiness
+
+Agent readiness rests on four pillars. Each one addresses a different failure mode that agents encounter in unprepared repositories.
+
+<MermaidDiagram chart={`graph TD
+    AR["Agent-Ready\nCodebase"] --> C["Context"]
+    AR --> CV["Conventions"]
+    AR --> CS["Constraints"]
+    AR --> FL["Feedback Loops"]
+    C --- C1["Project purpose\nArchitecture overview\nKey decisions"]
+    CV --- CV1["Code style\nFile organization\nNaming patterns"]
+    CS --- CS1["Off-limits areas\nSecurity boundaries\nPerformance requirements"]
+    FL --- FL1["Tests\nLinters\nType checkers"]
+    style AR fill:#ebf8ff,stroke:#3182ce,color:#1a202c
+    style C fill:#c6f6d5,stroke:#38a169,color:#1a202c
+    style CV fill:#bee3f8,stroke:#3182ce,color:#1a202c
+    style CS fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style FL fill:#fed7d7,stroke:#e53e3e,color:#1a202c
+`} />
+
+### Pillar 1: Context
+
+**Context** is the foundation. It tells the agent what the project is, why it exists, how it is structured, and what the key architectural decisions are. Without context, the agent operates blind -- it can read the code but cannot understand the intent behind it.
+
+Context lives in:
+
+- **Project instruction files** -- `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, or equivalent files that AI agents are designed to read first
+- **Architecture documentation** -- high-level descriptions of how components fit together
+- **README files** -- project purpose, setup instructions, and contribution guidelines
+
+> A well-written CLAUDE.md is the single highest-leverage investment you can make in agent readiness. It is the difference between an agent that understands your project and one that guesses.
+
+### Pillar 2: Conventions
+
+**Conventions** are the patterns your team follows -- how files are named, how components are structured, how errors are handled, how tests are organized. Human developers absorb these through osmosis: code reviews, pair programming, and months of exposure. Agents have none of that history.
+
+Conventions must be made explicit through:
+
+- **Documented style rules** -- not just "use ESLint" but "we use early returns, avoid nested ternaries, and prefer named exports"
+- **Exemplar code** -- pointing the agent to a well-written file and saying "follow this pattern"
+- **Linter and formatter configurations** -- `.eslintrc`, `.prettierrc`, `ruff.toml` that enforce conventions automatically
+
+### Pillar 3: Constraints
+
+**Constraints** tell the agent what not to do. This is equally as important as telling it what to do. Without explicit constraints, agents will cheerfully modify files they should not touch, introduce dependencies you do not want, or take approaches that violate security policies.
+
+Constraints include:
+
+- **Off-limits areas** -- "do not modify files in `src/core/`" or "never change the database schema directly"
+- **Security boundaries** -- "never log sensitive data" or "all API endpoints must validate authentication"
+- **Architectural rules** -- "the frontend must not import from backend modules" or "all database access goes through the repository layer"
+
+### Pillar 4: Feedback Loops
+
+**Feedback loops** are what allow agents to self-correct. An agent that writes code and cannot verify whether it works is an agent that produces unreliable output. The tighter and faster the feedback loop, the more effective the agent becomes.
+
+Critical feedback loops include:
+
+- **Test suites** -- unit tests, integration tests, and end-to-end tests that the agent can run
+- **Type checkers** -- TypeScript, mypy, or similar tools that catch structural errors immediately
+- **Linters** -- static analysis that flags convention violations before code review
+- **Build systems** -- a `pnpm build` or `cargo check` that validates the code compiles
+
+> If your test suite takes 45 minutes to run, your agent's feedback loop is 45 minutes. Fast tests are not just a developer experience improvement -- they are an agent effectiveness multiplier.
+
+## What Agent-Ready Is Not
+
+It is important to clear up common misconceptions:
+
+- **It is not about using a specific AI tool** -- agent readiness is tool-agnostic. A well-prepared codebase works with Claude Code, Cursor, GitHub Copilot, and any future agent
+- **It is not about dumbing down your code** -- you do not need to simplify your architecture for AI. You need to document and explain it
+- **It is not a one-time setup** -- agent readiness evolves with your codebase. As architecture changes, documentation must follow
+- **It is not just documentation** -- documentation without automated verification is only half the picture. Agents need both guidance and guardrails
+
+## Agent-Ready vs. Developer-Ready
+
+You might be thinking: "This just sounds like good engineering practices." You are right -- and that is the point. Agent readiness and developer readiness overlap significantly. But there are key differences in emphasis:
+
+| Aspect | Developer-Ready | Agent-Ready |
+|--------|----------------|-------------|
+| Documentation | Helpful but optional -- devs can ask | Essential -- agents cannot ask colleagues |
+| Conventions | Absorbed through culture | Must be explicitly written |
+| Constraints | Enforced through code review | Must be stated upfront and verifiable |
+| Feedback speed | Important for productivity | Critical for agent iteration loops |
+| File organization | Preference | Directly affects agent navigation |
+| Examples | Nice to have | Primary learning mechanism for agents |
+
+The good news: making your codebase agent-ready also makes it better for humans. Every investment in clarity, structure, and automation pays dividends in both directions.
+
+## The Agent Instruction File
+
+The centerpiece of agent readiness is the **agent instruction file**. Different tools use different names:
+
+- **Claude Code** looks for `CLAUDE.md`
+- **Cursor** reads `.cursorrules`
+- **GitHub Copilot** reads `.github/copilot-instructions.md`
+- **General convention** -- `AGENTS.md` as a tool-agnostic option
+
+These files serve the same purpose: they are the first thing the agent reads, and they shape every action the agent takes. A good instruction file covers:
+
+- What the project is and what it does
+- How to build, test, and run the project
+- Code conventions and patterns to follow
+- Files or areas that must not be modified
+- Common tasks and how to approach them
+
+We will build these files from scratch in later modules. For now, understand that this file is the single most impactful artifact for agent readiness.
+
+## Summary
+
+An **agent-ready** codebase is one that provides explicit context, documented conventions, clear constraints, and fast feedback loops. These four pillars ensure that an AI agent can work productively in your repository from its first interaction. Agent readiness is not a binary state -- it is a spectrum, and every improvement matters. In the next lesson, we will formalize this spectrum into a maturity model that helps you assess where your codebase stands and what to improve next.

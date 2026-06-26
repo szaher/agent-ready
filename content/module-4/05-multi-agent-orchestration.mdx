@@ -1,0 +1,348 @@
+---
+title: Multi-Agent Orchestration
+quiz:
+- question: In a fan-out pattern, what is the primary advantage over sequential execution?
+  options:
+  - Independent tasks run in parallel, reducing total wall-clock time
+  - Each agent uses fewer tokens
+  - The agents can communicate with each other directly
+  - Fan-out requires fewer agent definitions
+  correctIndex: 0
+- question: What is the role of the orchestrator in a team pattern?
+  options:
+  - It performs all the work and delegates nothing
+  - It replaces the need for individual agent definitions
+  - It decomposes the task, delegates to specialized agents, and synthesizes their results
+  - It provides Bash access to all sub-agents
+  correctIndex: 2
+- question: When should you avoid multi-agent orchestration?
+  options:
+  - When the task involves multiple files
+  - When different parts of the task need different permission levels
+  - When you have more than three agent definitions
+  - When the task is simple enough for a single agent and the overhead of coordination adds no value
+  correctIndex: 3
+---
+
+## Overview
+
+A single custom agent can accomplish focused tasks with precision. But real-world software development rarely involves just one task in isolation. A feature request might need architecture analysis, code implementation, test writing, and documentation -- each requiring different skills and different permissions. This lesson explores **multi-agent orchestration**: patterns for coordinating multiple agents to tackle complex, multi-step work. You will learn three core patterns -- teams, pipelines, and fan-out -- and when to use each.
+
+## Why Multiple Agents?
+
+You might wonder: why not just make one powerful agent that does everything? You already know part of the answer from earlier in this module -- least privilege and separation of concerns. But orchestration adds a second reason: **cognitive specialization**.
+
+When a single agent tries to review code, write tests, and update documentation in one session, it has to hold all three mindsets simultaneously. Its attention is split. Its system prompt is bloated. The quality of each output suffers.
+
+Multiple agents, each focused on one concern, produce better results than one agent juggling many concerns. The challenge is coordinating them.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Single["Single Agent Approach"]
+        SA["One agent doing\nreview + tests + docs"]
+    end
+    subgraph Multi["Multi-Agent Approach"]
+        MA1["Review Agent\nFocused analysis"]
+        MA2["Test Agent\nFocused testing"]
+        MA3["Docs Agent\nFocused writing"]
+    end
+    Single --> R1["Split attention\nBloated prompt\nInconsistent quality"]
+    Multi --> R2["Focused attention\nClean prompts\nConsistent quality"]
+    style Single fill:#fed7d7,stroke:#e53e3e
+    style Multi fill:#c6f6d5,stroke:#38a169
+    style R1 fill:#fff5f5,stroke:#fc8181
+    style R2 fill:#f0fff4,stroke:#68d391
+`} />
+
+## Pattern 1: The Team (Leader + Workers)
+
+The **team pattern** uses an **orchestrator agent** that decomposes a task, delegates subtasks to specialized worker agents, and synthesizes their results. The orchestrator is the only agent the developer interacts with directly.
+
+<MermaidDiagram chart={`graph TD
+    Dev["Developer"] --> Orch["Orchestrator Agent\n(Team Leader)"]
+    Orch --> W1["Code Reviewer\n(Read-only)"]
+    Orch --> W2["Test Writer\n(Read + Write)"]
+    Orch --> W3["Doc Generator\n(Read + Write)"]
+    W1 --> Orch
+    W2 --> Orch
+    W3 --> Orch
+    Orch --> Dev
+    style Dev fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style Orch fill:#b794f4,stroke:#6b46c1,color:#ffffff
+    style W1 fill:#ebf8ff,stroke:#3182ce
+    style W2 fill:#ebf8ff,stroke:#3182ce
+    style W3 fill:#ebf8ff,stroke:#3182ce
+`} />
+
+The orchestrator agent has broader permissions -- it needs to read the codebase to understand the task and invoke sub-agents. But the worker agents remain tightly scoped.
+
+Here is how you define an orchestrator:
+
+<CodeBlock code={`# Feature Team Lead
+
+You coordinate a team of specialized agents to implement features.
+
+## Your Role
+
+- Receive a feature request from the developer
+- Break it into discrete subtasks
+- Delegate each subtask to the appropriate specialist agent
+- Review the results from each agent
+- Synthesize a final status report
+
+## Available Agents
+
+- **code-reviewer**: Read-only code analysis
+- **test-writer**: Creates test files
+- **doc-generator**: Updates documentation
+
+## Workflow
+
+1. Analyze the feature request and identify affected files
+2. Delegate code review of existing related code to code-reviewer
+3. After review, delegate test creation to test-writer
+4. After tests, delegate documentation updates to doc-generator
+5. Compile a summary of all work done and any issues found
+
+## Constraints
+
+- You do NOT write code yourself -- delegate to agents
+- If an agent reports a blocking issue, stop and report to developer
+- Always run review BEFORE writing tests or docs
+`} language="markdown" filename=".claude/agents/feature-lead.md" />
+
+**When to use the team pattern:**
+
+- Complex tasks that require multiple skill sets
+- Tasks where the order of operations matters (review before implementation)
+- Scenarios where you want a single point of contact for the developer
+
+## Pattern 2: The Pipeline (Sequential Stages)
+
+The **pipeline pattern** passes work through a sequence of agents, where each agent's output becomes the next agent's input. Unlike the team pattern, there is no central orchestrator -- the stages are predefined.
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Dev as Developer
+    participant S1 as Stage 1: Analyzer
+    participant S2 as Stage 2: Implementer
+    participant S3 as Stage 3: Reviewer
+    participant S4 as Stage 4: Tester
+
+    Dev->>S1: Feature request
+    S1->>S1: Analyze requirements
+    S1->>S2: Analysis report + affected files
+    S2->>S2: Implement changes
+    S2->>S3: Changed files list
+    S3->>S3: Review implementation
+    S3->>S4: Review approval + changed files
+    S4->>S4: Write and run tests
+    S4-->>Dev: Final report: tests pass/fail
+`} />
+
+Each stage in the pipeline has a single responsibility and a clear contract for what it passes to the next stage:
+
+<CodeBlock code={`# Pipeline Stage 1: Requirement Analyzer
+
+You are the first stage in a multi-agent pipeline. Your job is to
+analyze a feature request and produce a structured implementation plan.
+
+## Your Output
+
+Produce a JSON-structured plan:
+
+- files_to_modify: list of files that need changes
+- files_to_create: list of new files needed
+- dependencies: external packages required
+- risks: potential issues or ambiguities
+- implementation_order: suggested sequence of changes
+
+## Constraints
+
+- You are read-only -- do not modify any files
+- Be conservative: if you are unsure whether a file needs changes,
+  include it with a note explaining the uncertainty
+- Your output is consumed by the next pipeline stage, so format it
+  precisely
+`} language="markdown" filename=".claude/agents/pipeline-analyzer.md" />
+
+<CodeBlock code={`# Pipeline Stage 3: Implementation Reviewer
+
+You are stage 3 in a multi-agent pipeline. You receive a list of
+files changed by stage 2 (the implementer) and review them.
+
+## Input
+
+You will receive a list of changed files from the previous stage.
+
+## Your Job
+
+1. Read each changed file
+2. Compare the changes against the original analysis from stage 1
+3. Verify the implementation matches the requirements
+4. Flag any issues as BLOCKING or NON-BLOCKING
+
+## Output
+
+Produce a review with a clear verdict:
+- PASS: proceed to testing (stage 4)
+- FAIL: list blocking issues that must be fixed
+
+## Constraints
+
+- You are read-only -- do not modify any files
+- Only review files that were listed as changed
+- If the review fails, the pipeline stops here
+`} language="markdown" filename=".claude/agents/pipeline-reviewer.md" />
+
+**When to use the pipeline pattern:**
+
+- Tasks with a natural sequential flow (analyze, implement, review, test)
+- When each stage's output is well-defined and serves as input for the next
+- CI/CD-like workflows where stages gate progression
+
+## Pattern 3: Fan-Out (Parallel Independent Tasks)
+
+The **fan-out pattern** dispatches multiple agents simultaneously on independent tasks. Unlike the pipeline, there is no sequential dependency between agents -- they all work in parallel.
+
+<MermaidDiagram chart={`graph TD
+    Dev["Developer"] --> D["Dispatcher"]
+    D --> A1["Agent 1\nLint module-auth"]
+    D --> A2["Agent 2\nLint module-api"]
+    D --> A3["Agent 3\nLint module-db"]
+    D --> A4["Agent 4\nLint module-ui"]
+    A1 --> C["Collector"]
+    A2 --> C
+    A3 --> C
+    A4 --> C
+    C --> Dev
+    style Dev fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+    style D fill:#b794f4,stroke:#6b46c1,color:#ffffff
+    style A1 fill:#ebf8ff,stroke:#3182ce
+    style A2 fill:#ebf8ff,stroke:#3182ce
+    style A3 fill:#ebf8ff,stroke:#3182ce
+    style A4 fill:#ebf8ff,stroke:#3182ce
+    style C fill:#c6f6d5,stroke:#38a169
+`} />
+
+Fan-out is ideal when you have the same task applied to independent units of work -- reviewing multiple modules, analyzing separate services, or running checks across different parts of the codebase.
+
+<CodeBlock code={`# Module Reviewer (Fan-Out Worker)
+
+You review a single module of the codebase for quality issues.
+
+## Input
+
+You will be told which module directory to review (e.g., src/auth/).
+
+## Your Job
+
+1. Read all files in the specified module directory
+2. Check for the review criteria listed below
+3. Produce a module-level report
+
+## Review Criteria
+
+- Are public functions documented?
+- Are error cases handled?
+- Are there TODO or FIXME comments that need attention?
+- Does the module follow the project's naming conventions?
+
+## Output Format
+
+### Module: [module name]
+- **Health**: Good / Needs Attention / Critical
+- **Issues**: numbered list of findings
+- **Recommendation**: one-sentence action item
+
+## Constraints
+
+- Only read files within the specified module directory
+- Do not read or comment on other modules
+- Do not modify any files
+`} language="markdown" filename=".claude/agents/module-reviewer.md" />
+
+The dispatcher sends each instance of this agent to a different module. Since modules are independent, all reviews run in parallel with no coordination overhead.
+
+**When to use the fan-out pattern:**
+
+- The same task applies to multiple independent units (modules, services, packages)
+- Tasks have no shared state or dependencies between units
+- You want to reduce wall-clock time by parallelizing work
+
+## Choosing the Right Pattern
+
+Here is a decision framework for selecting the orchestration pattern:
+
+<MermaidDiagram chart={`flowchart TD
+    Start["Complex task to accomplish"] --> Q1{"Do subtasks\ndepend on each other?"}
+    Q1 -->|"No dependencies"| FanOut["Fan-Out Pattern\nParallel execution"]
+    Q1 -->|"Yes, sequential"| Q2{"Is the sequence\nfixed and predictable?"}
+    Q2 -->|"Yes, fixed stages"| Pipeline["Pipeline Pattern\nSequential stages"]
+    Q2 -->|"No, needs judgment"| Team["Team Pattern\nOrchestrator + workers"]
+    style Start fill:#e2e8f0,stroke:#4a5568
+    style FanOut fill:#c6f6d5,stroke:#38a169
+    style Pipeline fill:#ebf8ff,stroke:#3182ce
+    style Team fill:#b794f4,stroke:#6b46c1,color:#ffffff
+`} />
+
+| Question | If Yes | If No |
+|----------|--------|-------|
+| Are subtasks independent? | Fan-out | Consider pipeline or team |
+| Is the order fixed? | Pipeline | Team (needs dynamic decisions) |
+| Does coordination require judgment? | Team | Pipeline or fan-out |
+| Is wall-clock time critical? | Fan-out | Pipeline or team are fine |
+
+## Combining Patterns
+
+In practice, real workflows often combine multiple patterns. A team leader might fan out reviews across modules, then pipeline the results through implementation and testing:
+
+<MermaidDiagram chart={`sequenceDiagram
+    participant Dev as Developer
+    participant Lead as Team Lead
+    participant R1 as Reviewer 1
+    participant R2 as Reviewer 2
+    participant R3 as Reviewer 3
+    participant Impl as Implementer
+    participant Test as Tester
+
+    Dev->>Lead: "Refactor auth module"
+    Lead->>R1: Review auth/login.ts
+    Lead->>R2: Review auth/session.ts
+    Lead->>R3: Review auth/tokens.ts
+    Note over R1,R3: Fan-out: parallel reviews
+    R1-->>Lead: Review report
+    R2-->>Lead: Review report
+    R3-->>Lead: Review report
+    Lead->>Impl: Consolidated findings + refactor plan
+    Note over Lead,Impl: Pipeline: sequential handoff
+    Impl-->>Lead: Changes complete
+    Lead->>Test: Verify changes
+    Test-->>Lead: All tests pass
+    Lead-->>Dev: Refactoring complete
+`} />
+
+The team leader uses fan-out for the review phase (parallel, independent reviews) and then switches to a pipeline for implementation and verification (sequential, dependent stages).
+
+## Anti-Patterns in Multi-Agent Orchestration
+
+Orchestration can go wrong. Watch out for these common mistakes:
+
+- **Over-orchestration** -- Using three agents for a task that one agent handles perfectly. Multi-agent orchestration has coordination overhead. If a single focused agent can do the job, let it.
+- **Shared state conflicts** -- Two agents trying to edit the same file simultaneously. Fan-out only works when tasks are truly independent.
+- **Missing error handling** -- A pipeline where stage 2 fails but stage 3 runs anyway. Every pipeline needs stop-on-failure semantics.
+- **Orchestrator bloat** -- The team leader agent doing all the work itself instead of delegating. If the orchestrator's system prompt includes implementation details, it is not delegating enough.
+- **Circular dependencies** -- Agent A needs output from Agent B, which needs output from Agent A. Design your workflows as directed acyclic graphs.
+
+> Start with a single agent. Add orchestration only when you have a clear reason -- either the task requires different permission levels, different skill sets, or parallelism for performance.
+
+## Practical Considerations
+
+When implementing multi-agent workflows, keep these operational details in mind:
+
+- **Token costs multiply** -- Each agent consumes its own context window. A team of four agents uses roughly four times the tokens of a single agent. Make sure the quality improvement justifies the cost.
+- **Latency compounds in pipelines** -- Four sequential stages each taking 30 seconds means two minutes of wall-clock time. Parallelize where possible.
+- **Debugging is harder** -- When something goes wrong in a multi-agent workflow, you need to identify which agent failed and why. Keep each agent's output structured and logged.
+- **Start simple, add agents gradually** -- Do not design a five-agent pipeline on day one. Start with one agent, then split responsibilities as pain points emerge.
+
+## Summary
+
+Multi-agent orchestration lets you tackle complex tasks by coordinating specialized agents. The three core patterns are **teams** (an orchestrator delegates to workers and synthesizes results), **pipelines** (sequential stages where each agent's output feeds the next), and **fan-out** (parallel execution of independent tasks). Each pattern has clear use cases: teams for tasks requiring dynamic judgment, pipelines for fixed sequential workflows, fan-out for parallelizable independent work. The key is to start simple -- use a single agent until you have a clear reason to add coordination -- and to watch out for anti-patterns like over-orchestration and shared state conflicts. With custom agents from this module and the CLAUDE.md foundation from Module 3, you now have the tools to build agent workflows that match the complexity of real-world software development.

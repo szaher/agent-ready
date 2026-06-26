@@ -1,0 +1,200 @@
+---
+title: Why Safety Matters
+quiz:
+- question: What is the primary risk unique to AI coding agents compared to traditional developer tools?
+  options:
+  - They can autonomously execute destructive commands without human review
+  - They generate code with syntax errors
+  - They consume more memory than IDEs
+  - They require an internet connection to function
+  correctIndex: 0
+- question: Why is the 'blast radius' concept important when thinking about agent safety?
+  options:
+  - It measures how fast an agent can complete a task
+  - It determines how many tokens the agent uses per session
+  - It describes the scope of damage a single unchecked agent action can cause
+  - It refers to the number of files an agent can read simultaneously
+  correctIndex: 2
+- question: Which of the following represents the correct relationship between trust and guardrails?
+  options:
+  - More trust means fewer guardrails are needed because agents are reliable
+  - Guardrails should be removed once a team is comfortable with agents
+  - Guardrails and trust are unrelated concepts in agent safety
+  - Trust is earned incrementally and guardrails should be relaxed deliberately, never removed entirely
+  correctIndex: 3
+---
+
+## Overview
+
+You are about to give an AI agent write access to your codebase and a shell on your machine. That sentence alone should make you pause. Unlike traditional developer tools that wait for you to press a button, an AI coding agent **autonomously decides** what to read, what to edit, and what commands to run. That autonomy is what makes agents powerful -- and it is exactly what makes safety non-negotiable.
+
+This lesson explores the real risks of letting AI agents operate in your codebase, the categories of harm that can occur, and the mental models you need before building any guardrails.
+
+## What Could Go Wrong
+
+Let us be concrete. Here are scenarios that have actually happened or nearly happened in teams adopting AI coding agents without sufficient guardrails:
+
+- An agent tasked with "cleaning up old files" ran `rm -rf` on a directory that contained uncommitted work
+- An agent pushed directly to `main` because no branch protection was configured in the agent's workflow
+- An agent installed an npm package with a similar name to the intended one -- a **typosquatting** package containing malicious code
+- An agent wrote database credentials into a source file that was later committed and pushed to a public repository
+- An agent modified CI/CD pipeline configuration, changing deployment targets
+- An agent ran `git reset --hard` to "fix" a merge conflict, discarding hours of uncommitted changes
+
+None of these required a malicious agent. Every one of them was a well-intentioned agent making a reasonable-sounding decision without understanding the consequences.
+
+## The Blast Radius Problem
+
+The concept of **blast radius** is borrowed from security engineering: when something goes wrong, how much damage can it cause? With traditional tools, the blast radius is small because a human is in the loop for every action. With an autonomous agent, the blast radius expands dramatically.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Manual["Manual Coding"]
+        M1["Developer types command"] --> M2["Reviews output"]
+        M2 --> M3["Decides next step"]
+        M3 --> M1
+    end
+    subgraph Agent["Autonomous Agent"]
+        A1["Agent decides action"] --> A2["Executes immediately"]
+        A2 --> A3["Observes result"]
+        A3 --> A4["Decides next action"]
+        A4 --> A2
+    end
+    Manual --> R1["Blast radius: 1 action"]
+    Agent --> R2["Blast radius: N actions<br/>before human review"]
+    style Manual fill:#c6f6d5,stroke:#38a169
+    style Agent fill:#fed7d7,stroke:#e53e3e
+    style R1 fill:#c6f6d5,stroke:#38a169
+    style R2 fill:#fed7d7,stroke:#e53e3e
+`} />
+
+In manual coding, every action is reviewed before execution. The blast radius is exactly one action. With an autonomous agent, dozens of actions can execute in sequence before a human sees the result. If action number three was destructive, actions four through twenty may compound the damage.
+
+> The question is not whether your agent will ever make a mistake. The question is how much damage that mistake can cause before you notice it.
+
+## Categories of Risk
+
+Agent risks fall into four distinct categories, each requiring different guardrails.
+
+<MermaidDiagram chart={`graph TD
+    R["Agent Risks"] --> D["Destructive Actions"]
+    R --> L["Data Leakage"]
+    R --> I["Integrity Violations"]
+    R --> S["Supply Chain Attacks"]
+    D --> D1["Deleting files or branches"]
+    D --> D2["Force-pushing over history"]
+    D --> D3["Dropping database tables"]
+    L --> L1["Committing secrets"]
+    L --> L2["Logging sensitive data"]
+    L --> L3["Sending code to external APIs"]
+    I --> I1["Modifying CI/CD pipelines"]
+    I --> I2["Changing security configurations"]
+    I --> I3["Bypassing code review"]
+    S --> S1["Installing malicious packages"]
+    S --> S2["Pulling untrusted images"]
+    S --> S3["Adding unvetted dependencies"]
+    style R fill:#ecc94b,stroke:#d69e2e,color:#1a202c
+    style D fill:#fed7d7,stroke:#e53e3e
+    style L fill:#fef3c7,stroke:#d69e2e
+    style I fill:#e9d8fd,stroke:#805ad5
+    style S fill:#feebc8,stroke:#dd6b20
+`} />
+
+### Destructive Actions
+
+These are actions that permanently destroy data or state. The classic example is `rm -rf`, but subtler versions include `git reset --hard`, `DROP TABLE`, or overwriting a file without backing it up. Destructive actions are the highest priority to guard against because they are often irreversible.
+
+### Data Leakage
+
+Agents work with whatever data is in the repository. If that includes API keys, database credentials, or customer data, the agent might inadvertently expose it -- by committing it to version control, logging it to stdout, or including it in an error message sent to an external service.
+
+### Integrity Violations
+
+These are changes that undermine the trustworthiness of the development process. An agent that modifies the CI/CD pipeline, disables tests, or pushes directly to the main branch is not destroying data -- but it is bypassing the safeguards that keep the codebase reliable.
+
+### Supply Chain Attacks
+
+When an agent installs packages, it might choose the wrong one. **Typosquatting** (packages with names similar to popular ones), dependency confusion attacks, and unvetted third-party code are all risks that increase when an agent, not a human, is making the selection.
+
+## Why Agents Make Different Mistakes Than Humans
+
+Agents are not careless in the way humans are. They do not fat-finger a command or get distracted. But they make a fundamentally different category of mistake: they **lack contextual judgment**.
+
+A human developer knows not to run `rm -rf /` even if asked to "clean up everything" because they understand the consequences. An agent interprets instructions literally and may not have the contextual understanding to distinguish between "delete all test fixtures" and "delete all tests."
+
+- **Humans** mistake through inattention but catch danger through experience
+- **Agents** execute precisely but miss danger through lack of world knowledge
+
+This asymmetry means that the safety mechanisms you build for agents must be different from those you build for human developers. You cannot rely on the agent "knowing better." You must encode your safety requirements explicitly.
+
+## The Trust Spectrum
+
+Not all agent tasks carry the same risk. Reading files is safe. Writing files is riskier. Running arbitrary shell commands is riskiest. A mature safety framework recognizes this spectrum and applies proportional controls.
+
+<MermaidDiagram chart={`graph LR
+    subgraph Low["Low Risk"]
+        L1["Read files"]
+        L2["Search code"]
+        L3["List directories"]
+    end
+    subgraph Medium["Medium Risk"]
+        M1["Edit source files"]
+        M2["Run tests"]
+        M3["Run linters"]
+    end
+    subgraph High["High Risk"]
+        H1["Run arbitrary shell commands"]
+        H2["Install packages"]
+        H3["Modify config files"]
+    end
+    subgraph Critical["Critical Risk"]
+        C1["Push to remote"]
+        C2["Modify CI/CD"]
+        C3["Access secrets"]
+    end
+    Low --> Medium --> High --> Critical
+    style Low fill:#c6f6d5,stroke:#38a169
+    style Medium fill:#fef3c7,stroke:#d69e2e
+    style High fill:#fed7d7,stroke:#e53e3e
+    style Critical fill:#e9d8fd,stroke:#805ad5
+`} />
+
+The goal is not to block the agent from doing anything useful. The goal is to ensure that higher-risk actions require proportionally higher levels of oversight. Reading files can be auto-approved. Running shell commands should be constrained to known-safe commands. Pushing to remote repositories should require explicit human approval.
+
+## The Three Pillars of Agent Safety
+
+Effective agent safety rests on three pillars that work together. We will explore each in depth throughout this module.
+
+**Permissions** define what the agent is allowed to do. They are the static rules: which commands can run, which files can be modified, which tools are available. Permissions are preventive -- they stop dangerous actions before they happen.
+
+**Hooks** add dynamic control. They are scripts that run before or after agent actions, inspecting what the agent is about to do and either allowing or blocking it. Hooks are detective -- they examine each action in context and make a judgment call.
+
+**Isolation** limits the blast radius. By running the agent in a git worktree, a container, or a sandboxed environment, you ensure that even if something goes wrong, the damage is contained. Isolation is corrective -- it makes mistakes recoverable.
+
+> **Think of it this way**: Permissions are the walls, hooks are the security guards, and isolation is the fire containment system. You need all three.
+
+## The Progressive Trust Model
+
+Safety is not a binary switch. Teams should start with tight guardrails and relax them as they build confidence. This **progressive trust model** looks like this:
+
+1. **Level 0 -- Full supervision**: Agent asks permission for every action. Human approves each step. Slow but safe.
+2. **Level 1 -- Allowlisted commands**: Common read operations and known-safe commands are auto-approved. Agent still asks for anything not on the list.
+3. **Level 2 -- Pattern-based trust**: Agent can edit files matching certain patterns (e.g., `src/**/*.ts`), run allowlisted commands, but critical operations still require approval.
+4. **Level 3 -- Isolated autonomy**: Agent operates freely within a sandboxed environment (worktree, container). Changes are reviewed at the end, not during execution.
+5. **Level 4 -- Supervised automation**: Agent runs in CI/CD with full isolation, human reviews PRs. Highest throughput, guardrails enforced by infrastructure.
+
+Most teams should operate at Level 2 or Level 3 for day-to-day development. Level 0 is for learning and Level 4 is for mature teams with robust review processes.
+
+## The Cost of No Safety
+
+Teams that skip safety guardrails face predictable consequences:
+
+- **Incident fatigue**: After the first accidental deletion or secret exposure, developers lose trust in agents and stop using them
+- **Shadow restrictions**: Individual developers create their own ad-hoc safety rules, leading to inconsistent practices across the team
+- **Compliance exposure**: In regulated industries, uncontrolled AI access to source code can violate audit requirements
+- **Recovery overhead**: Without isolation, recovering from agent mistakes requires manual git archaeology, backup restoration, or re-implementation
+
+The irony is that skipping safety setup to "move fast" ends up slowing teams down. One bad incident erases weeks of productivity gains.
+
+## Summary
+
+AI coding agents bring extraordinary productivity -- but that productivity comes with real risks. **Destructive actions**, **data leakage**, **integrity violations**, and **supply chain attacks** are not theoretical concerns; they are scenarios that teams encounter when agents operate without guardrails. The solution is not to avoid agents but to adopt a layered safety approach: **permissions** to control what the agent can do, **hooks** to inspect actions in context, and **isolation** to contain the blast radius. Safety and productivity are not in tension -- safety is what makes sustained productivity possible. In the next lesson, we will dive into the first pillar: permission models.

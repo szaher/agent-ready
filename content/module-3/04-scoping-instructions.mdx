@@ -1,0 +1,285 @@
+---
+title: Scoping Instructions
+quiz:
+- question: Where should project-specific build commands be placed?
+  options:
+  - In the project root CLAUDE.md, checked into version control
+  - In ~/.claude/CLAUDE.md so they apply to all projects
+  - In the global Claude settings file
+  - In a separate shell script that the agent runs
+  correctIndex: 0
+- question: What is the correct use case for ~/.claude/CLAUDE.md (user-level CLAUDE.md)?
+  options:
+  - Storing project build commands
+  - Defining your team's code style conventions
+  - Personal preferences like preferred response style or editor keybindings
+  - Listing third-party API keys and secrets
+  correctIndex: 2
+- question: In a monorepo, where should package-specific conventions be placed?
+  options:
+  - All in the root CLAUDE.md for convenience
+  - In the CI/CD configuration files
+  - In each package's README.md
+  - In a CLAUDE.md inside each package's subdirectory
+  correctIndex: 3
+- question: When multiple CLAUDE.md files apply, what is the merge behavior?
+  options:
+  - Only the root CLAUDE.md is read; nested files are ignored
+  - All applicable CLAUDE.md files are read and merged, with more specific files taking precedence
+  - Only the closest CLAUDE.md to the current file is read
+  - The agent randomly picks one CLAUDE.md to follow
+  correctIndex: 1
+---
+
+## Overview
+
+Not all instructions belong in the same place. Some rules are specific to a single project, others reflect your personal preferences, and some apply universally across every codebase you work in. Putting the wrong instruction in the wrong scope leads to conflicts, noise, and wasted context.
+
+This lesson covers the **three scopes of CLAUDE.md** -- project, user, and enterprise -- and how nested CLAUDE.md files work in monorepos. You will learn when to put instructions where, and how the scopes merge at runtime.
+
+## The Three Scopes
+
+Claude Code reads instructions from multiple locations and merges them into a single set of context for each session. Understanding these scopes is essential for keeping your instructions clean and non-conflicting.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Scopes["Instruction Scopes"]
+        A["Enterprise / Organization<br/><i>~/.claude/settings.json<br/>Managed by admin</i>"]
+        B["User (Personal)<br/><i>~/.claude/CLAUDE.md<br/>Your preferences</i>"]
+        C["Project Root<br/><i>./CLAUDE.md<br/>Checked into repo</i>"]
+        D["Subdirectory<br/><i>./packages/api/CLAUDE.md<br/>Package-specific</i>"]
+    end
+
+    A --> B --> C --> D
+
+    E["Broadest scope<br/>Least specific"] -.-> A
+    F["Narrowest scope<br/>Most specific"] -.-> D
+
+    style A fill:#e9d8fd,stroke:#6b46c1
+    style B fill:#ebf8ff,stroke:#3182ce
+    style C fill:#c6f6d5,stroke:#276749
+    style D fill:#fefcbf,stroke:#975a16
+`} />
+
+When scopes overlap, **more specific scopes take precedence**. A subdirectory CLAUDE.md can override a project-root instruction, and a project instruction overrides a user-level instruction.
+
+## Scope 1: Project Root CLAUDE.md
+
+This is the most common and most important scope. It lives at the root of your repository and is **checked into version control**. Every team member and every CI agent session reads it.
+
+<CodeBlock code={`# CLAUDE.md (project root)
+
+## Build & Test
+pnpm build                    # Build the project
+pnpm vitest run              # Run all tests
+pnpm vitest run src/auth/    # Run auth tests only
+pnpm lint                    # ESLint + Prettier check
+
+## Code Style
+- TypeScript strict mode. Never use \`any\`.
+- Functional components with hooks only.
+- Named exports, never default exports.
+
+## Architecture
+- \`src/app/\` — Next.js App Router pages
+- \`src/lib/\` — Business logic and utilities
+- \`src/components/\` — Shared UI components
+
+## Rules
+- Always run \`pnpm build\` before completing a task.
+- Do NOT modify files in \`src/generated/\`.
+`} language="markdown" filename="CLAUDE.md" />
+
+**What belongs here:**
+- Build, test, lint, and type-check commands
+- Code style conventions the whole team follows
+- Architecture overview and file structure
+- Project-wide do's and don'ts
+
+**What does NOT belong here:**
+- Personal preferences ("I prefer verbose explanations")
+- Secrets or API keys (these should be in `.env`, never in CLAUDE.md)
+- Instructions that only apply to one subdirectory
+
+> **Important:** Because this file is checked into git, treat it as team documentation. Changes should go through code review, just like any other project file.
+
+## Scope 2: User-Level CLAUDE.md
+
+Your personal CLAUDE.md lives at `~/.claude/CLAUDE.md`. It applies to **every project** you work on but is **not shared** with your team.
+
+<CodeBlock code={`# ~/.claude/CLAUDE.md (user-level)
+
+## My Preferences
+- When explaining code changes, be concise. Skip obvious explanations.
+- Default to writing tests alongside implementation, not after.
+- When I say "fix the build," run the build first to see the actual error
+  before attempting a fix.
+
+## My Environment
+- I use macOS with Homebrew.
+- My shell is zsh.
+- I have \`gh\` CLI installed for GitHub operations.
+`} language="markdown" filename="~/.claude/CLAUDE.md" />
+
+**What belongs here:**
+- Communication preferences (verbosity, explanation style)
+- Workflow preferences (test-first, fix approach)
+- Environment-specific information (OS, shell, installed tools)
+- Personal shortcuts or aliases you expect the agent to know about
+
+**What does NOT belong here:**
+- Project-specific build commands (these go in the project CLAUDE.md)
+- Team conventions (these should be shared via the project CLAUDE.md)
+- Anything that would help other team members too (share it in the project CLAUDE.md instead)
+
+> **Tip:** If you find yourself putting the same instruction in your user CLAUDE.md for multiple projects, consider whether it belongs in a template that you use when starting new projects instead.
+
+## Scope 3: Enterprise Settings
+
+Organizations using Claude for Business or Claude for Enterprise can set **organization-wide policies** through managed settings. These are the broadest scope and are controlled by administrators, not individual developers.
+
+Enterprise settings typically cover:
+
+- Security policies (do not access external URLs, do not install packages without approval)
+- Compliance rules (do not generate code with certain licenses)
+- Standard tooling requirements (always use the company's logging framework)
+- Approved patterns and libraries
+
+Individual developers usually do not need to manage this scope -- it is handled by the platform team or security team.
+
+## Nested CLAUDE.md in Monorepos
+
+Monorepos present a unique challenge: different packages have different languages, conventions, and tooling. A single root CLAUDE.md cannot capture this diversity without becoming bloated.
+
+The solution is **nested CLAUDE.md files** -- one at the root for shared conventions, and one in each package for package-specific rules.
+
+<MermaidDiagram chart={`graph TD
+    subgraph Root["Repository Root"]
+        A["CLAUDE.md<br/><i>Shared conventions, monorepo build commands</i>"]
+    end
+
+    subgraph Packages["Packages"]
+        B["packages/api/CLAUDE.md<br/><i>Python, FastAPI, pytest</i>"]
+        C["packages/web/CLAUDE.md<br/><i>TypeScript, Next.js, vitest</i>"]
+        D["packages/mobile/CLAUDE.md<br/><i>Kotlin, Android conventions</i>"]
+        E["packages/shared/CLAUDE.md<br/><i>TypeScript, library conventions</i>"]
+    end
+
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+
+    style Root fill:#c6f6d5,stroke:#276749
+    style Packages fill:#ebf8ff,stroke:#3182ce
+`} />
+
+Here is how the root and package-level files might look:
+
+<CodeBlock code={`# CLAUDE.md (monorepo root)
+
+This is a monorepo managed with Turborepo.
+
+## Build
+turbo build               # Build all packages
+turbo test                 # Test all packages
+turbo lint                 # Lint all packages
+
+## Conventions (all packages)
+- Every package has its own \`package.json\` with scripts.
+- Cross-package imports use the package name, not relative paths.
+- Shared types live in \`packages/shared/src/types/\`.
+
+## Rules
+- Do NOT add dependencies to the root package.json.
+- Do NOT import from one package's \`src/\` into another — use the published package interface.
+`} language="markdown" filename="CLAUDE.md" />
+
+<CodeBlock code={`# packages/api/CLAUDE.md
+
+This is a Python FastAPI backend.
+
+## Build & Test
+cd packages/api
+pip install -e ".[dev]"    # Install with dev dependencies
+pytest -x --tb=short       # Run tests (stop on first failure)
+ruff check .               # Lint
+ruff format .              # Format
+
+## Code Style
+- Use Pydantic v2 models for all request/response schemas.
+- Use dependency injection for database sessions, never global state.
+- Async handlers only — all endpoint functions must be \`async def\`.
+
+## Architecture
+- \`src/routes/\` — FastAPI route handlers
+- \`src/services/\` — Business logic (called by routes)
+- \`src/models/\` — SQLAlchemy models
+- \`src/schemas/\` — Pydantic schemas
+`} language="markdown" filename="packages/api/CLAUDE.md" />
+
+When the agent works on a file in `packages/api/`, it reads **both** the root CLAUDE.md and the `packages/api/CLAUDE.md`. The package-level file provides specific context, while the root file provides the monorepo-wide rules.
+
+## How Scopes Merge
+
+When multiple CLAUDE.md files apply, the agent merges them with a **more-specific-wins** strategy:
+
+<MermaidDiagram chart={`flowchart TD
+    A["Agent starts session"] --> B["Read enterprise settings<br/><i>Broadest scope</i>"]
+    B --> C["Read ~/.claude/CLAUDE.md<br/><i>User preferences</i>"]
+    C --> D["Read project root CLAUDE.md<br/><i>Project conventions</i>"]
+    D --> E{"Working in a subdirectory<br/>with its own CLAUDE.md?"}
+    E -->|Yes| F["Read subdirectory CLAUDE.md<br/><i>Package-specific rules</i>"]
+    E -->|No| G["Use merged context"]
+    F --> G
+
+    G --> H["All instructions are combined.<br/>More-specific files take<br/>precedence on conflicts."]
+
+    style B fill:#e9d8fd,stroke:#6b46c1
+    style C fill:#ebf8ff,stroke:#3182ce
+    style D fill:#c6f6d5,stroke:#276749
+    style F fill:#fefcbf,stroke:#975a16
+    style H fill:#f0fff4,stroke:#276749
+`} />
+
+For example, if your root CLAUDE.md says "use named exports" but a package-level CLAUDE.md says "use default exports for React components in this package," the package-level rule wins when working in that package.
+
+## Deciding Where to Put an Instruction
+
+Use this decision framework to determine the right scope for any instruction:
+
+| Question | If Yes | If No |
+|---|---|---|
+| Does this apply to everyone on the team? | Project CLAUDE.md | Continue below |
+| Does this apply to all projects I work on? | User CLAUDE.md | Continue below |
+| Does this apply to one package in a monorepo? | Package subdirectory CLAUDE.md | Continue below |
+| Does this apply to the whole organization? | Enterprise settings | Reconsider if it is needed |
+
+> **Rule of thumb:** Start by putting instructions in the project CLAUDE.md. Only move them to a different scope if you have a clear reason. Project-level is the safest default because it is version-controlled and team-shared.
+
+## Common Scoping Mistakes
+
+### Mistake 1: Project rules in user settings
+
+If you put project-specific build commands in `~/.claude/CLAUDE.md`, your teammates will not benefit from them, and the instructions will interfere when you work on a different project.
+
+### Mistake 2: Personal preferences in the project CLAUDE.md
+
+Instructions like "always give verbose explanations" or "prefer concise responses" are personal. Putting them in the project CLAUDE.md imposes your preference on the whole team.
+
+### Mistake 3: Everything in the root of a monorepo
+
+When a monorepo root CLAUDE.md tries to document conventions for every package, it becomes hundreds of lines long. This wastes context window for agents working on a single package that only needs 20 lines of specific instructions.
+
+### Mistake 4: Duplicating rules across scopes
+
+If both the root and a package CLAUDE.md say "run `pnpm test` before committing," you now have two places to update when you change the test command. Let the root handle shared rules and packages handle only their overrides.
+
+## Summary
+
+- CLAUDE.md has **three scopes**: project (checked into repo), user (`~/.claude/CLAUDE.md`), and enterprise (managed by admins)
+- The **project root CLAUDE.md** is the most important -- it contains build commands, code style, architecture, and team-wide rules
+- The **user-level CLAUDE.md** is for personal preferences and environment-specific details
+- **Monorepos** use nested CLAUDE.md files -- one root for shared conventions, one per package for specifics
+- Scopes merge with **more-specific-wins** precedence -- subdirectory overrides root, root overrides user
+- Put instructions at the **narrowest scope** where they apply, defaulting to project level when in doubt
+- Avoid common mistakes: project rules in user settings, personal preferences in project files, and duplicating rules across scopes
