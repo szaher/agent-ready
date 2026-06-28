@@ -1,56 +1,46 @@
-# Coding Agent Instructions
+# Agent Instructions
 
-This repository is a reusable learning-template platform. Academy instances
-should be updated from the template without overwriting academy-owned content.
+This repository has two operational modes. Pick the right scope for your task.
 
-## Update An Academy Instance
+## Content Authoring
 
-When asked to update an academy instance from this template, use the sync script:
+Write tutorial specs, lessons, quizzes, and presentations. Work inside `content/` and `presentations/`.
+
+- Do NOT modify `src/`, `__tests__/`, root config, or CI files.
+- Follow the authoring flow in `content/CLAUDE.md`.
+- Run `pnpm validate` before considering content ready.
+- Use the `/content-author` agent for guided content work.
+
+## Platform Development
+
+Modify the Next.js app, components, hooks, or build tooling in `src/` and `scripts/`.
+
+- Follow code style in `CLAUDE.md`.
+- Run `pnpm test`, `pnpm lint`, and `pnpm build` before considering work done.
+- Use the `/platform-dev` agent for platform changes.
+
+## Custom Agents
+
+Available in `.claude/agents/`:
+
+| Agent | Role | Scope |
+|-------|------|-------|
+| `content-author` | Write and edit tutorial content | `content/`, `presentations/` — read + write |
+| `code-reviewer` | Review code changes | Entire repo — read only, no modifications |
+| `platform-dev` | Modify platform code | `src/`, `scripts/`, config — read + write + bash |
+
+## Permission Model
+
+- **Content agents** may read any file but only write to `content/` and `presentations/`.
+- **Review agents** are strictly read-only. They do not modify files or run commands.
+- **Platform agents** may read, write, and run build/test/lint commands. They do not modify `content/`.
+
+## Template Sync
+
+When updating an academy instance from the template:
 
 ```bash
-/path/to/learn-template/scripts/update-template.sh --target /path/to/academy-instance
+scripts/update-template.sh --target /path/to/academy-instance
 ```
 
-If running from inside an instance that has this script copied locally, pass the
-template checkout explicitly:
-
-```bash
-pnpm update:template -- --source /path/to/learn-template
-```
-
-Before updating:
-
-- Confirm the target path is the academy instance, not the template checkout.
-- Require a clean target git worktree. The script enforces this for git repos.
-- Use `--dry-run` first when the target has valuable local customization.
-
-Preserve academy-owned files unless the user explicitly asks for a migration:
-
-- `content/`
-- `presentations/`
-- `academy.config.ts`
-- `.env*`
-- `docker-compose.yml`
-- local dependency/build output
-
-After updating, review the diff and run these in the target instance when
-feasible:
-
-```bash
-pnpm install
-pnpm validate
-pnpm test
-pnpm lint
-pnpm build
-```
-
-## Content Work
-
-- Do not modify `src/`, `__tests__/`, root config, or CI files unless asked to
-  change the platform.
-- Author tutorial specs in `content/tutorials/`.
-- Author rendered lessons in `content/module-N/`.
-- Use the staged prompts in `prompts/`.
-- Mark uncertain factual claims with `VerifyClaim`.
-
-See `CLAUDE.md` for the full content-authoring guide.
+Use `--dry-run` first. Preserve academy-owned files: `content/`, `presentations/`, `academy.config.ts`, `.env*`, `docker-compose.yml`. After updating, run `pnpm install && pnpm validate && pnpm test && pnpm lint && pnpm build`.
