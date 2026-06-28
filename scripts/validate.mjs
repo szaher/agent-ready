@@ -27,6 +27,7 @@ async function exists(file) {
 }
 
 async function listFiles(dir, predicate) {
+  if (!(await exists(dir))) return [];
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
