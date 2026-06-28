@@ -6,6 +6,8 @@ import Sidebar from "@/components/Sidebar";
 import { getCurriculum } from "@/lib/curriculum";
 import { academy } from "../../academy.config";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: academy.name,
   description: academy.description,
@@ -22,7 +24,7 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className="min-h-screen flex flex-col">
-        <Script src="/theme-init.js" strategy="beforeInteractive" />
+        <Script src={`${basePath}/theme-init.js`} strategy="beforeInteractive" />
         <Header />
         <div className="flex flex-1 min-h-0">
           <Sidebar curriculum={curriculum} />

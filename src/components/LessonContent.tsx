@@ -12,6 +12,8 @@ import Quiz from "./Quiz";
 import SidePanel, { type SidePanelTab } from "./SidePanel";
 import VoiceControls from "./VoiceControls";
 
+const isStaticExport = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
+
 interface LessonContentProps {
   module: ModuleMeta;
   lesson: LessonMeta;
@@ -265,15 +267,17 @@ export default function LessonContent({
             )}
           </div>
 
-          <div className="mt-8 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
-            <a
-              href={`/chat?context=${mod.id}:${lesson.slug}`}
-              className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
-            >
-              <span>💬</span>
-              <span>Ask about this lesson...</span>
-            </a>
-          </div>
+          {!isStaticExport && (
+            <div className="mt-8 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+              <a
+                href={`/chat?context=${mod.id}:${lesson.slug}`}
+                className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors"
+              >
+                <span>💬</span>
+                <span>Ask about this lesson...</span>
+              </a>
+            </div>
+          )}
         </div>
       </div>
 

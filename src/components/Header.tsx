@@ -6,6 +6,8 @@ import ExportMenu from "./ExportMenu";
 import ThemeToggle from "./ThemeToggle";
 import { academy } from "../../academy.config";
 
+const isStaticExport = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
+
 export default function Header() {
   const pathname = usePathname();
   const isChat = pathname.startsWith("/chat");
@@ -18,31 +20,33 @@ export default function Header() {
         {academy.name}
       </Link>
 
-      <nav className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1">
-        <Link
-          href="/"
-          className={`px-4 py-1.5 rounded-md text-sm transition-colors ${
-            isLesson
-              ? "bg-[var(--bg-primary)] text-[var(--text-primary)]"
-              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          Lesson Mode
-        </Link>
-        <Link
-          href="/chat"
-          className={`px-4 py-1.5 rounded-md text-sm transition-colors ${
-            isChat
-              ? "bg-[var(--bg-primary)] text-[var(--text-primary)]"
-              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          Chat Mode
-        </Link>
-      </nav>
+      {!isStaticExport && (
+        <nav className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1">
+          <Link
+            href="/"
+            className={`px-4 py-1.5 rounded-md text-sm transition-colors ${
+              isLesson
+                ? "bg-[var(--bg-primary)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Lesson Mode
+          </Link>
+          <Link
+            href="/chat"
+            className={`px-4 py-1.5 rounded-md text-sm transition-colors ${
+              isChat
+                ? "bg-[var(--bg-primary)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Chat Mode
+          </Link>
+        </nav>
+      )}
 
       <div className="flex items-center gap-3">
-        <ExportMenu />
+        {!isStaticExport && <ExportMenu />}
         <ThemeToggle />
       </div>
     </header>

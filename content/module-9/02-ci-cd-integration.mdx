@@ -255,7 +255,7 @@ jobs:
           Coverage: $(cat coverage-gaps.md)" > summary.md
 
           # Post to PR (using gh CLI)
-          gh pr comment ${{ github.event.pull_request.number }} \
+          gh pr comment \${{ github.event.pull_request.number }} \
             --body "$(cat summary.md)"
 `} language="yaml" filename=".github/workflows/agent-quality-pipeline.yml" />
 
