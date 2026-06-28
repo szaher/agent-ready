@@ -1,92 +1,147 @@
-# Prompt: Content Quality Review
+# 05 Structured Validation Prompt
 
-Use this prompt to review and improve content before finalizing.
+## System Prompt
 
----
+You are a strict content auditor. Return only JSON. Prefer reporting defects over guessing fixes.
 
-## Self-Edit Checklist
+## Required Inputs
 
-Run through this checklist for every lesson and presentation before considering it done.
-
-### Structure
-
-- [ ] Lesson starts with a "why this matters" overview
-- [ ] Sections flow logically — each builds on the previous
-- [ ] Lesson ends with a summary that connects to what's next
-- [ ] Headings use `##` (never `#` in lesson body)
-- [ ] Slug in filename matches slug in meta.json
-
-### Diagrams
-
-- [ ] At least one diagram per lesson that has `diagramTypes` in meta.json
-- [ ] Diagrams use `<MermaidDiagram>` in MDX (not `<div class="mermaid">`)
-- [ ] Diagrams use `<div class="mermaid">` in presentations (not `<MermaidDiagram>`)
-- [ ] Diagrams have labeled nodes (not just A, B, C)
-- [ ] Diagrams use subgraphs to group related concepts
-- [ ] Diagrams use style directives for color coding
-
-### Code
-
-- [ ] Code examples are realistic and runnable
-- [ ] Code uses the correct language from academy.config.ts
-- [ ] Code blocks use `<CodeBlock>` component in MDX
-- [ ] Code blocks use fenced markdown in presentations
-- [ ] Variable/function names are descriptive
-- [ ] No placeholder comments like `# TODO` or `# implement this`
-
-### Quizzes
-
-- [ ] 2-4 questions per lesson
-- [ ] correctIndex values are varied across questions
-- [ ] All distractors are plausible
-- [ ] Questions test understanding, not memorization
-- [ ] No "All of the above" or "None of the above"
-
-### Writing Quality
-
-- [ ] First occurrence of each key term is **bold**
-- [ ] No walls of text — break up with diagrams, lists, code
-- [ ] Sentences are concise (under 25 words preferred)
-- [ ] Analogies connect new concepts to familiar ones
-- [ ] No jargon without definition
-
-## Banned Phrases
-
-Remove or rewrite if you find these:
-
-| Phrase | Why | Replace With |
-|--------|-----|-------------|
-| "simply" / "just" / "easily" | Dismisses complexity | Remove or explain the steps |
-| "obviously" / "clearly" | Assumes prior knowledge | State the fact directly |
-| "as everyone knows" | Excludes beginners | Remove entirely |
-| "it's worth noting that" | Filler | State the thing directly |
-| "in order to" | Verbose | "to" |
-| "utilize" | Pretentious | "use" |
-| "leverage" (as verb) | Jargon | "use" or more specific verb |
-| "at the end of the day" | Cliche | Remove or state the conclusion |
-
-## Humanization Tips
-
-Content should read like a knowledgeable colleague explaining over coffee, not a textbook.
-
-1. **Use "you" and "we"** — "You'll notice that..." not "One can observe that..."
-2. **Acknowledge difficulty** — "This part is tricky because..." not pretending it's easy
-3. **Share the reasoning** — "We use X here because Y" not just "Use X"
-4. **Add context** — "In production, you'd also want..." shows real-world awareness
-5. **Be specific** — "This reduces memory usage by ~40%" not "This improves performance"
-
-## Prompt for Quality Pass
-
+```json
+{
+  "tutorialSpec": {},
+  "lessonArtifacts": [],
+  "validationReport": {},
+  "sourceInventory": [],
+  "contentStyle": {
+    "voice": "string",
+    "approaches": ["string"],
+    "generationMode": "string"
+  }
+}
 ```
-Review the following lesson content and improve it:
 
-1. Replace any banned phrases (see table above)
-2. Ensure first occurrence of key terms is **bold**
-3. Check that diagrams have descriptive node labels
-4. Verify code examples are realistic and complete
-5. Confirm quiz correctIndex values are varied
-6. Add analogies where concepts are abstract
-7. Break up any paragraph longer than 4 sentences
+When `contentStyle` is absent, skip voice/approach/mode-specific checks.
 
-Output the improved content with a brief changelog of what you fixed.
+## Output Schema
+
+```json
+{
+  "status": "pass | needs-repair | blocked",
+  "issues": [
+    {
+      "id": "string",
+      "severity": "error | warning",
+      "stage": "schema | mdx | links | citations | accessibility | duplication | claims | pedagogy | voice | dependencies | multimedia | gamification | udl | scaffolding | metacognition",
+      "path": "string",
+      "message": "string",
+      "repairInstruction": "string"
+    }
+  ],
+  "coverage": {
+    "objectivesCovered": true,
+    "prerequisitesCovered": true,
+    "citationsCovered": true,
+    "accessibilityCovered": true,
+    "voiceConsistent": true,
+    "dependencyChainValid": true,
+    "multimediaCoverage": true,
+    "udlCompliance": true
+  },
+  "humanReviewChecklist": ["string"]
+}
 ```
+
+## Core Checks (always run)
+
+- Schema validation errors.
+- MDX compilation errors.
+- Broken links and unresolved citation ids.
+- Missing alt text, transcript, captions, keyboard traps, or color-only meaning.
+- Duplicate or near-duplicate lesson sections.
+- Unsupported claims presented as facts.
+- Missing recap, next steps, exercises, or answers.
+
+## Voice Consistency Checks (stage: `voice`)
+
+- Verify all lessons use the same voice register throughout.
+- `conversational`: should use "you/we", contractions, direct address. Flag formal third-person passages.
+- `academic`: should use third person, formal language, inline citations. Flag casual contractions or slang.
+- `systematic`: should use imperative mood, numbered steps. Flag narrative tangents.
+- `narrative`: should maintain story arc elements, character references. Flag dry procedural passages without narrative framing.
+- `minimalist`: should be concise, bullet-heavy. Flag paragraphs longer than 3 sentences.
+
+Severity: `warning` for voice drift within a lesson; `error` for complete voice mismatch (e.g., spec says `academic` but lesson is written in `conversational` style).
+
+## Instructional Approach Checks (stage: `pedagogy`)
+
+- `socratic`: verify sections open with questions. Flag sections that start with declarative statements.
+- `problem-based`: verify a central problem is introduced early. Flag lessons without a problem framing.
+- `hands-on`: verify exercises appear in most sections. Flag long exposition without tasks.
+- `analogical`: verify analogies are present for key concepts. Flag concepts introduced without analogy.
+- `visual-first`: verify every section has a diagram before text. Flag text-first sections.
+- `challenge-based`: verify exercises have point values. Flag unpointsed exercises when gamification is enabled.
+
+Severity: `warning` for missing approach elements.
+
+## Generation Mode Compliance (stage: `dependencies`)
+
+- `sequential`: verify each lesson (after the first) has `dependsOnLessonIds` containing its predecessor. Flag gaps in the chain.
+- `parallel`: verify no lesson has non-empty `dependsOnLessonIds`. Flag dependency edges.
+- Detect dependency cycles (A→B→A). Severity: `error`.
+- Detect self-dependencies. Severity: `error`.
+- Detect unknown lesson ids in `dependsOnLessonIds`. Severity: `error`.
+
+## Multimedia Coverage Checks (stage: `multimedia`)
+
+- Every lesson should have at least one visual artifact (diagram, infographic, mind-map, or similar).
+- When `visual-first` approach is active, every `##` section needs a visual.
+- Artifact descriptors must have valid `type` values from the supported multimedia types.
+- All artifact descriptors must include `accessibility.fallbackText`.
+- Flag lessons with no multimedia at all. Severity: `warning`.
+
+## Gamification Integrity Checks (stage: `gamification`)
+
+- When `gamification.enabled` is true:
+  - At least 1 badge must be defined. Severity: `warning` if missing.
+  - All `achievements[].unlocksLessonIds` must reference valid lesson ids. Severity: `error`.
+  - Point rules should have positive point values. Severity: `warning` for zero-point rules.
+  - When `challenge-based` approach is active, exercises should have point annotations. Severity: `warning`.
+
+## UDL Compliance Checks (stage: `udl`)
+
+- `multipleRepresentations` must have at least 2 items. Severity: `warning` if fewer.
+- `multipleActions` must have at least 2 items. Severity: `warning` if fewer.
+- `multipleEngagement` must have at least 2 items. Severity: `warning` if fewer.
+- Verify that the listed representation modes actually appear in lesson content. Severity: `warning` for listed-but-absent modes.
+
+## Scaffolding Checks (stage: `scaffolding`)
+
+- When scaffolding is configured, verify differentiated content exists for at least 2 skill levels. Severity: `warning`.
+- Check that hint levels are present on exercises. Severity: `warning`.
+
+## Metacognition Checks (stage: `metacognition`)
+
+- When metacognition strategies are defined, verify reflection prompts appear in lesson MDX. Severity: `warning`.
+- Check for self-assessment checkpoints at lesson transitions. Severity: `warning`.
+
+## Adaptive Path Checks (stage: `dependencies`)
+
+- All `lessonSequence` entries must reference valid lesson ids. Severity: `error`.
+- At least 2 paths should be defined when adaptive paths are enabled. Severity: `warning` if fewer.
+
+## Project Capstone Checks (stage: `pedagogy`)
+
+- All `prerequisiteLessonIds` must reference valid lesson ids. Severity: `error`.
+- All `conceptIds` must reference valid concept ids. Severity: `error`.
+- Rubric should have at least 2 criteria. Severity: `warning`.
+
+## Spaced Repetition Checks (stage: `pedagogy`)
+
+- When enabled, verify lessons include `Flashcards` components or key-concept lists suitable for card generation. Severity: `warning`.
+
+## Severity Rules
+
+- **error**: Structural defects, broken references, invalid enum values, dependency cycles, unknown ids.
+- **warning**: Pedagogical gaps, missing optional enhancements, style drift, weak coverage.
+
+A spec with any `error` gets `status: "needs-repair"`. A spec with only `warning`s gets `status: "pass"` with issues noted. A spec that cannot be automatically repaired gets `status: "blocked"`.

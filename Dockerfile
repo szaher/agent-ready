@@ -11,6 +11,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV CI=true
 RUN pnpm build
 
 FROM node:22-alpine AS runtime

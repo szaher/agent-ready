@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCurriculum } from "@/lib/curriculum";
 import { academy } from "../../academy.config";
 
@@ -14,7 +15,7 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {curriculum.modules.map((mod) => (
-          <a
+          <Link
             key={mod.id}
             href={`/lesson/${mod.id}/${mod.lessons[0].slug}`}
             className="block p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] hover:border-[var(--border-hover)] transition-colors"
@@ -32,7 +33,7 @@ export default async function HomePage() {
             <p className="text-xs text-[var(--text-secondary)] mt-2">
               {mod.lessons.length} lessons
             </p>
-          </a>
+          </Link>
         ))}
       </div>
     </div>

@@ -15,7 +15,11 @@ export function getProgress(): ProgressState {
   if (typeof localStorage === "undefined") return { ...DEFAULT_STATE };
   const raw = localStorage.getItem(storageKeys.progress);
   if (!raw) return { ...DEFAULT_STATE, lessons: {} };
-  return JSON.parse(raw) as ProgressState;
+  try {
+    return JSON.parse(raw) as ProgressState;
+  } catch {
+    return { ...DEFAULT_STATE, lessons: {} };
+  }
 }
 
 function saveProgress(state: ProgressState): void {

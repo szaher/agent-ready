@@ -7,7 +7,12 @@ function noteKey(moduleId: number, lessonSlug: string): string {
 function getAllNotes(): Record<string, string> {
   if (typeof localStorage === "undefined") return {};
   const raw = localStorage.getItem(storageKeys.notes);
-  return raw ? JSON.parse(raw) : {};
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
 function saveAllNotes(notes: Record<string, string>): void {

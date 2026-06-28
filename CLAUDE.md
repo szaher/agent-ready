@@ -1,53 +1,118 @@
-# Academy Template — Content Author Guide
+# AI Tutorial Template - Content Author Guide
 
-You are building an interactive learning academy. The platform code is complete — your job is to **create content only**. Do not modify any source files under `src/`, `__tests__/`, or config files unless explicitly asked.
+You are building an interactive educational tutorial repository. Prefer structured JSON, deterministic validation, and human-review checkpoints over uncontrolled prose generation.
 
-## Quick Start
+## Operating Rules
 
-1. Run `bash setup.sh` to configure the academy (name, topic, colors)
-2. Create modules in `content/module-N/`
-3. Create presentation decks in `presentations/`
-4. Build and verify: `pnpm build && pnpm dev`
+- Do not modify `src/`, `__tests__/`, root config, or CI files unless explicitly asked to change the platform.
+- Author tutorial specs in `content/tutorials/`.
+- Author rendered lessons in `content/module-N/`.
+- Use the staged prompts in `prompts/` and return JSON first.
+- Run the quality gates before considering content ready.
+- Mark uncertain factual claims with `VerifyClaim` instead of presenting them as facts.
 
-## Architecture Overview (Read-Only Reference)
+## Updating An Instance From This Template
 
+When asked to update an academy instance from the template, use the template sync
+script instead of manually copying files:
+
+```bash
+/path/to/learn-template/scripts/update-template.sh --target /path/to/academy-instance
 ```
-academy.config.ts          <- The ONLY file you customize (or use setup.sh)
+
+If you are already inside the instance and only have the copied script there,
+pass the template checkout explicitly:
+
+```bash
+pnpm update:template -- --source /path/to/learn-template
+```
+
+Before updating:
+
+- Confirm the target path is the academy instance, not the template checkout.
+- Require a clean target git worktree. The script enforces this for git repos.
+- Start with `--dry-run` if the target has valuable local customization.
+
+The updater must preserve academy-owned files:
+
+- `content/`
+- `presentations/`
+- `academy.config.ts`
+- `.env*`
+- `docker-compose.yml`
+- local dependency/build output
+
+Do not overwrite those paths manually unless the user explicitly asks for a
+platform migration that changes instance-owned files. After the update, review
+the diff and run `pnpm install`, `pnpm validate`, `pnpm test`, `pnpm lint`, and
+`pnpm build` in the target instance when feasible.
+
+## Required Flow
+
+1. Define the tutorial with `prompts/01-curriculum-design.md`.
+2. (Optional) Select content style in the tutorial spec inputs:
+   - **Voice** (pick one): `conversational`, `academic`, `systematic`, `narrative`, `minimalist`.
+   - **Approaches** (pick one or more): `socratic`, `problem-based`, `hands-on`, `analogical`, `visual-first`, `challenge-based`.
+   - **Generation mode**: `sequential` (default, lessons build on each other) or `parallel` (lessons are independent).
+3. Save a validated `TutorialSpec` JSON file in `content/tutorials/`. Use `schemaVersion: "1.1.0"` for specs with enhancement fields, `"1.0.0"` for legacy specs.
+4. Plan sources and claim coverage before writing lessons.
+5. Plan multimedia with `prompts/08-multimedia-planning.md` after lesson outlines are ready.
+6. Generate lesson, assessment, and artifact JSON with `prompts/02-lesson-writing.md`, `prompts/03-quiz-creation.md`, and `prompts/04-presentation-creation.md`.
+7. Move approved MDX into `content/module-N/`.
+8. Run `pnpm validate`, `pnpm test`, `pnpm lint`, and `pnpm build`.
+9. Complete human review for factuality, pedagogy, accessibility, localization, and all `verify` claims.
+
+Use `prompts/07-repair-invalid-output.md` when model output fails schema, MDX, citation, or accessibility checks.
+
+## Repository Map
+
+```text
+academy.config.ts              # Academy display and tutor configuration
 content/
   module-1/
-    meta.json              <- Module metadata + lesson manifest
-    01-lesson-slug.mdx     <- Lesson content (MDX)
-    02-another-lesson.mdx
-  module-2/
-    meta.json
-    01-first-lesson.mdx
-presentations/
-  themes/academy.css       <- Marp theme (Red Hat branding)
-  01-deck-name.md          <- Presentation slides (Marp markdown)
-  build.sh                 <- Builds slides to HTML
-  fix-mermaid.sh           <- Injects Mermaid.js into slide decks
-src/                       <- DO NOT MODIFY
+    meta.json                  # Module metadata and lesson manifest
+    01-sample-lesson.mdx       # Rendered lesson content
+  tutorials/
+    sample-tutorial.json       # TutorialSpec 1.0.0 fixture
+    sample-enhanced-tutorial.json  # TutorialSpec 1.1.0 fixture with enhancements
+docs/
+  architecture.md              # System architecture
+  authoring-flow.md            # End-to-end authoring workflow
+prompts/
+  01-curriculum-design.md      # TutorialSpec generation
+  02-lesson-writing.md         # Lesson artifact generation
+  03-quiz-creation.md          # Assessment generation
+  04-presentation-creation.md  # Rich artifact generation
+  05-content-quality.md        # Audit prompt
+  07-repair-invalid-output.md  # Repair prompt
+  08-multimedia-planning.md    # Multimedia blueprint per lesson
+  schemas/
+    tutorial-spec.schema.json  # JSON Schema contract
+scripts/
+  validate.mjs                 # Deterministic quality gates
+src/                           # Platform code
 ```
 
-The app reads `content/` at build time. Modules are discovered by scanning `content/module-N/meta.json` files. Lessons are loaded from the MDX files listed in each `meta.json`.
+## Tutorial Specification
 
-## Content Creation Workflow
+Every production tutorial should have a `TutorialSpec` JSON document. It captures:
 
-Follow this order:
+- Audience, prerequisites, learning objectives, scope, and non-goals.
+- Lesson sequence, estimated duration, difficulty, and references.
+- Concepts, misconceptions, worked examples, exercises, and answers.
+- Formative assessment, mastery criteria, recap, and next steps.
+- Accessibility and localization metadata.
+- (v1.1.0) Content style (voice, instructional approaches, generation mode).
+- (v1.1.0) Gamification, adaptive paths, spaced repetition, microlearning, project capstones.
+- (v1.1.0) UDL framework, collaborative learning, multimedia plans, scaffolding, metacognition.
 
-1. **Design curriculum** — decide modules, lessons, progression
-2. **Create modules** — write `meta.json` for each module
-3. **Write lessons** — create `.mdx` files with diagrams, code, quizzes
-4. **Create presentations** — write Marp slide decks for key topics
-5. **Verify** — `pnpm build` must succeed; browse `localhost:3000` to check rendering
+The TypeScript contract lives in `src/types/tutorial.ts`; the JSON Schema prompt contract lives in `prompts/schemas/tutorial-spec.schema.json`.
 
----
+Specs using `schemaVersion: "1.0.0"` are always valid. Enhancement fields require `schemaVersion: "1.1.0"`. The validator accepts both versions.
 
-## File Formats
+## Module Metadata
 
-### meta.json
-
-Every module directory needs a `meta.json`. The `id` field must match the directory number (`module-1` has `id: 1`).
+Every module directory needs `meta.json`. The `id` field must match the directory number.
 
 ```json
 {
@@ -59,7 +124,7 @@ Every module directory needs a `meta.json`. The `id` field must match the direct
     {
       "slug": "01-lesson-name",
       "title": "Lesson Title",
-      "description": "One-line description of this lesson",
+      "description": "One-line description",
       "estimatedMinutes": 10,
       "diagramTypes": ["architecture", "flowchart"],
       "hasCode": true,
@@ -70,94 +135,102 @@ Every module directory needs a `meta.json`. The `id` field must match the direct
 ```
 
 Rules:
-- `slug` must exactly match the MDX filename without extension
-- `estimatedMinutes` is displayed in the sidebar
-- `diagramTypes` is informational — used for the sidebar icon
-- `hasCode` and `hasQuiz` are informational booleans
-- `color` uses a hex color — pick from the palette in `academy.config.ts`
-- Lessons appear in the order listed in the `lessons` array
 
-### MDX Lessons
+- `slug` must exactly match the MDX filename without extension.
+- Lessons appear in the order listed.
+- `diagramTypes`, `hasCode`, and `hasQuiz` are informational but should match the content.
+- Use colors from `academy.config.ts` unless there is a strong reason to add a new one.
 
-Each lesson is a `.mdx` file with YAML frontmatter and MDX body.
+## MDX Lessons
 
-#### Frontmatter
+Use `##` for lesson sections. Do not use `#` in lesson bodies because the page title is rendered by the app.
+
+Frontmatter quizzes are supported:
 
 ```yaml
 ---
 title: "Lesson Title"
 quiz:
-  - question: "What does X do?"
+  - question: "What does validation catch?"
     options:
-      - "Option A"
-      - "Option B (correct)"
-      - "Option C"
-      - "Option D"
+      - "Only grammar"
+      - "Structural and content-gate defects"
+      - "All factual errors"
     correctIndex: 1
-  - question: "Which is true about Y?"
-    options:
-      - "Statement 1"
-      - "Statement 2"
-      - "Statement 3"
-    correctIndex: 2
+    explanation: "Validation catches deterministic defects, while humans still review factuality."
 ---
 ```
 
-- `title` is required
-- `quiz` is optional — omit it for lessons without quizzes
-- `correctIndex` is zero-based
-- Include 3-4 options per question
-- Vary `correctIndex` across questions (don't always use 0)
+### Learning Components
 
-#### Body Content
+Use these reusable MDX components:
 
-Use `##` for section headings (never `#` — that's reserved for the page title). Write paragraphs with **bold** for key terms.
+- `LearningObjectives`
+- `Prerequisites`
+- `KeyTerms`
+- `Callout`
+- `Warning`
+- `Diagram`
+- `MermaidDiagram`
+- `Flashcards`
+- `QuizBlock`
+- `WorkedExample`
+- `Exercise`
+- `DataTable`
+- `NarrationHook`
+- `MindMap`
+- `Infographic`
+- `SlideEmbed`
+- `Citation`
+- `SourceQualityLabel`
+- `VerifyClaim`
 
-#### MermaidDiagram Component
-
-```mdx
-<MermaidDiagram chart={`graph TD
-    A[Node A] --> B[Node B]
-    B --> C[Node C]
-    subgraph Group["Group Name"]
-        C --> D[Node D]
-    end
-    style Group fill:#ebf8ff,stroke:#3182ce
-`} />
-```
-
-Supported diagram types: `graph TD`, `graph LR`, `graph RL`, `flowchart TD`, `sequenceDiagram`, `classDiagram`, `stateDiagram-v2`.
-
-Use subgraphs to group related nodes. Apply `style` directives for color coding.
-
-#### CodeBlock Component
+Example:
 
 ```mdx
-<CodeBlock code={`def example():
-    return "hello world"
-`} language="python" filename="example.py" />
+<LearningObjectives items={[
+  "Explain why schema validation runs before human review.",
+  "Classify generated claims as verified, verify, or unsupported."
+]} />
+
+<Diagram
+  chart={`graph LR
+    Spec[Tutorial Spec] --> Prompt[Structured Prompt]
+    Prompt --> Validate[Quality Gates]
+    Validate --> Review[Human Review]
+  `}
+  fallback="Tutorial specs feed structured prompts, validation gates, and human review."
+  caption="Generation artifacts move through validation before publication."
+/>
+
+<VerifyClaim status="verify">
+  Claims about current tool popularity require recent source review.
+</VerifyClaim>
 ```
 
-- `language` — syntax highlighting language (python, javascript, typescript, yaml, bash, etc.)
-- `filename` — displayed as a tab header above the code
+## Citation and Claim Rules
 
-#### Standard Markdown
+- Prefer primary, official, or peer-reviewed sources.
+- Every factual claim that depends on a source should have a citation or a verification state.
+- Use `Citation` with source-quality labels for supported claims.
+- Use `VerifyClaim status="verify"` for plausible but unverified claims.
+- Do not publish `unsupported` claims as instructional facts.
+- Do not state current versions, prices, popularity, laws, or recent events without fresh evidence.
 
-All standard markdown works in the body:
+## Diagrams and Accessibility
 
-- **Bold text** for key terms
-- *Italic text* for emphasis
-- Bulleted lists with `-`
-- Numbered lists with `1.`
-- `inline code` for function/class names
-- Blockquotes with `>`
-- Tables with `|` pipes
+- Every `Diagram` needs fallback text.
+- Every image needs meaningful alt text.
+- Every slide embed needs a title and fallback link.
+- Narration hooks should mirror visible content and not introduce hidden facts.
+- Do not encode meaning by color alone.
+- Keep tables readable and provide captions when context is not obvious.
 
-### Presentation Decks (Marp)
+## Presentation Decks
 
-Presentations are Marp markdown files in `presentations/`. Name them `NN-descriptive-name.md` (e.g., `01-introduction.md`, `02-core-concepts.md`).
+Presentations are Marp markdown files in `presentations/`. Name them `NN-descriptive-name.md`.
 
-#### Frontmatter
+Use `<div class="mermaid">` for Mermaid in presentations. Use `MermaidDiagram` or `Diagram` only in MDX lessons.
 
 ```markdown
 ---
@@ -167,230 +240,88 @@ header: 'Your Academy Name'
 footer: 'Deck Title'
 paginate: true
 ---
-```
 
-#### Mermaid Script Injection
-
-Immediately after the closing `---` of frontmatter, add:
-
-```html
-<script type="module">
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-mermaid.initialize({ startOnLoad: true, theme: "base", themeVariables: { primaryColor: "#e0f0ff", primaryTextColor: "#151515", primaryBorderColor: "#0066cc", lineColor: "#0066cc", secondaryColor: "#daf2f2", tertiaryColor: "#f2f2f2", noteBkgColor: "#fef0f0", noteTextColor: "#151515", fontFamily: "Red Hat Text, sans-serif" }});
-</script>
-```
-
-#### Slide Types
-
-**Title slide (lead):**
-```markdown
 <!-- _class: lead -->
 <!-- _paginate: false -->
-<!-- _header: '' -->
-<!-- _footer: '' -->
 
 # Presentation Title
 
 ## Subtitle
-
-Presenter Name | Date
 ```
 
-**Section divider:**
-```markdown
-<!-- _class: section-divider -->
-<!-- _header: '' -->
-<!-- _footer: '' -->
+## Quality Gates
 
-# Section Title
+Run these before review:
 
-## Brief description of this section
+```bash
+pnpm validate
+pnpm test
+pnpm lint
+pnpm build
 ```
 
-**Content slide with bullets:**
-```markdown
-# Slide Title
+`pnpm validate` checks:
 
-- **Key point** -- explanation
-- **Another point** -- details
-- **Third point** -- context
-
-> Important callout or quote
-```
-
-**Content slide with table:**
-```markdown
-# Comparison
-
-| Feature    | Option A    | Option B    |
-|------------|-------------|-------------|
-| Speed      | Fast        | Moderate    |
-| Cost       | High        | Low         |
-```
-
-Use `<span class="vs-good">Good</span>`, `<span class="vs-bad">Bad</span>`, `<span class="vs-neutral">Neutral</span>` for colored table values.
-
-**Content slide with diagram:**
-```markdown
-# Architecture
-
-<div class="mermaid">
-graph LR
-    A[Input] --> B[Process]
-    B --> C[Output]
-</div>
-```
-
-Note: In presentations, use `<div class="mermaid">` (NOT the `<MermaidDiagram>` component — that's for MDX lessons only).
-
-**Content slide with code:**
-````markdown
-# Code Example
-
-```python
-def process(data):
-    return transform(data)
-```
-````
-
-**Callout box:**
-```html
-<div class="callout">
-
-**Tip:** Important information here.
-
-</div>
-```
-
-**Speaker notes:**
-```markdown
-<!-- Speaker note: This won't be shown in the slides. -->
-```
-
-#### Slide Separator
-
-Use `---` on its own line to separate slides.
-
----
+- Tutorial spec shape and cross-references.
+- MDX compilation.
+- Broken local links and malformed URLs.
+- Citation ids against tutorial references.
+- Basic accessibility requirements for images, diagrams, and embeds.
+- Duplicate paragraphs.
+- Risky unsupported-claim wording outside `VerifyClaim`.
+- (v1.1.0) Content style values against canonical voices, approaches, and generation modes.
+- (v1.1.0) Lesson dependency graph: unknown ids, self-references, cycles.
+- (v1.1.0) Generation mode compliance: sequential chain integrity, parallel independence.
+- (v1.1.0) Artifact descriptor types, statuses, and accessibility fallback text.
+- (v1.1.0) Gamification integrity: badge existence, achievement lesson references.
+- (v1.1.0) Adaptive path and project capstone cross-references.
+- (v1.1.0) UDL framework coverage minimums.
 
 ## Naming Conventions
 
 - Module directories: `module-1`, `module-2`, ..., `module-N`
-- Lesson files: `NN-descriptive-slug.mdx` (e.g., `01-introduction.mdx`, `02-data-loading.mdx`)
-- Presentation files: `NN-descriptive-name.md` (e.g., `01-overview.md`)
-- Slugs use lowercase with hyphens, no spaces or underscores
-
-## Content Style Guide
-
-- Lead with a **why** before diving into **how**
-- Bold the first occurrence of every key term
-- Use diagrams to explain architecture and data flow — don't just describe in text
-- Include at least one code example per lesson that has `hasCode: true`
-- Keep quizzes to 2-4 questions per lesson
-- Make quiz distractors plausible — avoid obviously wrong answers
-- Use blockquotes for tips, warnings, and key takeaways
-- Each lesson should cover one focused concept (8-15 min read)
-- Progress from concrete to abstract within each module
-- Use analogies to connect new concepts to familiar ones
+- Lesson files: `NN-descriptive-slug.mdx`
+- Tutorial specs: `content/tutorials/descriptive-id.json`
+- Presentation files: `NN-descriptive-name.md`
+- Slugs and ids use lowercase words separated by hyphens.
 
 ## Anti-Patterns
 
-- Do NOT use `#` headings in lesson body — only `##` and `###`
-- Do NOT use `<MermaidDiagram>` in presentations — use `<div class="mermaid">`
-- Do NOT use `<div class="mermaid">` in MDX lessons — use `<MermaidDiagram>`
-- Do NOT use `<CodeBlock>` in presentations — use fenced code blocks
-- Do NOT modify files in `src/`, `__tests__/`, or root config files
-- Do NOT hardcode the academy name in content — the app reads it from `academy.config.ts`
-- Do NOT skip the `meta.json` — lessons won't appear without it
-- Do NOT use `correctIndex` values that exceed the options array length
+- Do not return prose when a prompt asks for JSON.
+- Do not invent citations.
+- Do not skip `content/tutorials/*.json` for production tutorials.
+- Do not use `#` headings inside lesson MDX bodies.
+- Do not use `MermaidDiagram` in presentation decks.
+- Do not use `<div class="mermaid">` in MDX lessons.
+- Do not hardcode academy display text when it belongs in `academy.config.ts`.
+- Do not rely on model fluency as a substitute for validation and review.
 
-## Build & Verify Commands
+## SOTA Educational Practices
 
-```bash
-# Install dependencies
-pnpm install
+The tutorial spec (v1.1.0) supports optional educational enhancements. These are modeled as authoring metadata — runtime features like point tracking or adaptive routing require separate platform work.
 
-# Development server
-pnpm dev
+| Feature | Authoring-Ready | Needs Runtime Support |
+|---------|----------------|----------------------|
+| **Gamification** — badges, points, streaks, achievements | Config in spec | Points state, badge UI, persistence |
+| **Adaptive paths** — branching lesson sequences by difficulty | Path definitions in spec | Diagnostic signals, route selection |
+| **Spaced repetition** — configurable review intervals | Intervals and card count in spec | Deck format, review scheduler |
+| **Microlearning** — short-form digest modules | Segmentation config in spec | Session segmentation, resume state |
+| **Project capstones** — culminating projects with rubrics | Spec with deliverables and rubric | Submission and grading UI |
+| **Collaborative learning** — peer review, group activities | Config in spec | Backend integration, identity |
+| **Scaffolding** — hints, differentiated paths | Config per lesson | Adaptive hint UI |
+| **UDL framework** — multiple representations, actions, engagement | Coverage metadata | Renderer support per modality |
+| **Metacognition** — self-assessment, reflection, goal-setting | Strategy prompts per lesson | Learner journaling UI |
+| **Interactive simulations** — dynamic explorations | Artifact descriptors | Component registry, sandboxing |
 
-# Production build (verifies all content compiles)
-pnpm build
+New multimedia types: `timeline`, `comparison-matrix`, `decision-tree`, `concept-map`, `interactive-simulation`. Use `DataTable` for comparison matrices. Use `MermaidDiagram` for decision-trees and concept-maps. Timeline and interactive-simulation require external authoring tools.
 
-# Run tests
-pnpm test
+## Optional Book Export
 
-# Build presentation slides
-cd presentations && bash fix-mermaid.sh && bash build.sh
-
-# Export lessons to markdown/notebooks
-pip install -r scripts/requirements.txt
-python scripts/export.py
-```
-
-## academy.config.ts Reference
-
-This is the single customization file. Edit it directly or use `setup.sh`.
-
-```typescript
-export const academy = {
-  name: "Your Academy Name",        // Displayed in header, title bar
-  slug: "your-academy",             // Used for localStorage keys (no spaces)
-  description: "One-line summary",   // HTML meta description
-  tagline: "Catchy subtitle",        // Displayed on home page
-
-  tutor: {
-    systemPrompt: `...`,             // AI tutor personality and knowledge
-    codeLanguage: "python",          // Primary code language
-    chatPlaceholder: "Ask a question...",
-    chatWelcome: "Welcome message",
-    chatSubtext: "Subtitle under welcome",
-  },
-
-  accentColor: "#63b3ed",           // UI accent (dot indicator, etc.)
-  moduleColors: ["#68d391", ...],   // One color per module sidebar
-
-  presentation: {
-    theme: "academy",               // Marp theme name
-    header: "Your Academy Name",    // Slide header text
-  },
-} as const;
-```
-
-## Docker
+The book export scripts remain available for publishing lesson content:
 
 ```bash
-# Build and run
-docker compose up --build
-
-# Required: set your GCP project for AI chat
-export ANTHROPIC_VERTEX_PROJECT_ID=your-project-id
-```
-
-The AI chat tutor requires Google Cloud credentials with Vertex AI access. Set `GOOGLE_APPLICATION_CREDENTIALS` or use application default credentials.
-
-## Book Export
-
-Convert your academy content into a publishable book (PDF, ePub, HTML).
-
-```bash
-# Build PDF (default)
 bash scripts/build-book.sh
-
-# Build PDF + ePub
-bash scripts/build-book.sh --formats pdf,epub
-
-# Build all formats
 bash scripts/build-book.sh --formats pdf,epub,html
-
-# Clean and rebuild
-bash scripts/build-book.sh --clean
-bash scripts/build-book.sh --formats pdf,epub
 ```
 
-The script reads all `content/module-N/` directories, transforms MDX to clean Markdown, extracts quizzes into an exercises appendix, collects bold terms into a glossary, and runs Pandoc to produce the final book.
-
-**Prerequisites:** `pandoc`, `xelatex` (TinyTeX or MacTeX), `mermaid-filter` (npm). See `prompts/06-book-conversion.md` for full toolchain setup and the complete book authoring guide.
-
-**Output:** `book/output/book.pdf`, `book/output/book.epub`, `book/output/book.html`
-
-Edit `book/metadata.yaml` after the first build to set the author name, subtitle, and licensing.
+Prerequisites include `pandoc`, `xelatex`, and `mermaid-filter`. See `prompts/06-book-conversion.md` for the book toolchain details.

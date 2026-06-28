@@ -18,14 +18,14 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function useTheme() {
-  const [mode, setMode] = useState<ThemeMode>("system");
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    if (typeof localStorage === "undefined") return "system";
+    return (localStorage.getItem(storageKeys.theme) as ThemeMode | null) || "system";
+  });
 
   useEffect(() => {
-    const stored = localStorage.getItem(storageKeys.theme) as ThemeMode | null;
-    const initial = stored || "system";
-    setMode(initial);
-    applyTheme(initial);
-  }, []);
+    applyTheme(mode);
+  }, [mode]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

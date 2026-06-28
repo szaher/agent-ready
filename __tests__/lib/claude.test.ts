@@ -4,12 +4,12 @@ import { buildSystemPrompt } from "@/lib/claude";
 describe("buildSystemPrompt", () => {
   it("includes tutor role", () => {
     const prompt = buildSystemPrompt();
-    expect(prompt).toContain("Ray Data tutor");
+    expect(prompt).toContain("expert tutor");
   });
 
-  it("includes Ray version", () => {
+  it("includes academy topic guidance", () => {
     const prompt = buildSystemPrompt();
-    expect(prompt).toContain("2.55.1");
+    expect(prompt).toContain("agent ready");
   });
 
   it("includes mermaid instruction", () => {

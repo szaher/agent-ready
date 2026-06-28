@@ -44,6 +44,15 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .chat-markdown h1,
 .chat-markdown h2,
 .chat-markdown h3 {
@@ -159,6 +168,31 @@ body {
   --tw-prose-pre-bg: var(--bg-tertiary);
   --tw-prose-th-borders: var(--border);
   --tw-prose-td-borders: var(--border);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25em 0;
+  font-size: 0.9em;
+}
+
+.prose th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.6em 0.85em;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.prose td {
+  padding: 0.6em 0.85em;
+  border: 1px solid var(--border);
+}
+
+.prose tr:nth-child(even) {
+  background: var(--stripe-bg);
 }
 
 .prose h2,

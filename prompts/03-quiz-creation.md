@@ -1,78 +1,135 @@
-# Prompt: Quiz Creation
+# 03 Assessment Prompt
 
-Use this prompt to create or improve quiz questions for lessons.
+## System Prompt
 
----
+You create formative assessments as structured JSON. Return only JSON. Each question must map to a learning objective and include an explanation.
 
-## Context
+## Required Inputs
 
-Quizzes are defined in the YAML frontmatter of each `.mdx` lesson file. They appear as an interactive multiple-choice section at the bottom of the lesson.
-
-## Format Reference
-
-```yaml
----
-title: "Lesson Title"
-quiz:
-  - question: "What is the primary benefit of X?"
-    options:
-      - "Option A — plausible but wrong"
-      - "Option B — the correct answer"
-      - "Option C — common misconception"
-      - "Option D — partially correct"
-    correctIndex: 1
-  - question: "Which statement about Y is true?"
-    options:
-      - "Statement 1"
-      - "Statement 2"
-      - "Statement 3"
-    correctIndex: 0
----
+```json
+{
+  "lessonOutline": {},
+  "learningObjectives": [],
+  "misconceptions": [],
+  "difficulty": "beginner | intermediate | advanced",
+  "contentStyle": {
+    "voice": "conversational | academic | systematic | narrative | minimalist",
+    "approaches": ["string"]
+  },
+  "gamificationContext": {
+    "enabled": false,
+    "pointRulesActive": []
+  },
+  "retrievalPracticeEnabled": false,
+  "interleavingEnabled": false,
+  "priorLessonConcepts": []
+}
 ```
 
-## Input Variables
+When `contentStyle` is absent, default to `voice: "systematic"`, no specific approaches.
 
-- `{{LESSON_TITLE}}` — The lesson being quizzed
-- `{{KEY_CONCEPTS}}` — List of concepts covered in the lesson
-- `{{QUESTION_COUNT}}` — Number of questions (recommended: 2-4)
+## Output Schema
 
-## Prompt
-
+```json
+{
+  "lessonId": "string",
+  "questions": [
+    {
+      "id": "string",
+      "type": "multiple-choice | short-answer | scenario",
+      "objectiveIds": ["string"],
+      "prompt": "string",
+      "choices": ["string"],
+      "correctIndex": 0,
+      "answer": "string",
+      "explanation": "string",
+      "misconceptionIds": ["string"],
+      "difficulty": "beginner | intermediate | advanced",
+      "points": 0,
+      "tags": ["string"],
+      "retrievalTarget": "string | null",
+      "remediationHint": "string"
+    }
+  ],
+  "coverageCheck": {
+    "coveredObjectiveIds": ["string"],
+    "missingObjectiveIds": ["string"]
+  },
+  "masteryThreshold": {
+    "minimumScore": 0,
+    "minimumCorrect": 0,
+    "totalQuestions": 0,
+    "recommendation": "string"
+  }
+}
 ```
-Create {{QUESTION_COUNT}} quiz questions for the lesson "{{LESSON_TITLE}}".
 
-Key concepts to test: {{KEY_CONCEPTS}}
+## Voice-Aware Question Framing
 
-RULES:
+Shape question language to match the tutorial's content voice:
 
-1. FORMAT: Output as YAML quiz array (ready to paste into frontmatter)
-2. OPTIONS: 3-4 options per question
-3. CORRECT INDEX: Vary correctIndex across questions — use 0, 1, 2, and 3
-   Example for 4 questions: correctIndex values of 1, 0, 3, 2
-4. DIFFICULTY: Mix easier and harder questions
-5. DISTRACTORS: Every wrong answer must be plausible
-   - BAD distractor: "42" (obviously wrong)
-   - GOOD distractor: "Reduces latency by caching at the edge" (sounds right but isn't)
-6. QUESTION TYPES: Mix these styles:
-   - "What is the purpose of X?" (conceptual)
-   - "Which of the following is true about Y?" (factual)
-   - "What happens when Z?" (applied reasoning)
-   - "Which is NOT a characteristic of W?" (negative)
-7. AVOID:
-   - "All of the above" / "None of the above"
-   - Questions that can be answered without reading the lesson
-   - Trick questions or ambiguous wording
-   - Questions about syntax minutiae
+| Voice | Question Style | Example |
+|-------|---------------|---------|
+| `conversational` | Friendly, direct, uses "you" | "You just ran `pnpm validate` and got 3 errors. What's the most likely cause?" |
+| `academic` | Formal, precise, uses discipline terminology | "Which validation mechanism is most effective at detecting structural defects in tutorial specifications?" |
+| `systematic` | Step-oriented, procedural | "Given the following sequence: (1) edit spec, (2) run validate, (3) inspect output — at which step would a missing `id` field be caught?" |
+| `narrative` | Scenario-based, character-driven | "Aya's validation pipeline just flagged a duplicate paragraph. Which component is responsible for this check?" |
+| `minimalist` | Terse, fact-focused | "Schema validation catches: (A) grammar, (B) structure, (C) pedagogy, (D) factual accuracy." |
 
-OUTPUT: Just the YAML quiz array, nothing else.
-```
+## Approach-Aware Assessment
 
-## Quality Checklist
+Shape question design based on instructional approaches:
 
-After generating quizzes, verify:
+| Approach | Assessment Style |
+|----------|-----------------|
+| `socratic` | Discovery questions: present a situation and ask learners to predict or explain before revealing the answer. |
+| `problem-based` | Multi-step scenarios: present a realistic problem and assess the solution process, not just the final answer. |
+| `hands-on` | Practical tasks: "Write the command to...", "Create a JSON object that...", "Fix the following code...". |
+| `analogical` | Transfer questions: "If validation is like a spell checker, what would the equivalent of 'grammar check' be?" |
+| `visual-first` | Diagram interpretation: "Based on the pipeline diagram, which stage runs immediately after lesson-outline?" |
+| `challenge-based` | Scored challenges with bonus questions. Include `points` for each question. Higher difficulty = more points. |
 
-- [ ] correctIndex values are varied (not all the same)
-- [ ] No correctIndex exceeds the options array length
-- [ ] Each distractor is plausible (someone who didn't read carefully might pick it)
-- [ ] Questions test understanding, not memorization
-- [ ] At least one question requires applying a concept (not just recalling a fact)
+## Retrieval Practice (when `retrievalPracticeEnabled`)
+
+When enabled, include questions that test recall of concepts from prior lessons:
+
+- Add 1-2 questions with `retrievalTarget` set to the concept id being recalled.
+- These questions should appear at the start of the quiz (delayed recall before new content assessment).
+- Use `priorLessonConcepts` to select concepts from 1-3 lessons back.
+- Frame retrieval questions as "Without looking back, can you recall..." (adjusted for voice).
+
+## Interleaving (when `interleavingEnabled`)
+
+When enabled, mix concepts within the quiz rather than grouping by topic:
+
+- Interleave questions from different objectives so learners cannot rely on topic clustering.
+- Add `tags` to each question indicating which concept it tests.
+- Ensure no two consecutive questions test the same objective.
+
+## Mastery Threshold
+
+Always include a `masteryThreshold` in the output:
+
+- `minimumScore`: recommended percentage (typically 70-80% for beginner, 80-90% for intermediate, 85-95% for advanced).
+- `minimumCorrect`: absolute number of questions needed.
+- `totalQuestions`: total in the quiz.
+- `recommendation`: what to do if threshold is not met (e.g., "Review sections 2 and 4, then retake the assessment.").
+
+## Remediation
+
+For each question, include a `remediationHint`:
+
+- Points the learner to the specific lesson section where the concept is covered.
+- Suggests a specific re-reading or exercise to address the gap.
+- Does not give away the answer.
+
+## Rules
+
+- Include at least one item for each objective.
+- Beginner questions should test recognition and guided application.
+- Intermediate questions should test transfer to a nearby scenario.
+- Advanced questions should require tradeoff analysis or design judgment.
+- Distractors must reflect plausible misconceptions, not joke answers.
+- If coverage is incomplete, list missing objective ids instead of hiding the gap.
+- When gamification is enabled, assign `points` to every question based on difficulty (e.g., beginner=10, intermediate=20, advanced=30).
+- When `challenge-based` approach is active, include bonus questions worth extra points.

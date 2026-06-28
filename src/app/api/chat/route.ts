@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { stream, kill } = streamClaude(message, context);
+  const { stream } = streamClaude(message, context);
 
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();
