@@ -8,6 +8,7 @@ quiz:
       - "TCP sockets and UDP datagrams"
       - "REST and GraphQL"
     correctIndex: 1
+    explanation: "MCP supports two transports: stdio (server runs as a child process, communicating via stdin/stdout) and HTTP with Server-Sent Events (server runs as an HTTP endpoint, responses stream back via SSE)."
   - question: "In MCP, what is the role of the MCP client?"
     options:
       - "It hosts the language model and generates text"
@@ -15,6 +16,7 @@ quiz:
       - "It replaces the agent's planning and reasoning capabilities"
       - "It lives inside the agent application and manages connections to MCP servers"
     correctIndex: 3
+    explanation: "The MCP client lives inside the host application (like Claude Code) and manages connections to MCP servers. It routes tool calls from the language model to the correct server and returns results."
   - question: "What message format does MCP use for communication?"
     options:
       - "Protocol Buffers"
@@ -22,6 +24,7 @@ quiz:
       - "JSON-RPC 2.0"
       - "MessagePack"
     correctIndex: 2
+    explanation: "MCP uses JSON-RPC 2.0 as its message format — a lightweight remote procedure call protocol where every message is a JSON object containing requests, responses, or notifications."
   - question: "What happens during the MCP initialization handshake?"
     options:
       - "The server sends its full database to the client"
@@ -29,6 +32,7 @@ quiz:
       - "The client downloads and installs the server's source code"
       - "The client and server exchange capabilities, agreeing on protocol version and supported features"
     correctIndex: 3
+    explanation: "During initialization, the client and server exchange capabilities, protocol versions, and identity information. This handshake ensures both sides agree on what features are supported before any tool calls happen."
 ---
 
 ## Overview
@@ -56,7 +60,7 @@ An MCP system has three main components that form a clear hierarchy:
     style S1 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style S2 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style S3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="MCP architecture hierarchy: the Host Application contains a Language Model and an MCP Client (with Connection Manager). The MCP Client communicates via JSON-RPC over stdio or SSE with multiple MCP Servers (GitHub, Database, Custom)." />
 
 The **host application** is the program you interact with -- Claude Code, Cursor, or a custom agent. The host contains the language model and the user interface. It is the outermost boundary.
 
@@ -86,7 +90,7 @@ Here is what a typical tool call looks like at the wire level:
     Service-->>Server: API Response (JSON)
     Server-->>Client: JSON-RPC Response<br/>result: {content: [{type: "text", text: "..."}]}
     Client-->>Agent: Tool result displayed to model
-`} />
+`} fallback="Tool call sequence: the agent tells the MCP client to call search_issues. The client sends a JSON-RPC request to the MCP server. The server calls the GitHub API. The API response flows back through the server, client, and to the agent." />
 
 The agent never talks directly to GitHub. It talks to the MCP client, which talks to the MCP server, which talks to GitHub. Each layer has a single, well-defined responsibility.
 
@@ -117,7 +121,7 @@ An MCP connection goes through four phases: initialization, operation, and shutd
 
     Note over Client,Server: Phase 4: Shutdown
     Client->>Server: close connection
-`} />
+`} fallback="MCP connection lifecycle in four phases: Phase 1 Initialize — client and server exchange protocol versions and capabilities. Phase 2 Discovery — client requests tools/list and resources/list, server responds with available tools and their schemas. Phase 3 Operation — client calls tools and reads resources as needed. Phase 4 Shutdown — client closes the connection." />
 
 **Phase 1 -- Initialize.** The client sends an `initialize` request containing its protocol version, supported capabilities, and identity. The server responds with its own protocol version, capabilities, and identity. The client then sends an `initialized` notification to confirm the handshake is complete. This is where the two sides agree on what they can do together.
 
@@ -148,7 +152,7 @@ With **stdio transport**, the MCP server runs as a child process of the host app
     style Child fill:#c6f6d5,stroke:#38a169
     style Client fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style Server fill:#9ae6b4,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="Stdio transport: the MCP Client in the host process sends JSON-RPC requests via stdin to the MCP Server running as a child process, and reads JSON-RPC responses from the server's stdout." />
 
 Stdio is the most common transport for local development. It is simple, requires no network configuration, and provides natural process lifecycle management -- when the host exits, the child process exits too. Claude Code and most desktop MCP clients use stdio by default.
 
@@ -169,7 +173,7 @@ With **SSE transport**, the MCP server runs as an HTTP server. The client connec
     style Remote fill:#c6f6d5,stroke:#38a169
     style Client fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style Server fill:#9ae6b4,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="SSE transport: the MCP Client on the local machine sends HTTP POST requests to the MCP Server on a remote server, and receives responses back via a Server-Sent Events stream." />
 
 SSE transport is appropriate when the server needs to run on a different machine, when multiple clients need to connect to the same server, or when you need to deploy the server behind a load balancer or API gateway.
 
@@ -211,7 +215,7 @@ From the language model's perspective, MCP tools look identical to any other too
     style T3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style T4 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style T5 fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="The language model's unified view of tools: built-in tools (read_file, search_code) and MCP tools (create_issue from GitHub, run_query from Database, send_message from Slack) appear identically — the model does not distinguish between them." />
 
 This transparency is a key design principle. The model reasons about `create_issue` the same way it reasons about `read_file`. The fact that one goes through MCP and the other is a native function is invisible at the reasoning layer. This means adding new capabilities via MCP does not require retraining or fine-tuning the model -- you just connect a new server.
 
@@ -249,7 +253,7 @@ Here is the complete flow when an agent uses an MCP tool, from human request to 
     Agent->>LM: Tool result + continue reasoning
     LM->>Agent: Natural language summary
     Agent->>Human: "I found 3 open bugs in the auth module..."
-`} />
+`} fallback="Complete MCP flow: human asks to find open bugs. The agent passes available tools to the language model. The model decides to call search_issues. The MCP client routes the call to the GitHub server, which calls the GitHub API. Results flow back through each layer. The model synthesizes a natural language summary for the human." />
 
 The human asks a question. The model decides it needs to search for issues. The MCP client routes the request to the GitHub MCP server. The server calls the GitHub API. The result flows back up through each layer. The model synthesizes a natural language response. The human sees the answer.
 

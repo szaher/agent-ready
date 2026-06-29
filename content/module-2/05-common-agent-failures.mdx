@@ -8,6 +8,7 @@ quiz:
   - The agent reads the wrong version of a file
   - The agent cannot find files because the project structure is too complex
   correctIndex: 0
+  explanation: "Path hallucination means the agent invents plausible but incorrect file paths based on common conventions in its training data, rather than searching for the actual path in your project."
 - question: What is the best way to prevent an agent from making edits that break other parts of the codebase?
   options:
   - Give the agent read-only access to all files
@@ -15,12 +16,14 @@ quiz:
   - Ensure the project has comprehensive tests and the agent is instructed to run them after changes
   - Review every edit manually before the agent proceeds
   correctIndex: 2
+  explanation: "Comprehensive tests act as an automated safety net — the agent can run them after each change to catch regressions immediately. Read-only access or manual review would cripple productivity, while limiting to one file misses the point."
 - question: Why do agents sometimes produce 'drift' -- code that technically works but does not match the project's existing patterns?
   options:
   - Agents draw on general training data and may use patterns that differ from your project's conventions
   - Agents deliberately introduce new patterns to improve the code
   - Agents cannot read existing code, so they always start from scratch
   correctIndex: 0
+  explanation: "Agents are trained on millions of code samples spanning many styles and frameworks. Without explicit convention guidance in your project, they draw on general patterns from training data that may differ from your team's specific standards."
 - question: What is the most effective codebase-level defense against agent failures?
   options:
   - Using the latest and largest AI model available
@@ -28,6 +31,7 @@ quiz:
   - Restricting agents to only simple tasks
   - Always having a human review before any change is applied
   correctIndex: 1
+  explanation: "No single layer catches all failures. Defense in depth — documentation (prevents wrong assumptions), consistent structure (makes right path obvious), automated checks (catches syntax and style errors), and comprehensive tests (verifies behavior) — provides overlapping coverage."
 ---
 
 ## Overview
@@ -83,7 +87,7 @@ This lesson catalogs the most common failure modes, explains why they happen (co
     style D fill:#fff5f5,stroke:#e53e3e
     style F fill:#f0fff4,stroke:#38a169
     style H fill:#f0fff4,stroke:#38a169
-`} />
+`} fallback="Two strategies for finding a file: the bad strategy guesses the path (Read /src/utils/validators.ts), gets a 'file not found' error, and wastes a loop plus tokens. The good strategy searches first for 'validation', finds the correct path (src/lib/validation/index.ts), and reads the right file directly." />
 
 ## Failure Mode 2: Editing the Wrong File
 
@@ -152,7 +156,7 @@ The **infinite fix loop** occurs when an agent's fix for one problem creates a n
     style A fill:#fff5f5,stroke:#e53e3e
     style F fill:#fff5f5,stroke:#e53e3e
     style H fill:#f0fff4,stroke:#38a169
-`} />
+`} fallback="Infinite fix loop: agent edits function A, which breaks test for function B. Agent fixes B, which breaks test for C. Agent fixes C, which breaks test for A — cycling back to the start. Root cause: the agent does not understand the dependency chain A → B → C → A." />
 
 **Why it happens**: The agent does not have a holistic understanding of the dependencies between components. It fixes problems locally without seeing the global impact.
 
@@ -294,7 +298,7 @@ No single technique prevents all agent failures. The most resilient codebases us
     style Layer2 fill:#ebf8ff,stroke:#3182ce
     style Layer3 fill:#fef3c7,stroke:#d69e2e
     style Layer4 fill:#fff5f5,stroke:#e53e3e
-`} />
+`} fallback="Defense-in-depth strategy with four layers: Layer 1 Documentation (CLAUDE.md, architecture docs, code comments) feeds into Layer 2 Code Structure (small files, consistent naming, explicit dependencies), then Layer 3 Automated Checks (type checking, linting, formatting), then Layer 4 Tests (unit, integration, clear error messages). An agent's change passes through all layers; if all pass, the change is likely correct; if any fail, the error is caught before merging." />
 
 Each layer catches different types of failures:
 

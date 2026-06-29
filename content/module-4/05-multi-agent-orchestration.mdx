@@ -8,6 +8,7 @@ quiz:
   - The agents can communicate with each other directly
   - Fan-out requires fewer agent definitions
   correctIndex: 0
+  explanation: "In a fan-out pattern, independent tasks run simultaneously across multiple agents. This reduces total wall-clock time because no task waits for another to finish."
 - question: What is the role of the orchestrator in a team pattern?
   options:
   - It performs all the work and delegates nothing
@@ -15,6 +16,7 @@ quiz:
   - It decomposes the task, delegates to specialized agents, and synthesizes their results
   - It provides Bash access to all sub-agents
   correctIndex: 2
+  explanation: "The orchestrator is the team leader — it breaks down the task, assigns subtasks to specialized worker agents, and combines their results into a coherent outcome for the developer."
 - question: When should you avoid multi-agent orchestration?
   options:
   - When the task involves multiple files
@@ -22,6 +24,7 @@ quiz:
   - When you have more than three agent definitions
   - When the task is simple enough for a single agent and the overhead of coordination adds no value
   correctIndex: 3
+  explanation: "Multi-agent orchestration adds coordination overhead. When a task is simple enough for a single focused agent, adding multiple agents increases complexity, token cost, and latency without improving the result."
 ---
 
 ## Overview
@@ -51,7 +54,7 @@ Multiple agents, each focused on one concern, produce better results than one ag
     style Multi fill:#c6f6d5,stroke:#38a169
     style R1 fill:#fff5f5,stroke:#fc8181
     style R2 fill:#f0fff4,stroke:#68d391
-`} />
+`} fallback="Comparison of single-agent versus multi-agent approaches: a single agent handling review, tests, and docs leads to split attention, bloated prompts, and inconsistent quality. Multiple specialized agents (Review, Test, Docs) each have focused attention, clean prompts, and consistent quality." />
 
 ## Pattern 1: The Team (Leader + Workers)
 
@@ -71,7 +74,7 @@ The **team pattern** uses an **orchestrator agent** that decomposes a task, dele
     style W1 fill:#ebf8ff,stroke:#3182ce
     style W2 fill:#ebf8ff,stroke:#3182ce
     style W3 fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Team pattern: a developer communicates with an orchestrator agent (team leader), which delegates to three specialized workers — Code Reviewer (read-only), Test Writer (read and write), and Doc Generator (read and write) — and collects their results." />
 
 The orchestrator agent has broader permissions -- it needs to read the codebase to understand the task and invoke sub-agents. But the worker agents remain tightly scoped.
 
@@ -136,7 +139,7 @@ The **pipeline pattern** passes work through a sequence of agents, where each ag
     S3->>S4: Review approval + changed files
     S4->>S4: Write and run tests
     S4-->>Dev: Final report: tests pass/fail
-`} />
+`} fallback="Pipeline pattern sequence: a feature request flows through four sequential stages — Analyzer (analyzes requirements), Implementer (implements changes), Reviewer (reviews implementation), and Tester (writes and runs tests) — with each stage's output feeding the next." />
 
 Each stage in the pipeline has a single responsibility and a clear contract for what it passes to the next stage:
 
@@ -221,7 +224,7 @@ The **fan-out pattern** dispatches multiple agents simultaneously on independent
     style A3 fill:#ebf8ff,stroke:#3182ce
     style A4 fill:#ebf8ff,stroke:#3182ce
     style C fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Fan-out pattern: a dispatcher sends the same task to four agents in parallel (each linting a different module — auth, api, db, ui), and a collector gathers all results back to the developer." />
 
 Fan-out is ideal when you have the same task applied to independent units of work -- reviewing multiple modules, analyzing separate services, or running checks across different parts of the codebase.
 
@@ -282,7 +285,7 @@ Here is a decision framework for selecting the orchestration pattern:
     style FanOut fill:#c6f6d5,stroke:#38a169
     style Pipeline fill:#ebf8ff,stroke:#3182ce
     style Team fill:#b794f4,stroke:#6b46c1,color:#ffffff
-`} />
+`} fallback="Decision flowchart for choosing an orchestration pattern: if subtasks have no dependencies, use fan-out. If they are sequential and the sequence is fixed, use pipeline. If the sequence requires judgment, use the team pattern with an orchestrator." />
 
 | Question | If Yes | If No |
 |----------|--------|-------|
@@ -318,7 +321,7 @@ In practice, real workflows often combine multiple patterns. A team leader might
     Lead->>Test: Verify changes
     Test-->>Lead: All tests pass
     Lead-->>Dev: Refactoring complete
-`} />
+`} fallback="Combined pattern sequence: a team lead fans out parallel reviews across three files (login.ts, session.ts, tokens.ts), collects all review reports, then pipelines the consolidated findings through an implementer and tester in sequence." />
 
 The team leader uses fan-out for the review phase (parallel, independent reviews) and then switches to a pipeline for implementation and verification (sequential, dependent stages).
 

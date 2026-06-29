@@ -30,13 +30,14 @@ export default function VoiceControls({
   if (!isSupported) return null;
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5" role="group" aria-label="Narration controls">
       {isPlaying ? (
         <>
           <button
             onClick={isPaused ? onResume : onPause}
             className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--accent-blue)] hover:bg-white/[0.04] transition-colors"
             title={isPaused ? "Resume" : "Pause"}
+            aria-label={isPaused ? "Resume narration" : "Pause narration"}
           >
             {isPaused ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -53,12 +54,17 @@ export default function VoiceControls({
             onClick={onStop}
             className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--accent-red)] hover:bg-white/[0.04] transition-colors"
             title="Stop"
+            aria-label="Stop narration"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <rect x="5" y="5" width="14" height="14" rx="2" />
             </svg>
           </button>
-          <span className="text-xs text-[var(--text-secondary)] ml-1">
+          <span
+            className="text-xs text-[var(--text-secondary)] ml-1"
+            aria-live="polite"
+            aria-label={`Section ${currentSectionIndex + 1} of ${totalSections}`}
+          >
             {currentSectionIndex + 1}/{totalSections}
           </span>
         </>
@@ -67,6 +73,7 @@ export default function VoiceControls({
           onClick={onPlayAll}
           className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--accent-blue)] hover:bg-white/[0.04] transition-colors"
           title="Read aloud"
+          aria-label="Read lesson aloud"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none" />
@@ -80,6 +87,7 @@ export default function VoiceControls({
         onClick={onCycleSpeed}
         className="px-1.5 py-0.5 rounded text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/[0.04] transition-colors"
         title="Change speed"
+        aria-label={`Playback speed ${speed}×. Activate to change.`}
       >
         {speed}x
       </button>

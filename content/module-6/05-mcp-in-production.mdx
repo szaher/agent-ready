@@ -8,6 +8,7 @@ quiz:
       - "Give agents full administrative access so they can handle any request"
       - "Disable logging to reduce disk usage"
     correctIndex: 1
+    explanation: "Production MCP servers must follow least privilege — granting only the minimum permissions needed — and validate all inputs to prevent data exfiltration, unauthorized writes, and scope creep."
   - question: "Why should MCP servers implement rate limiting?"
     options:
       - "To make the agent wait and think more carefully before each tool call"
@@ -15,6 +16,7 @@ quiz:
       - "To limit the number of users who can access the agent"
       - "To prevent runaway agents from exhausting API quotas or overwhelming downstream services"
     correctIndex: 3
+    explanation: "Rate limiting prevents runaway agent loops from exhausting downstream API quotas or overwhelming services. Without rate limits, a malfunctioning agent could make thousands of API calls in seconds."
   - question: "What is the recommended approach for MCP server authentication in production?"
     options:
       - "Hardcode API keys in the server source code for reliability"
@@ -22,6 +24,7 @@ quiz:
       - "Use OAuth 2.0 or short-lived tokens injected via environment variables, never committed to source control"
       - "Share a single API key across all team members"
     correctIndex: 2
+    explanation: "OAuth 2.0 or short-lived tokens provide proper authentication without embedding secrets in source code. Environment variables keep credentials out of version control where they could be exposed."
 ---
 
 ## Overview
@@ -56,7 +59,7 @@ Every MCP server is a bridge between an AI agent and an external system. That br
     T4 -.->|"mitigated by"| D4
     style Threats fill:#fed7d7,stroke:#e53e3e
     style Defenses fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Security threats and their defenses: Data Exfiltration is mitigated by Input Validation (schema + business rules), Unauthorized Writes by Least Privilege (minimal permissions), Resource Exhaustion by Rate Limiting (per-tool quotas), and Scope Creep by Audit Logging (every tool call recorded)." />
 
 The defense is defense in depth: validate inputs, limit permissions, restrict rates, and log everything.
 
@@ -431,7 +434,7 @@ When multiple agents or users need to access the same MCP server, deploy it as a
     style Gateway fill:#fefcbf,stroke:#d69e2e
     style Servers fill:#c6f6d5,stroke:#38a169
     style Services fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Shared MCP server architecture: multiple agent instances (Developer A, Developer B, CI Pipeline) connect via SSE to an API Gateway (authentication, rate limiting, access logging), which routes to an MCP Server Cluster, which accesses downstream services (Database, Internal APIs, Project Management)." />
 
 ### Local vs. Remote: Decision Framework
 
@@ -448,7 +451,7 @@ When multiple agents or users need to access the same MCP server, deploy it as a
     style LocalAuth fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style Internal fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style Remote fill:#fed7d7,stroke:#e53e3e,color:#1a202c
-`} />
+`} fallback="Decision flowchart for MCP server deployment: single user without sensitive data → local stdio. Single user with sensitive data → local stdio + credential rotation. Team on same network → internal SSE + API gateway. Team across networks → remote SSE + OAuth + TLS." />
 
 Start with the simplest deployment that meets your needs. Most teams begin with local stdio servers and only move to remote SSE deployments when they need shared access or centralized management.
 

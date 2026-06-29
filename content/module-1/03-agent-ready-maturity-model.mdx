@@ -8,6 +8,7 @@ quiz:
   - Level 2 -- Structured
   - Level 3 -- Optimized
   correctIndex: 0
+  explanation: "Level 1 (Foundational) means the basics work — a README, working build/test commands, and basic linting — but no agent-specific instruction file or documented conventions. A good README alone does not reach Level 2."
 - question: What is the primary difference between Level 2 (Structured) and Level 3 (Optimized)?
   options:
   - Level 3 uses more advanced AI models
@@ -15,6 +16,7 @@ quiz:
   - Level 3 incorporates agent-specific workflow integration and continuous refinement based on agent performance data
   - Level 2 is for small projects and Level 3 is for large ones
   correctIndex: 2
+  explanation: "Level 2 establishes agent instruction files and documented conventions. Level 3 goes further with workflow-specific guidance, exemplar patterns, and continuous refinement driven by real agent performance data."
 - question: Why does the maturity model emphasize progression over perfection?
   options:
   - Because perfection is impossible in software development
@@ -22,6 +24,7 @@ quiz:
   - Because AI agents only need Level 1 to function properly
   - Because each level builds on the previous one, and even small improvements at any level yield measurable gains in agent effectiveness
   correctIndex: 3
+  explanation: "Each maturity level builds on the previous one, so incremental progress is always valuable. Even a small step — like adding a working build command — yields measurable gains in agent effectiveness."
 ---
 
 ## Overview
@@ -50,7 +53,7 @@ Every codebase is different. A startup's MVP has different needs than a decade-o
     style L2 fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style L3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style L4 fill:#e9d8fd,stroke:#805ad5,color:#1a202c
-`} />
+`} fallback="Five maturity levels progressing left to right: Level 0 Unaware, Level 1 Foundational, Level 2 Structured, Level 3 Optimized, Level 4 Autonomous." />
 
 ### Level 0: Unaware
 
@@ -167,14 +170,14 @@ At **Level 0**, the codebase has no preparation for AI agents. This is the defau
     style L2C fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style L3C fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style L4C fill:#e9d8fd,stroke:#805ad5,color:#1a202c
-`} />
+`} fallback="Agent capabilities at each maturity level: Level 0 can read code but guesses everything; Level 1 can build and test but guesses conventions; Level 2 follows conventions and verifies work; Level 3 handles complex tasks with documented workflows; Level 4 drives features end-to-end autonomously." />
 
 | Aspect | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 |
 |--------|---------|---------|---------|---------|---------|
 | Agent instruction file | None | None | Basic | Hierarchical | Comprehensive |
 | Build/test reliability | Unreliable | Works | Fast | Very fast | Automated gates |
 | Convention docs | None | Minimal | Explicit | With examples | Self-updating |
-| Task completion rate | ~20% | ~40% | ~65% | ~80% | ~90%+ |
+| Task completion rate | Very low | Low | Moderate | High | Very high |
 | Human correction needed | Always | Usually | Sometimes | Rarely | Review only |
 
 ## Where to Start
@@ -202,4 +205,4 @@ The highest level where you can answer "yes" to all questions is approximately w
 
 ## Summary
 
-The **Agent-Ready Maturity Model** provides a five-level framework for assessing and improving your codebase's readiness for AI agents. From Level 0 (Unaware) to Level 4 (Autonomous), each level represents a meaningful improvement in how effectively agents can work in your repository. The model emphasizes progression over perfection -- even moving from Level 0 to Level 1 can double an agent's task completion rate. In the next lesson, we will get hands-on by running an AI coding agent on a real repository and observing these principles in action.
+The **Agent-Ready Maturity Model** provides a five-level framework for assessing and improving your codebase's readiness for AI agents. From Level 0 (Unaware) to Level 4 (Autonomous), each level represents a meaningful improvement in how effectively agents can work in your repository. The model emphasizes progression over perfection -- even moving from Level 0 to Level 1 meaningfully improves how effectively agents work in your codebase. In the next lesson, we will get hands-on by running an AI coding agent on a real repository and observing these principles in action.

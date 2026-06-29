@@ -8,6 +8,7 @@ quiz:
   - Minimizing the number of files in the repository
   - Avoiding the use of third-party dependencies
   correctIndex: 0
+  explanation: "A project instruction file like CLAUDE.md provides the context, conventions, and constraints that agents need. Language version, file count, and dependency choices are secondary concerns that do not address the four pillars of agent readiness."
 - question: What role do automated feedback loops play in agent readiness?
   options:
   - They replace the need for human code review entirely
@@ -15,6 +16,7 @@ quiz:
   - They allow the agent to verify its own work and self-correct without human intervention
   - They are only useful for CI/CD pipelines, not for agents
   correctIndex: 2
+  explanation: "Feedback loops like tests, linters, and type checkers let agents verify their own work and iterate without human help. They do not replace code review, and they are essential for agent autonomy — not just CI/CD."
 - question: Why is explicit convention documentation important for AI agents?
   options:
   - Agents cannot read code, so they need written instructions
@@ -22,6 +24,7 @@ quiz:
   - It is required by all AI agent vendors
   - Agents lack the cultural context that human team members absorb over time and need conventions stated explicitly
   correctIndex: 3
+  explanation: "Human developers absorb conventions through code reviews, pair programming, and team culture over time. Agents have none of that history, so conventions must be written down explicitly for them to follow."
 ---
 
 ## Overview
@@ -62,7 +65,7 @@ The agent needs to answer several questions quickly:
     Q5 --> A5
     style Questions fill:#ebf8ff,stroke:#3182ce
     style Answers fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="An agent's five first questions — What is this project? How is it structured? What are the conventions? How do I verify my work? What are the constraints? — mapped to where answers come from: project instruction files, directory structure, style guides and linter configs, test suites and CI pipelines, and explicit rules and permission boundaries." />
 
 An **agent-ready** codebase answers all of these questions clearly, explicitly, and in places where the agent knows to look.
 
@@ -84,7 +87,7 @@ Agent readiness rests on four pillars. Each one addresses a different failure mo
     style CV fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style CS fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style FL fill:#fed7d7,stroke:#e53e3e,color:#1a202c
-`} />
+`} fallback="An agent-ready codebase rests on four pillars: Context (project purpose, architecture overview, key decisions), Conventions (code style, file organization, naming patterns), Constraints (off-limits areas, security boundaries, performance requirements), and Feedback Loops (tests, linters, type checkers)." />
 
 ### Pillar 1: Context
 

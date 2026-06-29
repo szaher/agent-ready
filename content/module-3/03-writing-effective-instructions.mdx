@@ -8,6 +8,7 @@ quiz:
   - Tests are important in this project
   - Please run the test suite when you are done
   correctIndex: 0
+  explanation: "The most effective instructions are specific and actionable — they include the exact command to run and what to do with the result, leaving no room for interpretation."
 - question: What is the main risk of including too many instructions in CLAUDE.md?
   options:
   - The file becomes hard to read for humans
@@ -15,6 +16,7 @@ quiz:
   - Excessive instructions waste context window tokens and dilute the important rules
   - The agent will refuse to follow more than ten instructions
   correctIndex: 2
+  explanation: "Every instruction consumes context window tokens. Too many instructions dilute the important rules — the agent pays less attention to each individual instruction when surrounded by excessive content."
 - question: Which of the following is an anti-pattern in CLAUDE.md instructions?
   options:
   - 'Using imperative mood: ''Run pytest -x before committing'''
@@ -22,6 +24,7 @@ quiz:
   - Listing exact file paths for key utilities
   - Writing vague instructions like 'Follow best practices for error handling'
   correctIndex: 3
+  explanation: "Vague instructions like 'follow best practices' force the agent to decide what 'best practices' means — which varies across training data. Precise, imperative instructions with exact commands and examples are far more effective."
 ---
 
 ## Overview
@@ -60,7 +63,7 @@ Instructions exist on a spectrum from vague to precise. Agents perform best with
     style Vague fill:#fed7d7,stroke:#c53030
     style Better fill:#fefcbf,stroke:#975a16
     style Precise fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="The specificity spectrum from vague to precise: Vague instructions like 'Write good tests' and 'Handle errors properly' are ineffective. Better versions like 'Write unit tests for new functions' add some clarity. Precise instructions like 'Write tests using vitest. Place test files adjacent: foo.ts → foo.test.ts' and 'Use tryCatch() from src/lib/result.ts. Never throw raw exceptions.' are the most effective." />
 
 The key difference is **actionability**. A vague instruction like "write good tests" forces the agent to decide what "good" means. A precise instruction like "write tests using vitest, place test files adjacent to source" leaves no ambiguity.
 

@@ -8,6 +8,7 @@ quiz:
   - It gives agents access to the internet between sessions
   - It enables agents to modify files without developer permission
   correctIndex: 0
+  explanation: "Without persistent memory, agents start every session from scratch — rediscovering project-specific facts, conventions, and quirks that were already learned in prior sessions. Memory eliminates this repeated discovery cost."
 - question: Which type of memory captures things like 'this project uses pnpm, not npm' or 'always run migrations before tests'?
   options:
   - User preferences -- personal style choices
@@ -15,6 +16,7 @@ quiz:
   - Project facts -- discovered truths about the codebase and its tooling
   - Reference memory -- links to external documentation
   correctIndex: 2
+  explanation: "Project facts are stable truths about the codebase's tooling, configuration, and environment. They are the most valuable memory type because they prevent the agent from guessing or using incorrect defaults on every session."
 - question: Why should memory systems be selective about what they persist rather than recording everything?
   options:
   - Storage costs make it impractical to save everything
@@ -22,6 +24,7 @@ quiz:
   - Agents cannot read more than ten memory entries per session
   - Too much stored memory floods future sessions with irrelevant context, recreating the drowning problem
   correctIndex: 3
+  explanation: "Storing everything recreates the drowning problem — too many memories flood future sessions with marginally relevant observations, consuming context budget and diluting the agent's focus on what actually matters."
 - question: What happens when memory conflicts with CLAUDE.md?
   options:
   - Memory always wins because it is more recent
@@ -29,6 +32,7 @@ quiz:
   - The agent crashes due to contradictory instructions
   - The agent should ask the developer which source to trust
   correctIndex: 1
+  explanation: "CLAUDE.md is the version-controlled, team-agreed source of truth. Memory is supplementary and auto-generated. When they conflict, CLAUDE.md takes precedence because it represents the team's intentional, reviewed decisions."
 ---
 
 ## Overview
@@ -59,7 +63,7 @@ Without memory, every agent session is a fresh start. The agent reads CLAUDE.md,
     A3->>A3: Rediscovers the same root cause
     A3->>D: Same fix, third time
     Note over A3: The agent never learns.
-`} />
+`} fallback="The Groundhog Day problem: across three separate sessions, the developer asks about flaky payment tests. Each time, the agent rediscovers the same race condition in the database pool, applies the same mutex fix, and the knowledge is lost when the session ends. The agent never learns from previous sessions." />
 
 This is the **Groundhog Day problem**: the agent relives the same discovery process over and over. Each session pays the full cost of understanding something the agent already figured out before.
 
@@ -86,7 +90,7 @@ A **memory system** for AI agents records observations from each session and inj
     style Record fill:#ebf8ff,stroke:#3182ce
     style Retrieve fill:#fefcbf,stroke:#d69e2e
     style Apply fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="Memory system in three phases: Phase 1 Record — the agent observes something noteworthy, the memory system captures it, and it is stored persistently. Phase 2 Retrieve — a new session begins, the memory system searches for relevant past observations, and matched observations are injected into context. Phase 3 Apply — the agent uses past knowledge without rediscovery, leading to better decisions and fewer mistakes." />
 
 **Recording** happens during or after a session. The memory system observes the agent's actions, the developer's corrections, and the facts discovered during the session. Not everything is recorded -- the system filters for observations that are likely useful in future sessions.
 
@@ -161,7 +165,7 @@ The mechanics of memory injection vary by tool, but the general pattern is consi
     Note over A: Context now includes:<br/>1. CLAUDE.md<br/>2. Memory: connection pool limit=10<br/>3. Memory: JWT test fixtures use HS256<br/>4. Memory: run db:migrate:test first
     A->>A: Apply knowledge immediately
     A->>D: "Found it -- the connection pool limit<br/>is causing test contention. Here is the fix."
-`} />
+`} fallback="Memory injection sequence: the developer asks to fix a flaky payment test. The agent queries the memory system for 'payment test flaky,' which returns three relevant memories (connection pool limit, JWT test fixtures, db migration requirement). The agent immediately applies this knowledge and goes straight to the fix without rediscovery." />
 
 Notice the difference from the Groundhog Day scenario. Instead of rediscovering the connection pool issue, the agent starts with that knowledge and goes straight to the fix.
 

@@ -113,7 +113,7 @@ export default function MermaidDiagram({ chart, fallback, children }: MermaidDia
   return (
     <div className="my-6 p-4 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border)] overflow-x-auto">
       {svgHtml ? (
-        <div className="mermaid flex justify-center" dangerouslySetInnerHTML={{ __html: svgHtml }} />
+        <div className="mermaid flex justify-center" role="img" aria-label={fallback || "Diagram"} dangerouslySetInnerHTML={{ __html: svgHtml }} />
       ) : failed ? (
         <pre className="mermaid whitespace-pre-wrap text-sm text-[var(--text-secondary)]">
           {fallback || chartText}

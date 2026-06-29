@@ -8,6 +8,7 @@ quiz:
       - "It provides a standard way for AI agents to connect to external tools and data sources"
       - "It encrypts communication between microservices"
     correctIndex: 2
+    explanation: "MCP provides a standard way for AI agents to connect to external tools and data sources, eliminating the need for custom integration code between each agent-tool pair."
   - question: "Which analogy best describes MCP's role in the AI ecosystem?"
     options:
       - "MCP is like a programming language — it defines how to write agent code"
@@ -15,6 +16,7 @@ quiz:
       - "MCP is like a database — it stores all the agent's knowledge"
       - "MCP is like USB-C — one standard connector that works with many different devices"
     correctIndex: 3
+    explanation: "Like USB-C providing one standard connector for many devices, MCP provides one standard protocol for connecting any agent to any tool — reducing integrations from M×N to M+N."
   - question: "What was the main drawback of pre-MCP tool integrations?"
     options:
       - "They were too fast and difficult to debug"
@@ -22,9 +24,20 @@ quiz:
       - "They only supported Python"
       - "They were standardized but poorly documented"
     correctIndex: 1
+    explanation: "Before MCP, each agent-tool pair needed its own custom integration code. Agent A's GitHub integration could not be reused by Agent B, creating an M×N integration problem."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Explain the M×N integration problem that MCP solves",
+  "Describe the three MCP primitives: tools, resources, and prompts",
+  "Understand how MCP fits into the agent-ready stack as a capabilities layer"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 5: Repository Structure for Agents"
+]} />
 
 Every AI coding agent needs to interact with the world beyond its language model -- reading files from a database, creating issues in a project tracker, querying a search engine, or calling an internal API. Before the **Model Context Protocol (MCP)**, each of these integrations was a bespoke, tightly coupled piece of code. MCP changes that by providing a single, open standard for connecting agents to external tools and data sources. This lesson explains what MCP is, why it exists, and why it matters for anyone building agent-ready systems.
 
@@ -50,7 +63,7 @@ Imagine you are building an AI coding agent that needs to interact with GitHub, 
     style G2 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style D2 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style J2 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
-`} />
+`} fallback="Before MCP: Agent A and Agent B each need separate custom integration code for GitHub, Database, and Jira — resulting in six custom integrations for just two agents and three tools." />
 
 Each agent-tool pair requires its own **custom integration code**. Agent A's GitHub integration does not work with Agent B. Agent B's database connector cannot be reused by Agent A. Every new agent or tool multiplies the number of integrations you need to write and maintain.
 
@@ -77,13 +90,13 @@ To understand why MCP matters, think about what USB-C did for hardware. Before U
     style S1 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style S2 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style S3 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
-`} />
+`} fallback="After MCP: Agent A and Agent B both connect to the same MCP servers (GitHub, Database, Jira) through the standard MCP protocol — each server is written once and works with any agent." />
 
 MCP is USB-C for AI agents. Write a server once, and any MCP-compatible agent can use it. Build an agent once, and it can talk to any MCP server. The integration burden drops from multiplicative to additive.
 
 ## What MCP Actually Is
 
-The **Model Context Protocol** is an open standard, originally created by Anthropic and now adopted across the industry, that defines how AI agents communicate with external tools and data sources. At its core, MCP specifies:
+The **Model Context Protocol** is an open standard, originally created by Anthropic and now adopted across the industry, that defines how AI agents communicate with external tools and data sources (see [MCP Specification](https://modelcontextprotocol.io/specification)). At its core, MCP specifies:
 
 - **A message format** -- how requests and responses are structured (JSON-RPC 2.0)
 - **A transport layer** -- how messages travel between agent and tool (stdio or HTTP with Server-Sent Events)
@@ -111,7 +124,7 @@ MCP organizes everything a server can expose into three categories, called **pri
     style T1 fill:#f0fff4,stroke:#38a169,color:#1a202c
     style R1 fill:#fffff0,stroke:#d69e2e,color:#1a202c
     style P1 fill:#faf5ff,stroke:#805ad5,color:#1a202c
-`} />
+`} fallback="The three MCP primitives: Tools (actions the agent calls, like create_issue, search_code, run_query), Resources (data the agent reads, like file contents, DB schemas, config), and Prompts (templates the agent uses, like code review, bug report, analysis)." />
 
 **Tools** are functions the agent can call to take actions. Examples include creating a GitHub issue, running a database query, or sending a Slack message. Tools are the most commonly used primitive -- they give the agent the ability to do things in the world.
 
@@ -130,7 +143,7 @@ MCP is not a theoretical standard -- it is already integrated into the tools dev
 - **VS Code extensions** -- the GitHub Copilot extension and others are adopting MCP
 - **Open-source agents** -- many community-built agents use MCP as their tool integration layer
 
-The ecosystem of **pre-built MCP servers** is growing rapidly. There are already servers for GitHub, GitLab, Jira, Slack, PostgreSQL, MySQL, filesystem access, web search, and dozens more. You can often connect an agent to a new service by adding a few lines of configuration.
+<VerifyClaim status="verify">The ecosystem of **pre-built MCP servers** is growing rapidly. There are already servers for GitHub, GitLab, Jira, Slack, PostgreSQL, MySQL, filesystem access, web search, and dozens more. Check the MCP server directory for the current list.</VerifyClaim> You can often connect an agent to a new service by adding a few lines of configuration.
 
 ## Why MCP Matters for Agent-Ready Codebases
 
@@ -159,7 +172,7 @@ The MCP ecosystem has three layers:
     style L1 fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style L2 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style L3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="The MCP ecosystem in three layers: Agent Layer (Claude Code, Cursor, custom agents), Protocol Layer (JSON-RPC, stdio/SSE transport), and Server Layer (GitHub, Jira, databases, custom servers). The protocol layer connects agents to servers." />
 
 - The **agent layer** includes any application that embeds an MCP client -- Claude Code, Cursor, or your own custom agent
 - The **protocol layer** is the standard itself -- the message formats, transport mechanisms, and capability negotiation

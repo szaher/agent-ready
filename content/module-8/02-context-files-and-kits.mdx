@@ -8,6 +8,7 @@ quiz:
   - They encrypt sensitive project information so agents can read it securely
   - They automatically generate code documentation from source files
   correctIndex: 0
+  explanation: ".ctx files distribute context across the codebase so agents load only what is relevant to the current directory. CLAUDE.md alone forces all context into one file that is loaded in every session, wasting tokens on irrelevant information."
 - question: What is a context pack?
   options:
   - A compressed archive of all files in a directory
@@ -15,6 +16,7 @@ quiz:
   - A dynamically assembled bundle of relevant context files selected based on the current task
   - A predefined template for CLAUDE.md files
   correctIndex: 2
+  explanation: "A context pack is dynamically assembled from relevant .ctx files based on the current task. Instead of loading all context or none, the kit selects only the files relevant to the task at hand, creating a focused bundle."
 - question: Why should .ctx files describe the 'why' rather than duplicating the 'what' from code?
   options:
   - Because agents cannot read source code directly
@@ -22,6 +24,7 @@ quiz:
   - Because 'why' uses fewer tokens than 'what'
   - Because the 'what' changes with every commit, making the .ctx file immediately stale; the 'why' is more stable and more useful
   correctIndex: 3
+  explanation: "The 'what' (function names, class structures) changes with every commit, making embedded descriptions immediately stale. The 'why' (design rationale, architectural decisions) is more stable and is the information agents cannot infer from reading code alone."
 ---
 
 ## Overview
@@ -55,15 +58,17 @@ Before long, your CLAUDE.md is 400 lines. Every agent session loads all 400 line
     C -.-> F
     style Problem fill:#ebf8ff,stroke:#3182ce
     style F fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="The CLAUDE.md scaling problem: a small project with a 30-line CLAUDE.md costs ~500 tokens (minimal). A growing project with 200 lines costs ~3,000 tokens (acceptable). A large project with 500 lines costs ~8,000 tokens (4% of the context window wasted on mostly irrelevant content)." />
 
 The solution is not to stop documenting. It is to **distribute** the documentation so that each piece lives close to the code it describes and gets loaded only when the agent is actually working in that area.
 
 ## What Is a .ctx File?
 
-A **.ctx file** is a structured context file that describes a specific directory or component in your codebase. It lives alongside the code it documents, and agents read it when they navigate to that directory.
+A **.ctx file** is a convention some teams adopt for describing a specific directory or component in their codebase. It lives alongside the code it documents and serves as a local context document for that area.
 
-Think of it like a local tour guide. CLAUDE.md is the guidebook for the entire city. A .ctx file is the placard at a specific building explaining what it is, why it exists, and what you need to know to work on it.
+Unlike CLAUDE.md files (which Claude Code automatically discovers and loads), .ctx files are **not a Claude Code platform primitive**. They require custom tooling or explicit instructions for agents to find and read them. Think of .ctx as a team convention, not a platform feature.
+
+That said, the pattern is useful. Think of it like a local tour guide. CLAUDE.md is the guidebook for the entire city. A .ctx file is the placard at a specific building explaining what it is, why it exists, and what you need to know to work on it.
 
 <CodeBlock code={`# src/api/.ctx
 
@@ -89,7 +94,7 @@ this layer should be thin.
 - Run: pnpm test -- --grep "api"
 `} language="markdown" filename="src/api/.ctx" />
 
-The .ctx file answers the questions an agent asks when it enters a directory: What is this? What matters here? What should I know before changing things?
+The .ctx file answers the questions an agent would ask when it enters a directory: What is this? What matters here? What should I know before changing things? Note that agents need to be instructed (via CLAUDE.md or a system prompt) to look for .ctx files -- they will not discover them automatically.
 
 ## Anatomy of a Good .ctx File
 
@@ -134,17 +139,17 @@ idempotent -- the same message may be delivered more than once.
 
 ## .ctx Files vs. Nested CLAUDE.md
 
-You might wonder: "Why not just use nested CLAUDE.md files in subdirectories?" Both approaches distribute context, but they work differently.
+You might wonder: "Why not just use nested CLAUDE.md files in subdirectories?" Both approaches distribute context, but they have different tradeoffs.
 
-**Nested CLAUDE.md files** are automatically read by agents like Claude Code when they enter a directory. They have the advantage of being a well-known convention with built-in support. However, they carry the same instructions-format expectation as the root CLAUDE.md, and agents may treat them as global project instructions rather than directory-scoped context.
+**Nested CLAUDE.md files** are the platform-supported mechanism. Claude Code automatically discovers and loads them when working in a directory. They require no custom tooling. Claude Code also supports `.claude/rules/` files with a `paths` frontmatter field for targeting specific file patterns. These are the native, built-in approaches.
 
-**.ctx files** are explicitly loaded by context-aware tools and kits. They have a more structured format, can be indexed and searched by automated systems, and are designed specifically for on-demand loading rather than automatic injection.
+**.ctx files** are a team convention that requires custom tooling or explicit CLAUDE.md instructions (e.g., "when entering a new directory, check for a .ctx file") for agents to discover and load. They offer a more structured format and can be indexed by custom tools, but they are not automatically processed by any standard agent platform.
 
-In practice, both approaches work. Many teams use nested CLAUDE.md for high-level package boundaries and .ctx files for finer-grained directory context. The important thing is to distribute context rather than centralizing everything in one place.
+In practice, many teams use nested CLAUDE.md for high-level package boundaries and .ctx files for finer-grained directory context where they have invested in the tooling. If you are starting fresh, nested CLAUDE.md and `.claude/rules/` are the simpler choice because they work out of the box.
 
 ## Context Kits: Automated Context Selection
 
-Writing .ctx files distributes your documentation, but the agent still has to find and read the right ones. **Context kits** automate this step. A context kit is a system that, given a task description, selects the most relevant context files and assembles them into a **context pack** -- a focused bundle of information tailored to the current task.
+Writing .ctx files distributes your documentation, but the agent still has to find and read the right ones. **Context kits** are a design pattern for automating this step. If you build or adopt a context selection tool, here is how the pattern works: given a task description, a context kit selects the most relevant context files and assembles them into a **context pack** -- a focused bundle of information tailored to the current task.
 
 <MermaidDiagram chart={`graph TD
     A["Developer Request:\n'Fix the email retry logic'"] --> B["Context Kit"]
@@ -162,17 +167,17 @@ Writing .ctx files distributes your documentation, but the agent still has to fi
     style I fill:#c6f6d5,stroke:#276749
     style G fill:#e2e8f0,stroke:#a0aec0
     style H fill:#e2e8f0,stroke:#a0aec0
-`} />
+`} fallback="Context kit in action: a developer requests 'Fix the email retry logic.' The context kit selects relevant .ctx files (src/workers/ and src/services/email/) plus the root CLAUDE.md, skipping irrelevant ones (src/api/ and src/frontend/). The selected files are assembled into a focused context pack for the agent." />
 
 The context kit looks at the task, identifies which parts of the codebase are likely involved, and loads only those .ctx files. The agent starts with a focused view instead of a generic one.
 
 ## Building a Context Index
 
-For a context kit to select the right files, it needs an **index** -- a map of all .ctx files in the repository and what they cover. This index is typically stored in a `.ctxl` file at the root of the project.
+For a context kit to select the right files, it needs an **index** -- a map of all .ctx files in the repository and what they cover. One possible implementation stores this in an index file at the root of the project. Here is an example of what such an index might look like:
 
-<CodeBlock code={`# .ctxl — Context Index
-# Auto-generated from .ctx files across the repository.
-# Regenerate: ctxkit index generate
+<CodeBlock code={`# context-index.yaml — Example Context Index
+# This is a possible implementation, not a standard format.
+# A team might generate this with a custom script.
 
 entries:
   - path: src/api/.ctx
@@ -199,9 +204,9 @@ entries:
     scope: src/frontend/
     topics: [react, components, state-management, routing]
     tokens: 290
-`} language="yaml" filename=".ctxl" />
+`} language="yaml" filename="context-index.yaml (example implementation)" />
 
-The index lets the context kit quickly match a task to relevant directories without reading every .ctx file. When you ask the agent to "fix the email retry logic," the kit scans the index for topics matching "email," "retry," "workers," and "queues," then loads only those .ctx files.
+An index like this would let a context kit quickly match a task to relevant directories without reading every .ctx file. When you ask the agent to "fix the email retry logic," the kit scans the index for topics matching "email," "retry," "workers," and "queues," then loads only those .ctx files.
 
 ## Writing Effective .ctx Files
 
@@ -244,16 +249,18 @@ Here is how .ctx files fit into a typical development workflow:
 
 3. **During code review.** If a PR changes the patterns in a directory, check whether the .ctx file needs updating. Some teams add this to their PR checklist.
 
-4. **Periodically.** Run the context index generator to keep the .ctxl file in sync. Some teams do this in CI.
+4. **Periodically.** If you use an index, regenerate it to keep it in sync. Some teams automate this in CI.
 
 > **Tip:** Start with .ctx files for the three directories agents work in most often. You can expand from there. Do not try to cover every directory on day one.
 
 ## Summary
 
 - **CLAUDE.md does not scale** -- as projects grow, a single file becomes bloated with context that is irrelevant to most tasks
-- **.ctx files** distribute context across the codebase, placing documentation next to the code it describes
+- **.ctx files** are a team convention (not a platform primitive) that distributes context across the codebase, placing documentation next to the code it describes
+- Claude Code natively supports **nested CLAUDE.md files** and **`.claude/rules/`** with `paths` frontmatter -- these are the platform-supported mechanisms for distributing context
+- .ctx files require custom tooling or explicit instructions for agents to discover them
 - A good .ctx file has four sections: Purpose, Key Files, Patterns, and Testing -- kept to 10-30 lines
-- **Context kits** automatically select relevant .ctx files based on the task, assembling a focused **context pack**
-- A **.ctxl index** maps all context files in the repo, enabling fast lookup without reading every file
+- **Context kits** are a design pattern for automatically selecting relevant .ctx files based on the task, assembling a focused **context pack**
+- A context index maps all context files in the repo, enabling fast lookup -- the format and tooling are up to your team
 - .ctx files should describe the *why* and the *how*, not duplicate the *what* that agents can read from code
 - Keep .ctx files concise, current, and referential -- link to canonical examples rather than embedding them

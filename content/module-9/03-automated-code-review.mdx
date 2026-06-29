@@ -8,6 +8,7 @@ quiz:
   - Syntax errors in any programming language
   - Merge conflicts between branches
   correctIndex: 0
+  explanation: "Linters and type checkers operate on syntax and types. Logic bugs — like checking the wrong field or mishandling null values — require understanding what the code is trying to do, which is the agent reviewer's primary value."
 - question: Why is dimensional separation important in automated code review?
   options:
   - It reduces the number of API calls needed
@@ -15,6 +16,7 @@ quiz:
   - Each dimension (security, correctness, performance) requires different expertise and focus, producing better results than a single pass
   - It allows the reviews to be written in different programming languages
   correctIndex: 2
+  explanation: "Each dimension — security, correctness, performance — requires different expertise and focus. A single pass trying to catch everything produces a grab-bag of findings with poor signal-to-noise ratio, while focused passes produce higher-quality results."
 - question: What is the biggest risk of a noisy automated code reviewer?
   options:
   - It costs too much money
@@ -22,6 +24,7 @@ quiz:
   - It slows down the CI pipeline
   - Developers learn to ignore its output, missing real issues buried in false positives
   correctIndex: 3
+  explanation: "When developers are flooded with false positives, they learn to ignore all output from the reviewer. This means genuine critical findings get buried and missed — the reviewer becomes actively harmful by creating a false sense of coverage."
 ---
 
 ## Overview
@@ -65,7 +68,7 @@ An effective automated review follows a clear sequence from trigger to posted co
     CI->>Agent: "Synthesize and prioritize"
     Agent-->>CI: Consolidated review
     CI->>GH: Post review comment on PR
-`} />
+`} fallback="Review workflow sequence: a pull request triggers the CI runner, which checks out the code and computes the diff. The runner sends the diff to the review agent for correctness analysis, then for security analysis, then for synthesis and prioritization. The agent returns consolidated findings, and the CI runner posts a review comment on the PR via the GitHub API." />
 
 The critical design choice here is **dimensional separation** -- running distinct review passes for correctness, security, and performance rather than asking one agent to cover everything in a single pass.
 
@@ -88,7 +91,7 @@ When you ask an agent to "review this code," it produces a grab-bag of findings:
     style R2 fill:#fed7d7,stroke:#e53e3e
     style R3 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style S fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Dimensional separation: the PR diff fans out to three parallel reviewers — Correctness Review, Security Review, and Performance Review. All three feed into a Synthesis step that produces prioritized findings." />
 
 Each reviewer is a specialist. The correctness reviewer looks for logic bugs, off-by-one errors, null pointer risks, and incorrect assumptions. The security reviewer focuses on injection vectors, authentication gaps, and data exposure. The performance reviewer hunts for N+1 queries, unnecessary allocations, and algorithmic complexity issues.
 
@@ -211,7 +214,7 @@ Strategies to control false positive rate:
     style P fill:#c6f6d5,stroke:#38a169
     style A fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style U fill:#bee3f8,stroke:#3182ce
-`} />
+`} fallback="False positive feedback loop: an agent finding is evaluated — if it is a real bug, it is posted to the PR for developer review, and the developer's fix-or-dismiss feedback improves the prompt. If it is a false positive, the team analyzes why, updates the review prompt, and the improved prompt produces better results next time." />
 
 > An automated reviewer with a 90% precision rate is far more valuable than one that catches everything but is right only 50% of the time. Developers trust precision; they ignore recall.
 

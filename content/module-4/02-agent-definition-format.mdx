@@ -3,11 +3,12 @@ title: The Agent Definition Format
 quiz:
 - question: Where do custom agent definition files live in a repository?
   options:
-  - In .claude/agents/ as markdown files
+  - In .claude/agents/ as markdown files with YAML frontmatter
   - In the root directory as .agent files
   - Inside CLAUDE.md as YAML blocks
   - In a dedicated agents/ directory at the project root
   correctIndex: 0
+  explanation: "Custom agent definitions live in the .claude/agents/ directory as markdown files with YAML frontmatter. This is the standard convention that Claude Code uses to discover and load agent definitions."
 - question: What is the purpose of the system prompt section in an agent definition?
   options:
   - It replaces CLAUDE.md entirely for that agent
@@ -15,18 +16,20 @@ quiz:
   - It provides role-specific instructions that are combined with the project's CLAUDE.md
   - It lists the files the agent is allowed to read
   correctIndex: 2
-- question: Why should the agent filename use a descriptive slug like 'code-reviewer.md'?
+  explanation: "The system prompt provides role-specific instructions that are combined with — not a replacement for — the project's CLAUDE.md. The agent receives both project context and role-specific behavior."
+- question: Which two frontmatter fields are required in every agent definition?
   options:
-  - The system requires kebab-case filenames to parse correctly
-  - It must match a corresponding entry in CLAUDE.md
-  - Markdown files with spaces in the name cannot be parsed
-  - It becomes the identifier developers use to invoke the agent, so clarity matters
-  correctIndex: 3
+  - tools and model
+  - name and tools
+  - name and description
+  - description and model
+  correctIndex: 2
+  explanation: "Every agent definition requires a name (the agent's identifier) and a description (when to use it). Other fields like tools and model are optional and control behavior."
 ---
 
 ## Overview
 
-You know why custom agents matter. Now you need to know how to build one. Every custom agent is defined by a single **markdown file** placed in the `.claude/agents/` directory of your repository. This file is the complete specification for the agent's identity, behavior, and capabilities. In this lesson, you will learn the anatomy of an agent definition file -- its structure, fields, and conventions -- so you can start creating agents with confidence.
+You know why custom agents matter. Now you need to know how to build one. Every custom agent is defined by a single **markdown file** with **YAML frontmatter** placed in the `.claude/agents/` directory of your repository. This file is the complete specification for the agent's identity, behavior, and capabilities. In this lesson, you will learn the anatomy of an agent definition file -- its structure, fields, and conventions -- so you can start creating agents with confidence.
 
 ## The Agent File Location
 
@@ -50,17 +53,22 @@ Custom agents live in a specific location within the **`.claude/` directory** at
     style F fill:#ebf8ff,stroke:#3182ce
     style G fill:#e2e8f0,stroke:#4a5568
     style H fill:#63b3ed,stroke:#3182ce,color:#ffffff
-`} />
+`} fallback="Repository file structure showing agent definitions: the .claude/ directory contains an agents/ subdirectory with individual agent files (code-reviewer.md, test-writer.md, doc-generator.md, security-auditor.md), alongside settings.json. CLAUDE.md sits at the repository root." />
 
-Each `.md` file in `.claude/agents/` defines one agent. The filename becomes the identifier you use to invoke the agent, so choose descriptive, kebab-case names: `code-reviewer.md`, `test-writer.md`, `security-auditor.md`.
+Each `.md` file in `.claude/agents/` defines one agent. The `name` frontmatter field identifies the agent. The filename is used to store and discover the definition, but it does not need to match the agent's name.
 
 > Check your agent definitions into version control. They are part of your project's infrastructure, just like CLAUDE.md.
 
 ## Anatomy of an Agent Definition
 
-An agent definition file has two main sections: the **body content** that serves as the agent's system prompt, providing its role-specific instructions. Let us look at a complete example and then break it apart.
+An agent definition file has two main parts: **YAML frontmatter** that specifies the agent's metadata and configuration, and a **markdown body** that serves as the agent's system prompt. Let us look at a complete example and then break it apart.
 
-<CodeBlock code={`# Code Reviewer
+<CodeBlock code={`---
+name: code-reviewer
+description: Reviews code changes for correctness, security, and project conventions. Use after modifying code.
+tools: Read, Glob, Grep
+model: sonnet
+---
 
 You are a senior code reviewer for this project.
 
@@ -93,20 +101,67 @@ Structure your review as:
 - If you are unsure about something, say so rather than guessing
 `} language="markdown" filename=".claude/agents/code-reviewer.md" />
 
-This single file contains everything the agent needs to know about its role. Let us examine each part.
+This single file contains everything the agent needs. Let us examine each part.
 
-## The Agent Name
+## The Frontmatter
 
-The top-level heading (using `#`) at the start of the file serves as the **agent's display name**. This is what developers see when they select the agent:
+The YAML frontmatter between the `---` delimiters defines the agent's metadata and configuration. Two fields are required:
 
-<CodeBlock code={`# Code Reviewer
-`} language="markdown" filename="Agent name section" />
+<CodeBlock code={`---
+name: code-reviewer
+description: Reviews code changes for correctness, security, and project conventions.
+---
+`} language="yaml" filename="Required frontmatter fields" />
 
-Keep the name short and descriptive. It should immediately communicate what the agent does.
+**`name`** is the unique identifier for the agent. Use lowercase letters and hyphens. This is what you use to invoke the agent (`claude --agent code-reviewer`) and what appears in the UI. It does not need to match the filename.
+
+**`description`** tells Claude when to delegate tasks to this agent. Write a clear, specific description so Claude knows when this agent is the right choice. Include phrases like "Use after modifying code" or "Use proactively" to encourage automatic delegation.
+
+## Optional Frontmatter Fields
+
+Beyond the two required fields, several optional fields control agent behavior:
+
+| Field | Purpose | Example |
+|-------|---------|---------|
+| `tools` | Which tools the agent can use (allowlist) | `Read, Glob, Grep` |
+| `disallowedTools` | Tools to deny from inherited set | `Write, Edit` |
+| `model` | AI model to use | `sonnet`, `haiku`, `opus`, `inherit` |
+| `permissionMode` | How permission prompts are handled | `default`, `plan`, `dontAsk` |
+| `maxTurns` | Maximum agentic turns before stopping | `10` |
+| `hooks` | Lifecycle hooks scoped to this agent | See Module 7 |
+| `memory` | Persistent memory scope | `user`, `project`, `local` |
+| `skills` | Skills to preload into context | `api-conventions` |
+| `mcpServers` | MCP servers available to this agent | See Module 6 |
+
+The most important optional field for controlling agent behavior is **`tools`**. When you specify `tools`, the agent can only use those tools -- nothing else. When you omit it, the agent inherits all tools from the main conversation. This is the primary mechanism for enforcing least-privilege access on a per-agent basis.
+
+<CodeBlock code={`---
+name: security-auditor
+description: Scans code for security vulnerabilities and produces a severity-rated report.
+tools: Read, Glob, Grep
+model: sonnet
+---
+`} language="yaml" filename="Frontmatter with tools restriction" />
+
+This agent can only read files and search. It cannot edit, write, or execute commands -- regardless of what its system prompt says or what a user asks it to do.
+
+## Agent Scopes
+
+Agent definitions can live in different locations depending on how broadly they should be available:
+
+| Location | Scope | When to use |
+|----------|-------|------------|
+| `.claude/agents/` | Current project | Agents specific to this codebase, shared via version control |
+| `~/.claude/agents/` | All your projects | Personal agents you use everywhere |
+| Managed settings | Organization-wide | Agents deployed by IT/security teams |
+| `--agents` CLI flag | Current session only | Quick testing or automation scripts |
+| Plugin `agents/` directory | Where plugin is enabled | Agents distributed with plugins |
+
+When multiple agents share the same `name`, the one from the higher-priority location is used. Project agents take priority over user agents.
 
 ## The System Prompt Body
 
-Everything after the name heading is the **system prompt** -- the instructions that define how the agent behaves. This is where you encode the agent's personality, expertise, rules, and output format.
+Everything after the frontmatter is the **system prompt** -- the instructions that define how the agent behaves. This is where you encode the agent's personality, expertise, rules, and output format.
 
 The system prompt is composed alongside your project's CLAUDE.md, not instead of it. Think of the relationship like this:
 
@@ -118,7 +173,7 @@ The system prompt is composed alongside your project's CLAUDE.md, not instead of
     style B fill:#b794f4,stroke:#6b46c1,color:#ffffff
     style C fill:#fefcbf,stroke:#d69e2e
     style D fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="How an agent's effective prompt is composed: CLAUDE.md (project context, conventions, architecture) and the Agent Definition (role-specific instructions, behavior rules, output format) combine to produce the agent's effective prompt, which drives agent behavior." />
 
 Your CLAUDE.md tells the agent about the project. The agent definition tells the agent about its role. Together, they produce an agent that understands both what it is working on and what it is supposed to do.
 
@@ -128,9 +183,7 @@ The system prompt body follows the same principles you learned in Module 3 for w
 
 **Role definition** -- Tell the agent what it is and what it does. Be explicit about the persona:
 
-<CodeBlock code={`## Your Role
-
-You are a test engineer specializing in this project's test suite.
+<CodeBlock code={`You are a test engineer specializing in this project's test suite.
 Your job is to write comprehensive tests for new and changed code.
 You prioritize edge cases and error paths over happy-path testing.
 `} language="markdown" filename="Role definition section" />
@@ -173,7 +226,11 @@ End with a summary: "X critical, Y warnings, Z nits found."
 
 Here is the simplest useful agent -- a documentation helper with a focused role:
 
-<CodeBlock code={`# Doc Helper
+<CodeBlock code={`---
+name: doc-helper
+description: Reviews and improves markdown documentation files.
+tools: Read, Write, Edit, Glob, Grep
+---
 
 You help maintain this project's documentation.
 
@@ -192,34 +249,34 @@ You help maintain this project's documentation.
 - Use American English spelling conventions
 `} language="markdown" filename=".claude/agents/doc-helper.md" />
 
-This agent is effective because it is focused. It knows exactly what it does (documentation), what files it touches (markdown only), and what style to follow (American English, existing structure).
+This agent is effective because it is focused. It knows exactly what it does (documentation), what files it touches (markdown only), and what style to follow (American English, existing structure). The `tools` frontmatter ensures it has only the capabilities it needs.
 
 ## Common Agent Archetypes
 
 While you can create agents for any purpose, most teams start with a few common archetypes:
 
-| Archetype | Primary Action | Key Constraint |
-|-----------|---------------|----------------|
-| Code Reviewer | Analyze and comment | Read-only, no modifications |
-| Test Writer | Create test files | No source code changes |
-| Refactorer | Restructure code | No behavior changes |
-| Doc Generator | Write documentation | Markdown files only |
-| Security Auditor | Find vulnerabilities | Read-only, report format |
-| Migration Helper | Update APIs/patterns | Specific file scopes |
+| Archetype | Primary Action | Key Constraint | Typical Tools |
+|-----------|---------------|----------------|---------------|
+| Code Reviewer | Analyze and comment | Read-only, no modifications | `Read, Glob, Grep` |
+| Test Writer | Create test files | No source code changes | `Read, Write, Edit, Glob, Grep` |
+| Refactorer | Restructure code | No behavior changes | `Read, Write, Edit, Bash, Glob, Grep` |
+| Doc Generator | Write documentation | Markdown files only | `Read, Write, Edit, Glob, Grep` |
+| Security Auditor | Find vulnerabilities | Read-only, report format | `Read, Glob, Grep` |
+| Migration Helper | Update APIs/patterns | Specific file scopes | `Read, Write, Edit, Bash, Glob, Grep` |
 
-Each archetype translates into a focused agent definition file with role-appropriate instructions and constraints.
+Each archetype translates into a focused agent definition file with role-appropriate frontmatter and instructions.
 
 ## Naming Conventions and Organization
 
 As your agent collection grows, good naming and organization become important:
 
-- Use **kebab-case** for filenames: `code-reviewer.md`, not `CodeReviewer.md` or `code reviewer.md`
-- Start the filename with the **action or role**: `review-security.md`, `write-tests.md`, `generate-docs.md`
+- Use **kebab-case** for the `name` field: `code-reviewer`, not `CodeReviewer` or `code reviewer`
+- Start names with the **action or role**: `review-security`, `write-tests`, `generate-docs`
 - Keep agent definitions **under 200 lines** -- if the prompt is longer, you are probably trying to do too much in one agent
-- Consider **grouping by concern** when you have many agents -- though the flat directory structure works well for most teams
+- The `description` field should clearly state **when** to use the agent, not just what it does
 
-> A well-named agent file is self-documenting. When a developer runs `ls .claude/agents/`, the filenames alone should communicate what each agent does.
+> A well-named agent with a clear description enables automatic delegation. When Claude sees a task that matches the description, it delegates without being asked.
 
 ## Summary
 
-Every custom agent is a **markdown file** in `.claude/agents/` with a clear structure: a name heading, a role definition, behavioral rules, output format expectations, and constraints. The agent definition works alongside CLAUDE.md -- project instructions provide shared context, while the agent definition provides role-specific behavior. In the next lesson, you will learn how to control what tools and permissions each agent has access to, turning the behavioral boundaries in your system prompt into enforced technical constraints.
+Every custom agent is a **markdown file** in `.claude/agents/` with YAML frontmatter and a system prompt body. The frontmatter requires two fields: `name` (the agent's identifier) and `description` (when to use it). Optional fields like `tools`, `model`, and `permissionMode` control capabilities. The system prompt body defines role, methodology, output format, and constraints. The agent definition works alongside CLAUDE.md -- project instructions provide shared context, while the agent definition provides role-specific behavior. In the next lesson, you will learn how to control what tools and permissions each agent has access to, turning the behavioral boundaries in your system prompt into enforced technical constraints.

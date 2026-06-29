@@ -8,6 +8,7 @@ quiz:
   - It generates code faster
   - It only works in specific programming languages
   correctIndex: 0
+  explanation: "Agents are defined by their ability to plan multi-step tasks, use tools, observe results, and iterate — all across an entire repository. Autocomplete tools only predict the next few tokens in the current file."
 - question: Why does the agentic shift require changes to how codebases are structured?
   options:
   - Agents refuse to work on unstructured code
@@ -15,6 +16,7 @@ quiz:
   - Agents rely on contextual signals like documentation, conventions, and project structure to operate effectively
   - It is a requirement imposed by AI vendors
   correctIndex: 2
+  explanation: "Agents navigate codebases autonomously and need clear signals — documentation, conventions, and structure — to make correct decisions. Without these signals, agents guess and produce inconsistent results."
 - question: Which of the following best describes the evolution of AI-assisted coding?
   options:
   - Autocomplete replaced copilots, which replaced agents
@@ -22,9 +24,20 @@ quiz:
   - All three are different names for the same technology
   - Autocomplete, copilot, and agent represent increasing levels of autonomy and scope
   correctIndex: 3
+  explanation: "The three waves represent increasing autonomy: autocomplete predicts tokens, copilots generate functions via chat, and agents plan and execute multi-file tasks independently."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Understand what an AI coding agent is and how it differs from autocomplete and copilot tools",
+  "Identify the three waves of AI-assisted development and the capabilities each wave introduced",
+  "Recognize why agent-ready codebases require clear context, conventions, and feedback loops"
+]} />
+
+<Prerequisites items={[
+  "No prior experience with AI coding tools required"
+]} />
 
 Something fundamental has changed in how software gets built. We have moved beyond AI tools that suggest the next line of code and into an era where **AI coding agents** can plan multi-step tasks, execute them across entire repositories, and iterate on their own work. This lesson explores what that shift means, why it matters, and what it demands from the codebases we build.
 
@@ -38,7 +51,7 @@ To understand where we are, it helps to see where we have been. AI-assisted codi
     style A fill:#e2e8f0,stroke:#4a5568,color:#1a202c
     style B fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style C fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="Three waves of AI-assisted coding progressing left to right: Wave 1 Autocomplete leads to Wave 2 Copilot through more context, which leads to Wave 3 Agent through more autonomy." />
 
 **Wave 1 -- Autocomplete** brought inline suggestions as you typed. Tools like GitHub Copilot's early mode and TabNine would predict the next few tokens based on the current file. The scope was narrow: one line, one file, one moment.
 
@@ -67,7 +80,7 @@ The word "agent" gets overused, so let us be precise. An AI coding agent has fou
     style Agent fill:#ebf8ff,stroke:#3182ce
     style U fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style R fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="The agent loop: a developer request feeds into a Plan step, which leads to Execute, then Observe, then Adjust, which cycles back to Execute. The Observe step also produces a Result. This plan-execute-observe-adjust cycle is the core of agentic behavior." />
 
 This **plan-execute-observe-adjust loop** is the defining characteristic of agentic behavior. A copilot generates code when asked. An agent pursues a goal.
 
@@ -89,7 +102,7 @@ When your coding assistant can autonomously navigate a codebase, the quality of 
     end
     style Good fill:#c6f6d5,stroke:#38a169
     style Bad fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Comparison of two paths: In a well-prepared repo, a clear CLAUDE.md leads to the agent understanding context, correct implementation, and tests passing first try. In an unprepared repo, no documentation leads to guessing at conventions, wrong patterns, and a cycle of multiple fix attempts." />
 
 In a well-prepared repository, an agent can read the project instructions, understand the architecture, follow the conventions, and produce code that a human reviewer would approve. In an unprepared one, the agent flails -- guessing at patterns, breaking conventions, and generating code that requires extensive rework.
 

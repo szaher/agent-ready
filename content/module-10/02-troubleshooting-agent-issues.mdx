@@ -8,6 +8,7 @@ quiz:
   - Switch to a different AI model
   - Add more instructions to the system prompt
   correctIndex: 0
+  explanation: "The transcript shows exactly what the agent did — which files it read, what tools it called, where it diverged from the expected path. Diagnosing from the transcript identifies the root cause rather than guessing or making assumptions."
 - question: An agent keeps editing the wrong files despite clear project structure. What is the most likely root cause?
   options:
   - The agent's model is too small
@@ -15,6 +16,7 @@ quiz:
   - The directory structure is ambiguous or the CLAUDE.md does not point to the correct locations
   - The codebase has too many files
   correctIndex: 2
+  explanation: "When the agent edits wrong files, it cannot tell which directory is correct. This is almost always because the directory structure is ambiguous from the agent's perspective or the CLAUDE.md does not point to the correct locations for different file types."
 - question: What does 'context overflow' mean in agent troubleshooting?
   options:
   - The agent runs out of disk space
@@ -22,6 +24,7 @@ quiz:
   - The agent sends too many API requests
   - The agent's prompt exceeds the model's context window, causing it to lose earlier instructions or file content
   correctIndex: 3
+  explanation: "Context overflow means the accumulated session content — CLAUDE.md, files read, tool calls, and outputs — exceeds the model's effective attention window. Earlier instructions and file content are lost, causing the agent to forget conventions it was following earlier."
 - question: When comparing a successful agent session to a failed one, which difference is most diagnostic?
   options:
   - The time of day the session ran
@@ -29,6 +32,7 @@ quiz:
   - Which developer initiated the session
   - The total number of tokens consumed
   correctIndex: 1
+  explanation: "The tool call sequence is the agent's actual behavior trace. Comparing where the successful and failed sequences diverge pinpoints the exact moment — and the contextual difference — that caused the failure."
 ---
 
 ## Overview
@@ -65,7 +69,7 @@ When an agent session produces unexpected results, follow this systematic proces
     style Fix4 fill:#c6f6d5,stroke:#38a169
     style Fix5 fill:#c6f6d5,stroke:#38a169
     style Fix6 fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="Diagnostic flowchart: starting from 'Agent produced unexpected output,' Step 1 is to review the transcript. Then check: Did the agent read the right files? If no, update CLAUDE.md with file pointers. If yes, did it follow instructions? If no, check if CLAUDE.md is clear — if not, rewrite vague instructions; if yes, check for conflicting rules. If the agent followed instructions, check if it had enough context — if no, reduce context or split the task. If yes, check if the task is well-scoped — if no, break into smaller tasks; if yes, it may be a model limitation requiring a different approach." />
 
 ### Step 1: Review the Transcript
 
@@ -158,7 +162,7 @@ Follow our coding conventions.
     end
     style Loop fill:#fed7d7,stroke:#e53e3e
     style Fix fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Agent loop pattern vs fix: the loop shows the agent attempting approach A, tests failing, reverting changes, and attempting approach A again in an endless cycle. The fix breaks the loop by clarifying success criteria, providing explicit approach guidance, and adding constraints that eliminate dead ends." />
 
 **Fix:** Define success criteria explicitly in the task description. If the agent should use approach B instead of A, say so. If there are known dead ends, mention them.
 

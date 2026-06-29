@@ -8,6 +8,7 @@ quiz:
   - They use a pre-built database of every file's purpose
   - They rely entirely on README files in the root directory
   correctIndex: 0
+  explanation: "Agents navigate codebases by reading file trees, searching with grep, and following import chains — they have no IDE features like jump-to-definition or class hierarchy browsers."
 - question: What is the main risk of a deeply nested directory structure for an AI agent?
   options:
   - It makes the codebase slower to compile
@@ -15,6 +16,7 @@ quiz:
   - It exceeds the agent's token budget during exploration, causing it to miss relevant files
   - It forces the agent to use a different programming language
   correctIndex: 2
+  explanation: "Every directory listing and file read consumes tokens from the agent's finite context window. Deep nesting requires more traversal steps, leaving less budget for actual code writing and verification."
 - question: Why does inconsistent project structure cause agents to produce lower-quality code?
   options:
   - Agents cannot parse files that follow different patterns
@@ -22,6 +24,7 @@ quiz:
   - Agents are programmed to reject inconsistent codebases
   - Inconsistency forces the agent to guess at conventions, leading to code that does not match the rest of the project
   correctIndex: 3
+  explanation: "When structure is inconsistent, the agent cannot rely on patterns it learned from one part of the codebase. It must investigate each module individually, leading to guesses that may not match existing conventions."
 - question: Which structural property is MOST important for agent effectiveness?
   options:
   - Using the latest framework version
@@ -29,9 +32,20 @@ quiz:
   - Having fewer than 100 files in the project
   - Storing all code in a single directory
   correctIndex: 1
+  explanation: "Predictability means the agent can learn a pattern from one module and apply it across the entire codebase. This is more important than project size, framework version, or directory depth."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Explain how AI agents navigate and build mental models of codebases",
+  "Identify the three properties of agent-friendly structure: discoverability, predictability, and locality",
+  "Compare feature-based versus layer-based organization through the lens of agent navigation cost"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 4: Custom Agent Definitions"
+]} />
 
 When a human developer joins a new project, they ask a colleague for a tour, browse a wiki, or explore the code in an IDE with jump-to-definition. An AI coding agent gets none of that. It starts with a **file tree** and a set of tools -- read file, search text, list directory -- and must build a mental model of the project from what it discovers. The structure of your project is the single biggest factor in whether that model is accurate or wildly wrong. This lesson explains why, shows what agents actually do when they encounter a codebase, and demonstrates the difference between structures that help and structures that hinder.
 
@@ -53,7 +67,7 @@ An agent does not open your project in VS Code. It does not have a class hierarc
     style A fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style G fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style J fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="Agent navigation flow: receive task, list root directory, read key files (README, CLAUDE.md, package.json), identify relevant areas, search and grep for patterns, read target files, build mental model, write code, then run tests. Failures loop back to searching." />
 
 Every step in this flow consumes **tokens** -- the agent's finite budget of attention. The more steps required to find the right files, the less budget remains for actually writing and verifying code. Structure determines how many steps the agent needs.
 
@@ -76,7 +90,7 @@ When structure works against an agent, the failure shows up in one of two ways:
     end
     style Mode1 fill:#fed7d7,stroke:#e53e3e
     style Mode2 fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="Two failure modes: Mode 1 (Can't Find It) — agent searches for authentication code scattered across 6 directories, finds only 3, produces incomplete implementation. Mode 2 (Wrong Mental Model) — agent reads project structure, infers the wrong pattern, and writes code following the wrong conventions." />
 
 **Failure Mode 1: Cannot find it.** The agent needs to modify the authentication flow, but auth-related code is spread across `src/controllers/authController.ts`, `src/middleware/checkAuth.js`, `lib/utils/tokenHelper.ts`, `src/services/userService.ts`, and `config/auth-config.yaml`. The agent finds some of these but misses others, producing an incomplete change.
 
@@ -113,7 +127,7 @@ Related code should live close together. If modifying a feature requires touchin
     end
     style Friendly fill:#c6f6d5,stroke:#38a169
     style Hostile fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Agent-friendly versus agent-hostile structure: Friendly has discoverable names that reveal purpose, predictable patterns that repeat consistently, and local code that lives together. Hostile has opaque names requiring investigation, inconsistent organization per module, and scattered related code across directories." />
 
 ## A Side-by-Side Comparison
 
@@ -149,7 +163,7 @@ Consider a project with user management, billing, and notifications. Here are tw
     end
     style Bad fill:#fed7d7,stroke:#e53e3e
     style Good fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Side-by-side comparison: Layer-based (agent-hostile) separates controllers, services, models, and utils into separate directories, scattering each feature's files. Feature-based (agent-friendly) groups all files for users, billing, and notifications together in their own directories with service, controller, model, and test files colocated." />
 
 In the **layer-based** structure, adding a new feature to billing requires the agent to navigate to `controllers/`, `services/`, `models/`, and `utils/`, reading each directory listing to find the right files. In the **feature-based** structure, the agent navigates to `src/billing/` and finds everything it needs in one place.
 

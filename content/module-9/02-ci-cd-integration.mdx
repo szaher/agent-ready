@@ -3,11 +3,12 @@ title: CI/CD Integration
 quiz:
 - question: Why must agents running in CI use headless mode with pre-configured permissions?
   options:
-  - CI environments have no human to approve permission prompts, so the agent must run non-interactively
+  - CI environments have no human to approve permission prompts, and headless mode also requires a security model for untrusted PR content
   - Interactive prompts would make the CI logs too verbose
   - Headless mode is faster because it skips the language model
   - CI runners do not support terminal emulation
   correctIndex: 0
+  explanation: "CI environments run without a human operator. Without headless mode, the agent would pause at permission prompts with nobody to respond, causing the pipeline to hang or timeout."
 - question: What is the primary role of CLAUDE.md in a CI pipeline?
   options:
   - It replaces the need for a build script
@@ -15,6 +16,7 @@ quiz:
   - It provides the agent with project context, conventions, and constraints so it can act correctly without human guidance
   - It defines the CI trigger events
   correctIndex: 2
+  explanation: "In CI, the agent cannot ask a developer what framework the project uses or what the test command is. CLAUDE.md provides all the project-specific context the agent needs to act correctly without human guidance."
 - question: Which GitHub Actions event trigger is most appropriate for running an agent-powered code review?
   options:
   - push to main
@@ -22,6 +24,7 @@ quiz:
   - schedule (cron)
   - pull_request (opened or synchronize)
   correctIndex: 3
+  explanation: "The pull_request event fires when a PR is opened or updated with new commits, which is exactly when code review should run. Push-to-main is too late, and schedule/dispatch events are not tied to specific code changes."
 - question: What should you do if an agent CI step fails due to insufficient permissions?
   options:
   - Add --dangerously-skip-permissions to the CLI flags
@@ -29,6 +32,15 @@ quiz:
   - Disable all CI checks until the issue is resolved
   - Switch to a different AI provider
   correctIndex: 1
+  explanation: "The settings.json allowlist is the proper way to pre-authorize specific commands. Skipping permissions entirely is dangerous, and the allowlist follows the principle of least privilege by granting only what the agent needs."
+- question: Which of the following is untrusted input in a PR-triggered CI workflow?
+  options:
+  - The CLAUDE.md file in the repository
+  - The .claude/settings.json permission configuration
+  - The PR title, description, diff content, and changed file contents
+  - The GitHub Actions workflow YAML file
+  correctIndex: 2
+  explanation: "PR content — titles, descriptions, diffs, and changed files — is controlled by the PR author, who may be an external contributor or attacker. Repository files like CLAUDE.md and settings.json are controlled by maintainers and are trusted."
 ---
 
 ## Overview
@@ -55,9 +67,9 @@ Running agents locally is useful. Running agents in CI is transformative. Here i
     end
     style CI fill:#c6f6d5,stroke:#38a169
     style Local fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="CI vs local comparison: a CI/CD pipeline shows a deterministic sequence — PR opened triggers Build and Test, then Agent Review, then Security Gate, then Deploy Preview. The local-only approach shows a developer remembering to run a script manually, with the risk of forgetting next time." />
 
-CI integration turns agent workflows from optional developer habits into **mandatory quality gates**. No PR merges without the agent review. No deployment without the security scan.
+CI integration turns agent workflows from optional developer habits into **consistent, automated review steps**. Every PR gets an agent review. Every change gets a security scan. The agent provides advisory feedback that complements -- but does not replace -- your deterministic checks and human review.
 
 ## The Headless Challenge
 
@@ -89,14 +101,50 @@ Agents in CI face a constraint that local usage does not: there is no human at t
     C->>C: Analyze and generate review
     C-->>R: Output review markdown
     R->>GH: Post review comment
-`} />
+`} fallback="Headless execution sequence: GitHub Actions triggers a runner on a PR event. The runner checks out code, installs the CLI, and invokes the agent with a review prompt. The agent reads CLAUDE.md, settings.json, and the diff from the repository, analyzes the code, and returns review markdown. The runner posts the review as a comment on the PR." />
+
+## Security Model for CI Agents
+
+Before wiring agents into CI, you need a security model. A CI pipeline that runs agents on pull requests is processing **untrusted input** -- and without guardrails, an attacker can exploit the agent to exfiltrate secrets, modify code, or bypass review.
+
+Here are the non-negotiable guardrails:
+
+**1. PR content is untrusted input.** PR titles, descriptions, diffs, commit messages, and changed file contents are all attacker-controlled in a fork PR scenario. Never interpolate raw diff content directly into a prompt string -- write it to a temporary file and pass the file path instead. This prevents prompt injection through crafted diffs.
+
+**2. Fork isolation.** Fork PRs should run without repository secrets or write-capable tokens. Use the `pull_request` event (not `pull_request_target`) so that fork PRs cannot access secrets. If you need `pull_request_target` for other reasons, never check out or execute code from the fork's HEAD.
+
+**3. Least-privilege tools for the reviewing agent.** A code reviewer needs read-only tools. It should not have access to deployment credentials, write tokens, or the ability to post arbitrary comments with embedded commands. Use `tools: Read, Glob, Grep` in agent frontmatter.
+
+**4. Advisory output only.** Agent review output is untrusted advisory text. Deterministic checks -- tests, linting, type checking, policy scanners -- make merge decisions. The agent provides a second pair of eyes, not a quality gate. A human reviewer makes the final merge decision.
+
+**5. Pin third-party Actions.** In production-grade workflows, pin GitHub Actions to immutable commit SHAs rather than mutable tags like `@v4`. A compromised tag can inject malicious code into your workflow.
+
+<MermaidDiagram chart={`flowchart TD
+    PR["Pull Request"] --> Fork{"Fork PR?"}
+    Fork -->|Yes| NoSecrets["Run without secrets\nNo write tokens"]
+    Fork -->|No| WithSecrets["Secrets available\nStill scope tightly"]
+    NoSecrets --> Agent["Agent Review\nRead-only tools"]
+    WithSecrets --> Agent
+    Agent --> Output["Advisory output"]
+    Output --> Human["Human reviewer\nmakes merge decision"]
+    Output --> Deterministic["Deterministic checks\ntests, lint, types"]
+    Deterministic --> Gate["Quality gate\npass/fail"]
+    Human --> Merge["Merge decision"]
+    Gate --> Merge
+    style NoSecrets fill:#fed7d7,stroke:#e53e3e
+    style Agent fill:#ebf8ff,stroke:#3182ce
+    style Human fill:#c6f6d5,stroke:#276749
+    style Deterministic fill:#c6f6d5,stroke:#276749
+`} fallback="Fork PR security flowchart: a pull request is checked — if it is a fork PR, it runs without secrets or write tokens. Both fork and non-fork PRs go through an agent review with read-only tools. The agent produces advisory output, which feeds into both a human reviewer (who makes the merge decision) and deterministic checks (tests, lint, types) that form a pass/fail quality gate." />
 
 ## GitHub Actions Setup
 
-Here is a complete GitHub Actions workflow that runs an agent-powered code review on every pull request:
+Here is a GitHub Actions workflow that runs an agent-powered code review on every pull request, incorporating the security guardrails above:
 
 <CodeBlock code={`name: Agent Code Review
 
+# Use pull_request (not pull_request_target) so fork PRs
+# cannot access repository secrets.
 on:
   pull_request:
     types: [opened, synchronize]
@@ -111,6 +159,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # Pin Actions to commit SHAs in production workflows.
+      # Using @v4 tags here for readability.
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -123,17 +173,18 @@ jobs:
         env:
           ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          DIFF=$(git diff origin/main...HEAD)
-          claude -p "You are a code reviewer. Review the following diff for:
+          # Write diff to a file instead of interpolating into the prompt.
+          # This prevents prompt injection through crafted diff content.
+          git diff origin/main...HEAD > /tmp/pr-diff.txt
+          claude -p "You are a code reviewer. Read the diff file at
+          /tmp/pr-diff.txt and review it for:
           1. Correctness bugs (logic errors, null handling, edge cases)
           2. Security issues (injection, auth, data exposure)
           3. Performance concerns (N+1 queries, unnecessary work)
-          
+
           Be specific. Reference file names and line numbers.
-          Only report genuine issues, not style preferences.
-          
-          Diff:
-          $DIFF" --output-format json > review.json
+          Only report genuine issues, not style preferences." \
+          --max-turns 3 --output-format json > review.json
 
       - name: Post review comment
         uses: actions/github-script@v7
@@ -145,16 +196,20 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: '## Agent Review\\n\\n' + review
+              body: '## Agent Review (Advisory)\\n\\n' + review
             });
 `} language="yaml" filename=".github/workflows/agent-review.yml" />
 
 Key decisions in this workflow:
 
+- **`pull_request` event** (not `pull_request_target`) -- fork PRs cannot access secrets
+- **Diff written to a file** instead of interpolated into the prompt -- prevents prompt injection through crafted diffs
+- **`--max-turns 3`** limits agent iterations to prevent runaway sessions
 - **`fetch-depth: 0`** gives the agent full git history for accurate diffs
 - **`timeout-minutes: 10`** prevents runaway agent sessions from blocking CI
 - **`--output-format json`** produces structured output that downstream steps can parse
 - The API key is stored as a **GitHub secret**, never hardcoded
+- The review comment is labeled **"Advisory"** -- it is input for human reviewers, not a merge gate
 
 ## Permission Configuration for CI
 
@@ -209,6 +264,10 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   agent-quality:
     runs-on: ubuntu-latest
@@ -221,42 +280,51 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
+      # Write diff to a file once. Each agent step reads the file
+      # instead of interpolating diff content into prompts.
+      - name: Prepare diff
+        run: git diff origin/main...HEAD > /tmp/pr-diff.txt
+
       - name: Step 1 - Correctness review
         env:
           ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude -p "Review the diff for correctness bugs only. 
-          $(git diff origin/main...HEAD)" > correctness.md
+          claude -p "Read the diff at /tmp/pr-diff.txt. 
+          Review for correctness bugs only." \
+          --max-turns 3 > correctness.md
 
       - name: Step 2 - Security review
         env:
           ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude -p "Review the diff for security vulnerabilities only.
-          $(git diff origin/main...HEAD)" > security.md
+          claude -p "Read the diff at /tmp/pr-diff.txt. 
+          Review for security vulnerabilities only." \
+          --max-turns 3 > security.md
 
       - name: Step 3 - Test coverage check
         env:
           ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude -p "Analyze the diff and identify any new code paths 
-          that lack test coverage. Suggest specific test cases.
-          $(git diff origin/main...HEAD)" > coverage-gaps.md
+          claude -p "Read the diff at /tmp/pr-diff.txt. 
+          Identify new code paths that lack test coverage. 
+          Suggest specific test cases." \
+          --max-turns 3 > coverage-gaps.md
 
       - name: Synthesize and post
         env:
           ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude -p "Combine these three review reports into a single 
-          summary. Deduplicate findings. Rank by severity.
-          
-          Correctness: $(cat correctness.md)
-          Security: $(cat security.md)
-          Coverage: $(cat coverage-gaps.md)" > summary.md
+          claude -p "Read these three review reports and combine 
+          them into a single summary. Deduplicate findings. 
+          Rank by severity.
+          Correctness report: correctness.md
+          Security report: security.md
+          Coverage report: coverage-gaps.md" \
+          --max-turns 3 > summary.md
 
-          # Post to PR (using gh CLI)
+          # Post advisory summary to PR
           gh pr comment \${{ github.event.pull_request.number }} \
-            --body "$(cat summary.md)"
+            --body "## Agent Review (Advisory)\n\n$(cat summary.md)"
 `} language="yaml" filename=".github/workflows/agent-quality-pipeline.yml" />
 
 This is the **fan-out pattern from the previous lesson**, implemented as CI steps. Each review dimension runs independently, then a synthesis step merges the results.
@@ -271,12 +339,17 @@ Here is how agents fit into a complete CI/CD architecture:
     subgraph CI
         Build["Build"] --> Test["Test Suite"]
         Test --> Lint["Linter"]
-        Lint --> Agent["Agent Review"]
-        Agent --> Gate["Quality Gate"]
+        Build --> Gate["Quality Gate\n(deterministic checks)"]
+        Test --> Gate
+        Lint --> Gate
     end
     
-    Gate -->|"pass"| Preview["Deploy Preview"]
+    PR --> Agent["Agent Review\n(advisory)"]
+    
+    Gate -->|"pass"| Human["Human Reviewer"]
     Gate -->|"fail"| Block["Block Merge"]
+    Agent -->|"advisory input"| Human
+    Human --> Merge["Merge Decision"]
     
     subgraph Agent
         A1["Correctness"] 
@@ -287,10 +360,10 @@ Here is how agents fit into a complete CI/CD architecture:
     style CI fill:#ebf8ff,stroke:#3182ce
     style Agent fill:#c6f6d5,stroke:#38a169
     style Block fill:#fed7d7,stroke:#e53e3e
-    style Preview fill:#fefcbf,stroke:#d69e2e,color:#1a202c
-`} />
+    style Human fill:#fefcbf,stroke:#d69e2e,color:#1a202c
+`} fallback="Agent-integrated pipeline architecture: a pull request feeds into two parallel tracks. The CI pipeline runs deterministic checks (Build, Test Suite, Linter) that form a pass/fail quality gate. Separately, the agent review runs parallel correctness, security, and coverage analyses. The quality gate determines pass/fail, while agent review provides advisory input to a human reviewer. Both the gate result and the human reviewer feed into the final merge decision." />
 
-The agent review step sits alongside traditional checks -- build, test, lint -- and its output feeds into the quality gate. A critical finding from the agent can block a merge just like a failing test would.
+The agent review step runs alongside traditional deterministic checks -- build, test, lint. The deterministic checks form the actual quality gate (pass/fail). The agent review provides advisory input to a human reviewer, who makes the final merge decision. Agent output should never be the sole merge gate -- it is a second pair of eyes, not a replacement for tests and human judgment.
 
 ## Cost and Performance Considerations
 

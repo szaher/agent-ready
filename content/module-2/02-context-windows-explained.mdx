@@ -8,6 +8,7 @@ quiz:
   - About 2,000 lines
   - About 200,000 lines
   correctIndex: 0
+  explanation: "At roughly 3-5 tokens per line of code and a 200K token window, about 50,000-60,000 lines fit — but that is the theoretical maximum before accounting for system prompt, conversation history, and output space."
 - question: What happens when an agent's conversation exceeds the context window limit?
   options:
   - The agent automatically saves everything to disk
@@ -15,18 +16,21 @@ quiz:
   - Older messages are truncated or summarized, losing detail from earlier in the session
   - The conversation pauses until the user clears the history
   correctIndex: 2
+  explanation: "When context overflows, the agent framework must truncate or summarize older messages, causing the agent to lose details from earlier turns. The model does not auto-expand or save to disk."
 - question: Why is a well-structured project easier for agents to work with, even if it has more total code?
   options:
   - Smaller files mean the agent needs fewer tokens to load the relevant context
   - Agents can only read files that are under 100 lines
   - Agents skip files that are too large to fit in the context window
   correctIndex: 0
+  explanation: "Smaller, focused files mean the agent loads only the code it needs per turn, consuming fewer tokens. A 200-line file costs a fraction of a 2,000-line monolith, leaving more context budget for reasoning and other files."
 - question: What is the 'lost in the middle' effect?
   options:
   - The agent forgets the user's original request after too many tool calls
   - Information placed in the middle of a long context window receives less attention than information at the beginning or end
   - The agent loses track of which file it is currently editing
   correctIndex: 1
+  explanation: "Research (Liu et al., 2023) shows LLMs attend most to the beginning and end of their context window, with information in the middle receiving less attention — even if it is still technically present in the window."
 ---
 
 ## Overview
@@ -60,7 +64,7 @@ A context window is the total amount of text (measured in **tokens**) that a lar
     style C fill:#fef3c7,stroke:#d69e2e
     style D fill:#fef3c7,stroke:#d69e2e
     style E fill:#fff5f5,stroke:#e53e3e
-`} />
+`} fallback="The context window (e.g., 200K tokens) is divided into layers: System Prompt (2,000-5,000 tokens), Project Docs like CLAUDE.md (500-3,000 tokens), Conversation History (grows with each turn), Recent Tool Results (file contents, search results), and Output Space (4,000-8,000 tokens reserved)." />
 
 ## Tokens: The Unit of Measurement
 
@@ -137,7 +141,7 @@ Let us trace how the context window fills during a real task:
     style Phase1 fill:#f0fff4,stroke:#38a169
     style Phase2 fill:#fef3c7,stroke:#d69e2e
     style Phase3 fill:#fff5f5,stroke:#e53e3e
-`} />
+`} fallback="How context fills across three phases: Turns 1-3 (Exploration) add ~2,600 tokens reading the README, searching, and reading the target file. Turns 4-7 (Understanding) add ~3,500 tokens reading related, test, types, and config files. Turns 8-10 (Acting) add ~3,400 tokens for editing, running tests, and fixing failures." />
 
 After just 10 turns, the agent has consumed roughly 9,500 tokens of conversation history. That is manageable. But consider what happens during a complex feature implementation with 40+ turns, large files, and verbose test outputs -- the context can fill rapidly.
 
@@ -176,7 +180,7 @@ All of these strategies have the same consequence: **the agent forgets**.
     style A4 fill:#fff5f5,stroke:#e53e3e
     style B1 fill:#fff5f5,stroke:#e53e3e
     style B2 fill:#fef3c7,stroke:#d69e2e
-`} />
+`} fallback="Before truncation: Turns 1-4 contain detailed exploration of architecture and modules, followed by implementation work through Turn 16. After truncation: Turns 1-4 are lost, replaced by a brief summary ('Explored architecture and module structure'), with only Turns 5-16 preserved in full." />
 
 When an agent forgets its early observations, it might:
 
@@ -187,7 +191,7 @@ When an agent forgets its early observations, it might:
 
 ## The "Lost in the Middle" Effect
 
-Even before the context overflows, there is another problem. Research has shown that LLMs pay **uneven attention** to different parts of the context window. Information at the **beginning** (system prompt, early instructions) and the **end** (recent messages) gets the most attention. Information in the **middle** receives less.
+Even before the context overflows, there is another problem. Research has shown that LLMs pay **uneven attention** to different parts of the context window. Information at the **beginning** (system prompt, early instructions) and the **end** (recent messages) gets the most attention. Information in the **middle** receives less (see [Liu et al., "Lost in the Middle: How Language Models Use Long Contexts," 2023](https://arxiv.org/abs/2307.03172)).
 
 This is called the **lost in the middle** effect, and it has practical consequences:
 
@@ -220,7 +224,7 @@ This is where agent-readiness becomes practical. The way you structure your code
 
     style Monolith fill:#fff5f5,stroke:#e53e3e
     style Modular fill:#f0fff4,stroke:#38a169
-`} />
+`} fallback="Comparison of two code structures: A monolithic utils.py (2,000 lines, ~7,000 tokens) forces the agent to read the entire file to find one function. A modular structure with validation.py (150 lines, ~500 tokens), formatting.py (120 lines, ~400 tokens), and parsing.py (180 lines, ~600 tokens) lets the agent read only the file it needs." />
 
 The same principle applies to:
 

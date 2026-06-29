@@ -49,7 +49,7 @@ export interface QuizQuestion {
   question: string;
   options: string[];
   correctIndex: number;
-  explanation: string;
+  explanation?: string;
 }
 
 export interface ExportRequest {

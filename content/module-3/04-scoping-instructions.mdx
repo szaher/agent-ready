@@ -8,6 +8,7 @@ quiz:
   - In the global Claude settings file
   - In a separate shell script that the agent runs
   correctIndex: 0
+  explanation: "Project-specific build commands belong in the project root CLAUDE.md, which is checked into version control and shared with the team. The user-level file is for personal preferences, and enterprise settings are admin-controlled."
 - question: What is the correct use case for ~/.claude/CLAUDE.md (user-level CLAUDE.md)?
   options:
   - Storing project build commands
@@ -15,6 +16,7 @@ quiz:
   - Personal preferences like preferred response style or editor keybindings
   - Listing third-party API keys and secrets
   correctIndex: 2
+  explanation: "User-level CLAUDE.md (~/.claude/CLAUDE.md) applies to all projects and is not shared with your team. It is the right place for personal preferences like response style, workflow habits, and environment details."
 - question: In a monorepo, where should package-specific conventions be placed?
   options:
   - All in the root CLAUDE.md for convenience
@@ -22,13 +24,15 @@ quiz:
   - In each package's README.md
   - In a CLAUDE.md inside each package's subdirectory
   correctIndex: 3
+  explanation: "Each package in a monorepo has its own language, conventions, and tooling. A subdirectory CLAUDE.md provides package-specific context without bloating the root file with rules that only apply to one package."
 - question: When multiple CLAUDE.md files apply, what is the merge behavior?
   options:
   - Only the root CLAUDE.md is read; nested files are ignored
-  - All applicable CLAUDE.md files are read and merged, with more specific files taking precedence
+  - All applicable CLAUDE.md files are concatenated into context, with more-local files appearing later
   - Only the closest CLAUDE.md to the current file is read
   - The agent randomly picks one CLAUDE.md to follow
   correctIndex: 1
+  explanation: "All applicable CLAUDE.md files are concatenated — enterprise, user, project root, and subdirectory files are all read and merged into context. Contradictions between files are not resolved automatically, so instructions must be kept consistent."
 ---
 
 ## Overview
@@ -58,9 +62,9 @@ Claude Code reads instructions from multiple locations and merges them into a si
     style B fill:#ebf8ff,stroke:#3182ce
     style C fill:#c6f6d5,stroke:#276749
     style D fill:#fefcbf,stroke:#975a16
-`} />
+`} fallback="Four instruction scopes from broadest to narrowest: Enterprise/Organization (managed settings), User/Personal (~/.claude/CLAUDE.md), Project Root (./CLAUDE.md, checked into repo), and Subdirectory (e.g., ./packages/api/CLAUDE.md, package-specific). Each scope narrows from organization-wide to a single package." />
 
-When scopes overlap, **more specific scopes take precedence**. A subdirectory CLAUDE.md can override a project-root instruction, and a project instruction overrides a user-level instruction.
+When scopes overlap, all applicable CLAUDE.md files are **concatenated into context**. More-local files appear later in the context window, but this is concatenation, not a deterministic override. If two files contradict each other, the agent reads both and behavior is unpredictable. Remove contradictions rather than relying on file order.
 
 ## Scope 1: Project Root CLAUDE.md
 
@@ -171,7 +175,7 @@ The solution is **nested CLAUDE.md files** -- one at the root for shared convent
 
     style Root fill:#c6f6d5,stroke:#276749
     style Packages fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Monorepo nesting: the repository root CLAUDE.md contains shared conventions and build commands, and feeds into package-level CLAUDE.md files for each package — packages/api (Python, FastAPI, pytest), packages/web (TypeScript, Next.js, vitest), packages/mobile (Kotlin, Android), and packages/shared (TypeScript, library conventions)." />
 
 Here is how the root and package-level files might look:
 
@@ -221,7 +225,7 @@ When the agent works on a file in `packages/api/`, it reads **both** the root CL
 
 ## How Scopes Merge
 
-When multiple CLAUDE.md files apply, the agent merges them with a **more-specific-wins** strategy:
+When multiple CLAUDE.md files apply, the agent **concatenates** them into a single context window:
 
 <MermaidDiagram chart={`flowchart TD
     A["Agent starts session"] --> B["Read enterprise settings<br/><i>Broadest scope</i>"]
@@ -229,19 +233,21 @@ When multiple CLAUDE.md files apply, the agent merges them with a **more-specifi
     C --> D["Read project root CLAUDE.md<br/><i>Project conventions</i>"]
     D --> E{"Working in a subdirectory<br/>with its own CLAUDE.md?"}
     E -->|Yes| F["Read subdirectory CLAUDE.md<br/><i>Package-specific rules</i>"]
-    E -->|No| G["Use merged context"]
+    E -->|No| G["Use concatenated context"]
     F --> G
 
-    G --> H["All instructions are combined.<br/>More-specific files take<br/>precedence on conflicts."]
+    G --> H["All instructions are concatenated.<br/>More-local files appear later<br/>in context. Contradictions are<br/>not resolved automatically."]
 
     style B fill:#e9d8fd,stroke:#6b46c1
     style C fill:#ebf8ff,stroke:#3182ce
     style D fill:#c6f6d5,stroke:#276749
     style F fill:#fefcbf,stroke:#975a16
     style H fill:#f0fff4,stroke:#276749
-`} />
+`} fallback="Scope merge flow: the agent reads enterprise settings (broadest), then user CLAUDE.md, then project root CLAUDE.md, then checks if the working subdirectory has its own CLAUDE.md. All instructions are concatenated into a single context. More-local files appear later, but contradictions are not resolved automatically." />
 
-For example, if your root CLAUDE.md says "use named exports" but a package-level CLAUDE.md says "use default exports for React components in this package," the package-level rule wins when working in that package.
+For example, if your root CLAUDE.md says "use named exports" and a package-level CLAUDE.md says "use default exports for React components in this package," the agent reads both. In practice, the more-local instruction often guides behavior because it appears later in context -- but this is not a guaranteed override. If the instructions directly contradict each other, the agent may follow either one. Write package-level instructions as **refinements** ("in this package, prefer default exports for React components") rather than contradictions.
+
+> **Modern alternative:** Claude Code also supports `.claude/rules/` files with a `paths` frontmatter field (e.g., `paths: ["packages/web/**"]`). These provide targeted, per-path instructions without relying on nested CLAUDE.md files. See the Claude Code documentation for details.
 
 ## Deciding Where to Put an Instruction
 
@@ -272,7 +278,11 @@ When a monorepo root CLAUDE.md tries to document conventions for every package, 
 
 ### Mistake 4: Duplicating rules across scopes
 
-If both the root and a package CLAUDE.md say "run `pnpm test` before committing," you now have two places to update when you change the test command. Let the root handle shared rules and packages handle only their overrides.
+If both the root and a package CLAUDE.md say "run `pnpm test` before committing," you now have two places to update when you change the test command. Let the root handle shared rules and packages handle only their refinements.
+
+### Mistake 5: Relying on "override" behavior to resolve contradictions
+
+Conflicting instructions are not resolved through a deterministic override rule. If the root says "never use default exports" and a package says "always use default exports," the agent reads both and behavior is unpredictable. Instead of contradicting a root-level rule, refine it: "in this package, prefer default exports for React components." When instructions cannot be reconciled, remove the contradiction from one scope.
 
 ## Summary
 
@@ -280,6 +290,8 @@ If both the root and a package CLAUDE.md say "run `pnpm test` before committing,
 - The **project root CLAUDE.md** is the most important -- it contains build commands, code style, architecture, and team-wide rules
 - The **user-level CLAUDE.md** is for personal preferences and environment-specific details
 - **Monorepos** use nested CLAUDE.md files -- one root for shared conventions, one per package for specifics
-- Scopes merge with **more-specific-wins** precedence -- subdirectory overrides root, root overrides user
+- Scopes are **concatenated** -- all applicable files are read, with more-local files appearing later in context, but contradictions are not resolved automatically
+- Conflicting instructions are not resolved through a deterministic override rule -- remove contradictions rather than relying on file order
 - Put instructions at the **narrowest scope** where they apply, defaulting to project level when in doubt
-- Avoid common mistakes: project rules in user settings, personal preferences in project files, and duplicating rules across scopes
+- `.claude/rules/` files with `paths` frontmatter offer an alternative to nested CLAUDE.md for per-path scoping
+- Avoid common mistakes: project rules in user settings, personal preferences in project files, duplicating rules, and relying on override behavior for contradictions

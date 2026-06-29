@@ -29,7 +29,7 @@ Before writing any configuration, you need to understand what you are protecting
     style E fill:#fed7d7,stroke:#e53e3e
     style G fill:#fef3c7,stroke:#d69e2e
     style H fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Risk assessment decision flowchart: start by checking if the repo contains secrets (if yes, add secret-scanning hook and deny network commands), then if it deploys to production (if yes, deny CI/CD modifications and push to main), then if the repo is public (if yes, deny force-push and require branch isolation), otherwise apply standard basic deny rules and allowlist common commands. All applicable rules combine into the final settings.json." />
 
 Ask yourself these questions:
 

@@ -8,6 +8,7 @@ quiz:
   - Not including the project name in the file
   - Writing it in a language other than English
   correctIndex: 0
+  explanation: "A massive CLAUDE.md is loaded into every agent session regardless of the task. Most of the content is irrelevant to any given session, wasting thousands of tokens of context budget on information the agent will never use."
 - question: Why does a self-describing codebase consume less context budget?
   options:
   - Because self-describing code compiles to fewer bytes
@@ -15,6 +16,7 @@ quiz:
   - Because good names, types, and structure communicate intent without the agent needing to read external documentation
   - Because the context window automatically expands for well-organized projects
   correctIndex: 2
+  explanation: "When code uses descriptive names, explicit types, and clear directory structure, the agent can infer intent directly from the code. It does not need to read external documentation or additional files to understand what things do, saving context tokens."
 - question: What is context compression, and why should developers be aware of it?
   options:
   - It is a file compression algorithm that reduces repository size on disk
@@ -22,6 +24,7 @@ quiz:
   - It is a technique for writing shorter CLAUDE.md files
   - It is the process where agents or platforms summarize earlier conversation to free context space, which means early details can be lost
   correctIndex: 3
+  explanation: "Context compression automatically summarizes earlier messages in long sessions to free space. This means details from early in a conversation can be lost, so developers should not rely on the agent remembering decisions made many messages ago."
 ---
 
 ## Overview
@@ -59,7 +62,7 @@ The problem is not the content itself -- each line was probably added for a good
     style Lean fill:#c6f6d5,stroke:#276749
     style Cost1 fill:#fed7d7,stroke:#e53e3e
     style Cost2 fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="Comparison of bloated vs lean CLAUDE.md: a bloated 500-line file containing build commands, 20 style rules, API patterns, database conventions, frontend patterns, deploy procedures, security guidelines, code examples, and edge cases costs ~8,000 tokens every session with low relevance. A lean 50-line file with just build/test/lint commands, top 5 critical rules, a 3-sentence architecture overview, and pointers to .ctx files costs ~800 tokens with high relevance." />
 
 The fix is to apply the **80/20 rule**: identify the 20% of instructions that prevent 80% of agent mistakes, and keep only those in CLAUDE.md. Everything else goes into .ctx files, where it is loaded on demand.
 
@@ -213,7 +216,7 @@ What survives compression:
     style Early fill:#fefcbf,stroke:#d69e2e
     style Mid fill:#ebf8ff,stroke:#3182ce
     style Late fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="Context compression over a session: at the start, all messages have full detail. By mid-session, earlier messages (1-20) are compressed into summaries like 'Discussed API design, decided on REST.' Late in the session (40+ messages), the current context is mostly recent work at full detail, while early conversation details may be lost." />
 
 The practical implication: **do not rely on the agent remembering details from early in a long session**. If you made an important decision in message 5 and you are now on message 40, the agent may only have a vague summary of that decision.
 
@@ -240,7 +243,7 @@ A key context budget decision is what the agent should know before starting vers
     end
     style Preload fill:#ebf8ff,stroke:#3182ce
     style Discover fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="Pre-load vs discover trade-off: Pre-loaded context (CLAUDE.md, Memory) is always available but costs tokens every session — best for universal rules, build commands, and critical constraints. Discovered context (Search, Read) is loaded only when needed and costs tokens only when relevant — best for implementation details, module-specific patterns, and examples." />
 
 The rule of thumb: **pre-load things the agent needs in every session, and let it discover things it only needs sometimes.**
 

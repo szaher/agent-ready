@@ -8,6 +8,7 @@ quiz:
   - Hooks are faster to evaluate than permissions
   - Permissions are defined in JSON and hooks are defined in YAML
   correctIndex: 0
+  explanation: "Permissions apply the same rules regardless of context — a command is either allowed or denied. Hooks run custom shell scripts that can inspect the full context of an action (arguments, file paths, content) and make dynamic decisions."
 - question: What happens when a pre-tool hook exits with a non-zero exit code?
   options:
   - The agent retries the action with different arguments
@@ -15,6 +16,7 @@ quiz:
   - The action is blocked and the agent receives an error message
   - The entire agent session is terminated
   correctIndex: 2
+  explanation: "A non-zero exit code from a pre-tool hook acts as a gate — it blocks the action before it executes. The error message written to stderr is relayed to the agent, which can then adjust its approach."
 - question: Which hook event type would you use to run a linter after every file edit?
   options:
   - PreToolUse on the Bash tool
@@ -22,6 +24,7 @@ quiz:
   - PreToolUse on the Read tool
   - PostToolUse on the Write or Edit tool
   correctIndex: 3
+  explanation: "PostToolUse hooks fire after the tool call completes, making them ideal for follow-up actions like linting. Matching on the Edit or Write tool ensures the linter runs specifically after file modifications, not after other operations."
 ---
 
 ## Overview
@@ -58,7 +61,7 @@ A hook is a shell command that runs at a specific point in the agent's workflow.
         PreHook-->>Framework: BLOCK (exit 1)
         Framework-->>Agent: Error: action blocked by hook
     end
-`} />
+`} fallback="Hook execution sequence: the agent requests a tool call, the framework runs the pre-hook script. If the hook exits 0, the tool executes, post-hook runs, and the result returns to the agent. If the hook exits non-zero, the action is blocked and the agent receives an error message." />
 
 The critical design principle is that **pre-hooks are gates** (they can stop execution) while **post-hooks are observers** (they react to what happened). This separation gives you both preventive and detective controls.
 
@@ -307,7 +310,7 @@ When multiple hooks are configured for the same event type, they execute in orde
     style X fill:#fed7d7,stroke:#e53e3e
     style D fill:#c6f6d5,stroke:#38a169
     style G fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Hook pipeline flowchart: an agent requests a Bash command, which passes through Pre-Hook 1 (validate-command.sh) and Pre-Hook 2 (check-project-rules.sh) — if either exits non-zero, the action is blocked. If both pass, the command executes, then Post-Hook 1 (log-command.sh) and Post-Hook 2 (notify-team.sh) run in sequence before the result returns to the agent." />
 
 This pipeline model means you can decompose your safety logic into small, focused hooks rather than building one monolithic script. Each hook handles one concern: one validates commands, another checks file paths, another enforces naming conventions.
 

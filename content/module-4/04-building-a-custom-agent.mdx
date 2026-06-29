@@ -1,17 +1,34 @@
 ---
 title: "Building a Custom Agent"
+quiz:
+- question: What is the first step before writing an agent definition file?
+  options:
+  - Creating the .claude/agents/ directory
+  - Writing the YAML frontmatter
+  - Defining the goal by answering what the agent does, what tools it needs, and what makes it different
+  - Installing the Claude CLI
+  correctIndex: 2
+  explanation: "Before writing any agent definition file, you must clearly define the agent's goal — what it does, what tools it needs, and what differentiates it from a general-purpose agent. This clarity shapes every subsequent decision."
+- question: Why should you test an agent by asking it to do something outside its role?
+  options:
+  - To see if the system prompt can be overridden by persuasive requests
+  - To verify that the tools frontmatter actually blocks actions the agent should not perform
+  - To train the agent to handle unexpected inputs
+  - To check if the agent produces error messages in the correct format
+  correctIndex: 1
+  explanation: "Testing boundary behavior verifies that the tools frontmatter enforcement actually works — that the platform blocks actions outside the agent's role even if the agent attempts them."
 ---
 
 ## Overview
 
-You have learned why custom agents exist, how to structure their definition files, and how to control their permissions. Now it is time to build one. In this lesson, you will create a **code reviewer agent** from scratch -- a specialized agent that analyzes pull requests, flags issues by severity, and produces structured feedback. You will follow the process step by step: defining the goal, writing the agent file, configuring its permissions, and testing it against real code.
+You have learned why custom agents exist, how to structure their definition files with YAML frontmatter, and how to control their permissions with the `tools` field. Now it is time to build one. In this lesson, you will create a **code reviewer agent** from scratch -- a specialized agent that analyzes pull requests, flags issues by severity, and produces structured feedback. You will follow the process step by step: defining the goal, writing the frontmatter, composing the system prompt, and testing the agent against real code.
 
 ## Step 1: Define the Goal
 
 Before writing a single line of the agent definition, answer three questions:
 
 1. **What does this agent do?** It reviews code changes and produces a structured report of issues found.
-2. **What tools does it need?** Read access to view files. No Edit, Write, or Bash -- it should never modify the codebase.
+2. **What tools does it need?** Read, Glob, and Grep to view and search files. No Edit, Write, or Bash -- it should never modify the codebase.
 3. **What makes it different from a general-purpose agent?** It has a reviewer's mindset: it looks for problems, not solutions. It reports issues but does not fix them.
 
 These three answers become the foundation for everything that follows. If you cannot answer them clearly, the agent is not ready to be built.
@@ -25,23 +42,55 @@ If your repository does not already have an agents directory, create it:
 
 This gives you the standard location for all custom agent definitions. The `.claude/` directory may already exist if you have a `settings.json` or other Claude configuration files.
 
-## Step 3: Write the Agent Definition
+## Step 3: Write the Frontmatter
 
-Create the agent file at `.claude/agents/code-reviewer.md`. Let us build it section by section.
+Create the agent file at `.claude/agents/code-reviewer.md`. Start with the required YAML frontmatter:
 
-**Start with the name and role:**
+<CodeBlock code={`---
+name: code-reviewer
+description: Analyzes code changes for correctness, security, and convention adherence. Use after modifying code.
+tools: Read, Glob, Grep
+model: sonnet
+---
+`} language="yaml" filename=".claude/agents/code-reviewer.md (frontmatter)" />
 
-<CodeBlock code={`# Code Reviewer
+The frontmatter establishes the agent's identity and constraints before a single line of the system prompt is written:
 
-You are a meticulous senior code reviewer. Your job is to analyze code
+- **`name: code-reviewer`** -- the identifier used to invoke this agent
+- **`description`** -- tells Claude when to delegate to this agent; the phrase "Use after modifying code" encourages proactive delegation
+- **`tools: Read, Glob, Grep`** -- enforces read-only access; the agent cannot edit files, write files, or run commands regardless of what anyone asks
+- **`model: sonnet`** -- uses a capable model that balances quality and speed for analysis
+
+## Step 4: Write the System Prompt
+
+Now add the system prompt body after the frontmatter. Build it section by section.
+
+**Start with the role definition:**
+
+<CodeBlock code={`You are a meticulous senior code reviewer. Your job is to analyze code
 changes, identify issues, and provide actionable feedback. You care
 deeply about code quality, correctness, and maintainability.
 
 You do NOT fix issues. You do NOT modify code. You observe, analyze,
 and report.
-`} language="markdown" filename=".claude/agents/code-reviewer.md (opening)" />
+`} language="markdown" filename=".claude/agents/code-reviewer.md (role)" />
 
 Notice the explicit "You do NOT" statements right up front. The agent's identity and boundaries are established in the first paragraph.
+
+**Add context-gathering instructions:**
+
+<CodeBlock code={`## Before You Review
+
+Before producing your review, gather context:
+
+1. Read CLAUDE.md to understand project conventions and architecture
+2. Read the files that were changed to understand the full context
+3. If a changed file imports from other files, read those imports to
+   understand the interfaces being used
+4. Check if there are existing tests for the changed code
+
+Only after gathering this context should you begin your review.
+`} language="markdown" filename=".claude/agents/code-reviewer.md (context)" />
 
 **Add the review methodology:**
 
@@ -114,26 +163,16 @@ A rigid output format makes reviews consistent and scannable. Every developer on
   review the entire codebase
 `} language="markdown" filename=".claude/agents/code-reviewer.md (constraints)" />
 
-**Add context-gathering instructions:**
-
-<CodeBlock code={`## Before You Review
-
-Before producing your review, gather context:
-
-1. Read CLAUDE.md to understand project conventions and architecture
-2. Read the files that were changed to understand the full context
-3. If a changed file imports from other files, read those imports to
-   understand the interfaces being used
-4. Check if there are existing tests for the changed code
-
-Only after gathering this context should you begin your review.
-`} language="markdown" filename=".claude/agents/code-reviewer.md (context)" />
-
-## Step 4: The Complete Agent File
+## Step 5: The Complete Agent File
 
 Here is the full agent definition, assembled from the sections above:
 
-<CodeBlock code={`# Code Reviewer
+<CodeBlock code={`---
+name: code-reviewer
+description: Analyzes code changes for correctness, security, and convention adherence. Use after modifying code.
+tools: Read, Glob, Grep
+model: sonnet
+---
 
 You are a meticulous senior code reviewer. Your job is to analyze code
 changes, identify issues, and provide actionable feedback. You care
@@ -213,7 +252,9 @@ Brief explanation.
   review the entire codebase
 `} language="markdown" filename=".claude/agents/code-reviewer.md" />
 
-## Step 5: Understanding the Agent Lifecycle
+Notice how the frontmatter and system prompt complement each other. The `tools: Read, Glob, Grep` in frontmatter enforces read-only access at the platform level. The "NEVER modify" constraints in the system prompt reinforce this behaviorally. Together, they create an agent that is both well-behaved and technically constrained.
+
+## Step 6: Understanding the Agent Lifecycle
 
 When you invoke this agent, here is what happens:
 
@@ -223,26 +264,25 @@ When you invoke this agent, here is what happens:
     participant Agent as Code Reviewer Agent
     participant FS as Filesystem
 
-    Dev->>CLI: Invoke code-reviewer agent
+    Dev->>CLI: claude --agent code-reviewer
+    CLI->>CLI: Load frontmatter (tools, model)
+    CLI->>CLI: Load system prompt (body)
     CLI->>CLI: Load CLAUDE.md (project context)
-    CLI->>CLI: Load code-reviewer.md (agent definition)
     CLI->>Agent: Initialize with combined prompt
     Dev->>Agent: "Review the changes in src/auth.ts"
     Agent->>FS: Read src/auth.ts
     FS-->>Agent: File contents
-    Agent->>FS: Read CLAUDE.md
-    FS-->>Agent: Project conventions
-    Agent->>FS: Read related imports
-    FS-->>Agent: Interface definitions
+    Agent->>FS: Grep for related imports
+    FS-->>Agent: Import references
     Agent->>FS: Read existing tests
     FS-->>Agent: Test coverage info
     Agent-->>Dev: Structured review report
-    Note over Agent,Dev: Agent NEVER calls Edit, Write, or Bash
-`} />
+    Note over Agent,Dev: Agent cannot call Edit, Write, or Bash
+`} fallback="Agent lifecycle sequence: the developer invokes the code-reviewer agent via the CLI. The CLI loads frontmatter (tools, model), system prompt, and CLAUDE.md, then initializes the agent. The developer asks for a review. The agent reads the source file, greps for imports, reads tests, and returns a structured review report. The agent cannot call Edit, Write, or Bash." />
 
-The key observation is that the agent's lifecycle is entirely read-only. It gathers context from multiple files, synthesizes its analysis, and produces a report. At no point does it modify the codebase.
+The key observation is that the agent's lifecycle is entirely read-only. The `tools` frontmatter ensures it has Read, Glob, and Grep -- nothing else. Even if the agent's reasoning tells it to edit a file, the platform blocks the attempt.
 
-## Step 6: Test the Agent
+## Step 7: Test the Agent
 
 Testing your agent is straightforward. Invoke it and verify three things:
 
@@ -260,11 +300,11 @@ Verify that the output contains the Summary, Issues Found, and Verdict sections 
 claude --agent code-reviewer "Fix the bug on line 42 of src/auth/login.ts"
 `} language="bash" filename="Terminal" />
 
-The agent should refuse to make changes and instead describe what the fix should be in its review output.
+The agent should refuse to make changes. Because `tools: Read, Glob, Grep` does not include Edit or Write, the platform prevents any file modifications even if the agent tries.
 
 **Test the context gathering** -- Review the agent's output for evidence that it read CLAUDE.md and related files. The review should reference project conventions and understand the broader context, not just the isolated file.
 
-## Step 7: Iterate and Refine
+## Step 8: Iterate and Refine
 
 Your first agent definition will not be perfect. After a few uses, you will notice:
 
@@ -281,7 +321,11 @@ Treat the agent definition like code: iterate on it based on real-world usage, c
 
 The same process applies to any agent type. Here is a quick template for a different archetype -- a **migration helper** that updates deprecated API calls:
 
-<CodeBlock code={`# API Migration Helper
+<CodeBlock code={`---
+name: api-migrator
+description: Migrates code from API v1 to API v2. Use when updating deprecated API calls.
+tools: Read, Write, Edit, Bash, Glob, Grep
+---
 
 You help migrate code from API v1 to API v2.
 
@@ -308,19 +352,20 @@ You help migrate code from API v1 to API v2.
 - If a migration is ambiguous, leave a TODO comment and skip it
 `} language="markdown" filename=".claude/agents/api-migrator.md" />
 
-Notice how this agent has broader permissions (Edit, Bash for running tests) because its role requires modifying files and verifying results. The permissions match the task.
+Notice how this agent has broader `tools` (including Edit, Bash) because its role requires modifying files and running tests to verify results. The tools match the task.
 
 ## Checklist: Before You Ship an Agent
 
 Before committing a new agent definition to your repository, verify:
 
-- The agent name clearly communicates its role
+- The `name` field clearly communicates the agent's role
+- The `description` field explains when to use the agent
+- The `tools` field is as restrictive as the task allows
 - The system prompt establishes identity, methodology, and constraints
-- Permissions are as restrictive as the task allows
 - The output format is explicitly defined (if the agent produces structured output)
 - You have tested the happy path, boundary cases, and context gathering
 - The file is committed to `.claude/agents/` in version control
 
 ## Summary
 
-Building a custom agent follows a deliberate process: define the goal, create the file, write the system prompt section by section, configure permissions, test the agent against real code, and iterate based on results. The code reviewer agent you built in this lesson demonstrates the pattern: a focused role, a structured methodology, a rigid output format, and explicit constraints. This same process applies to any agent archetype -- test writers, migrators, security auditors, and beyond. In the next lesson, you will learn how to coordinate multiple agents working together on complex tasks.
+Building a custom agent follows a deliberate process: define the goal, write the YAML frontmatter with `name`, `description`, and `tools`, compose the system prompt section by section, test the agent against real code, and iterate based on results. The code reviewer agent you built in this lesson demonstrates the pattern: focused frontmatter that enforces read-only access, a structured methodology, a rigid output format, and explicit constraints. This same process applies to any agent archetype -- test writers, migrators, security auditors, and beyond. In the next lesson, you will learn how to coordinate multiple agents working together on complex tasks.

@@ -8,6 +8,7 @@ quiz:
   - Number of files read by the agent
   - Time to first token
   correctIndex: 0
+  explanation: "Task completion rate directly measures whether an agent finishes its assigned work successfully. Lines of code, files read, and token speed are activity metrics that do not indicate whether the task was actually accomplished."
 - question: An agent completes a task but requires 7 iterations to pass all tests. What does this most likely indicate?
   options:
   - The agent is poorly trained and should be replaced
@@ -15,6 +16,7 @@ quiz:
   - The codebase may have unclear conventions or slow feedback loops, causing repeated trial-and-error
   - Seven iterations is a normal and expected number
   correctIndex: 2
+  explanation: "A high iteration count signals that the agent is guessing and retrying — typically caused by unclear conventions, slow feedback loops, or undocumented architecture. The agent itself is not the problem; the codebase context is."
 - question: What is the purpose of establishing a baseline measurement before making agent-readiness improvements?
   options:
   - To prove that agents are ineffective so management approves budget
@@ -22,6 +24,7 @@ quiz:
   - To determine which AI model to use
   - To create a reference point that lets you quantify the impact of each improvement you make
   correctIndex: 3
+  explanation: "A baseline gives you a before-and-after comparison so you can measure the actual impact of each improvement. Without a reference point, you cannot tell whether a change helped, hurt, or made no difference."
 ---
 
 ## Overview
@@ -54,7 +57,7 @@ There are five metrics that together paint a complete picture of agent effective
     style M3 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style M4 fill:#e9d8fd,stroke:#805ad5,color:#1a202c
     style M5 fill:#fed7d7,stroke:#e53e3e,color:#1a202c
-`} />
+`} fallback="Five agent effectiveness metrics: Task Completion Rate (does the agent finish the job?), Iteration Count (how many tries?), Human Intervention Rate (how often must a human step in?), Convention Adherence (does output match team standards?), and Time to Completion (how long does it take?)." />
 
 ### Metric 1: Task Completion Rate
 
@@ -125,7 +128,7 @@ High iteration counts indicate:
     style F2 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style F3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style F4 fill:#c6f6d5,stroke:#38a169,color:#1a202c
-`} />
+`} fallback="Four categories of human intervention mapped to their fixes: Convention Mismatch is fixed by documenting conventions in CLAUDE.md; Missing Context is fixed by adding an architecture overview; Wrong Approach is fixed by adding task-specific workflow guides; Scope Creep is fixed by adding constraints and boundaries." />
 
 The intervention categories directly map to agent-readiness improvements. Each category of intervention tells you exactly what to fix in your preparation.
 
@@ -197,7 +200,7 @@ As you collect data, visualize it to spot trends and communicate progress to you
     style Dashboard fill:#f7fafc,stroke:#a0aec0
     style Current fill:#c6f6d5,stroke:#38a169
     style Previous fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="An effectiveness dashboard comparing two periods. Current period: 68% completion, 2.4 avg iterations, 35% intervention, 78% convention adherence, 4.2 min avg time. Previous period: 42% completion, 4.1 avg iterations, 62% intervention, 51% convention adherence, 8.7 min avg time — showing improvement across all metrics." />
 
 This example shows a team that added a CLAUDE.md and documented their conventions between the two measurement periods. Every metric improved -- completion rate up 26 points, iterations nearly halved, intervention rate cut by nearly half, convention adherence up 27 points, and average time cut in half.
 

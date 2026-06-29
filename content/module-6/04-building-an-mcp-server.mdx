@@ -92,7 +92,7 @@ This is the frame around which everything else is built. The `McpServer` class h
     style T3 fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style R1 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style Agent fill:#e9d8fd,stroke:#805ad5,color:#1a202c
-`} />
+`} fallback="Custom MCP server architecture: the project-tools server contains a server skeleton (McpServer + StdioTransport) that exposes three tools (list_team, project_status, create_summary) and one resource (team-directory). The MCP client in Claude Code communicates with the server via stdio." />
 
 ## Defining Tools
 
@@ -479,7 +479,7 @@ After restarting Claude Code, the agent will discover your three tools (`list_te
     Note over CC,Server: Usage
     CC->>Server: tools/call {name: "project_status", arguments: {project: "payments"}}
     Server-->>CC: "payments: degraded | health 85/100 | 7 issues"
-`} />
+`} fallback="Server startup and usage sequence: Claude Code starts the server process, sends initialize, receives capabilities (tools and resources), discovers available tools and resources, then during usage calls project_status with a project name and gets back a formatted status string." />
 
 Now you can ask your agent "What is the status of the payments project?" and it will call your custom MCP tool to get the answer.
 

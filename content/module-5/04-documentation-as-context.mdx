@@ -8,6 +8,7 @@ quiz:
   - Agents can only understand typed languages
   - Type annotations are required by all modern build tools
   correctIndex: 0
+  explanation: "Type annotations are machine-readable contracts that agents can parse directly. They define inputs, outputs, and data shapes without requiring the agent to read implementation details."
 - question: What should a directory-level README.md contain for maximum agent benefit?
   options:
   - A complete tutorial on how the module was built
@@ -15,6 +16,7 @@ quiz:
   - The module's purpose, public API surface, key patterns, and what NOT to do
   - A copy of the project's main README with the module name replaced
   correctIndex: 2
+  explanation: "A directory-level README should answer the questions agents have when entering a module: what does it do, what is the public API, what patterns should be followed, and what is prohibited."
 - question: Which type of inline comment is MOST helpful for AI agents?
   options:
   - Comments that restate what the code does line by line
@@ -22,6 +24,7 @@ quiz:
   - Comments that credit the original author
   - Comments that explain WHY a non-obvious decision was made or what constraint drove the implementation
   correctIndex: 3
+  explanation: "Comments explaining WHY a non-obvious decision was made give agents the reasoning they need to preserve important constraints. Comments restating what the code does add no value since the code already says that."
 - question: What is the relationship between JSDoc/docstrings and type annotations?
   options:
   - They are redundant — you should only use one
@@ -29,6 +32,7 @@ quiz:
   - JSDoc replaces the need for type annotations entirely
   - Docstrings are only for human developers, not for agents
   correctIndex: 1
+  explanation: "Type annotations define the contract — what a function accepts and returns. Docstrings complement this by explaining behavior, constraints, and edge cases that types cannot express."
 ---
 
 ## Overview
@@ -49,7 +53,7 @@ An agent builds its understanding of your code layer by layer, starting broad an
     style C fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style D fill:#fed7e2,stroke:#d53f8c,color:#1a202c
     style E fill:#e2e8f0,stroke:#4a5568,color:#1a202c
-`} />
+`} fallback="The documentation context stack from broad to narrow: CLAUDE.md / Root README (project purpose, architecture, conventions), Directory README.md (module purpose, API surface, patterns), Type Annotations (function contracts, data shapes), Docstrings / JSDoc (behavior, constraints, edge cases), and Inline Comments (why non-obvious decisions were made)." />
 
 The agent reads these layers in order: it starts with the project-level CLAUDE.md, drills into directory READMEs as it navigates, reads type signatures when it opens files, scans docstrings for functions it plans to call or modify, and finally reads inline comments when it needs to understand specific implementation decisions.
 
@@ -311,7 +315,7 @@ The documentation stack works best when each layer complements the others withou
     style Types fill:#bee3f8,stroke:#3182ce
     style Docs fill:#fefcbf,stroke:#d69e2e
     style Comments fill:#e2e8f0,stroke:#4a5568
-`} />
+`} fallback="How documentation layers connect without duplicating: README covers module purpose, public API, key patterns, and prohibitions. Types cover input shapes, output shapes, optional vs required, and generic constraints. Docstrings cover preconditions, side effects, error conditions, and usage examples. Inline comments cover business decisions, external constraints, non-obvious dependencies, and historical context. Each layer feeds into the next." />
 
 - **README** tells the agent what a module is and how to use it (broad scope)
 - **Types** tell the agent what a function expects and returns (function scope)

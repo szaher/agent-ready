@@ -8,6 +8,7 @@ quiz:
   - User settings (~/.claude/settings.json in the home directory)
   - All three levels have equal precedence
   correctIndex: 0
+  explanation: "Enterprise policy has the highest precedence because it represents organization-wide non-negotiable safety rules. Deny rules at the enterprise level cannot be overridden by project or user settings, ensuring baseline safety across all projects."
 - question: What does an allowlist-based permission model do by default when an agent requests an action not on the list?
   options:
   - Executes the action and logs a warning
@@ -15,6 +16,7 @@ quiz:
   - Asks the user for approval before proceeding
   - Terminates the agent session immediately
   correctIndex: 2
+  explanation: "In default permission mode, actions not on the allow or deny list fall through to a user prompt. This ensures that unexpected actions get human review rather than being silently executed or blocked."
 - question: Why should deny patterns take priority over allow patterns in permission configuration?
   options:
   - Because deny patterns are faster to evaluate
@@ -22,6 +24,7 @@ quiz:
   - Because allow patterns are deprecated in newer agent frameworks
   - Because a single allowed dangerous command can cause irreversible damage
   correctIndex: 3
+  explanation: "Deny-first evaluation ensures that no allow rule can accidentally override a safety-critical restriction. A single destructive command like rm -rf or git push --force can cause irreversible damage that no recovery mechanism can fix."
 - question: What is the security risk of using overly broad permission patterns like 'Bash(*)' in project settings?
   options:
   - It makes the agent run slower due to pattern matching overhead
@@ -29,6 +32,7 @@ quiz:
   - It prevents the agent from reading files
   - It disables the hooks system
   correctIndex: 1
+  explanation: "Bash(*) matches every shell command, effectively disabling permission checks for all commands. This means destructive operations like rm -rf, git push --force, or sudo commands execute without any user approval."
 ---
 
 ## Overview
@@ -55,7 +59,7 @@ Every time an AI coding agent wants to execute a tool -- reading a file, running
     style G fill:#fef3c7,stroke:#d69e2e
     style H fill:#fef3c7,stroke:#d69e2e
     style I fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Permission decision flowchart: when an agent requests an action, it is first checked against the deny list (blocked if matched), then the allow list (auto-approved if matched). If neither matches, the fallback depends on the permission mode: default mode asks the user, auto mode auto-approves if deemed safe, and bypass mode auto-approves all actions." />
 
 The flow is simple but powerful: deny rules are checked first, then allow rules, then the fallback behavior depends on the permission mode. This **deny-first** approach ensures that no allowlist can accidentally override a safety-critical restriction.
 
@@ -78,7 +82,7 @@ Permission settings are defined in JSON configuration files at three levels. Hig
     style Tier1 fill:#e9d8fd,stroke:#805ad5
     style Tier2 fill:#ebf8ff,stroke:#3182ce
     style Tier3 fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="The three-tier permission hierarchy: Tier 1 Enterprise/Organization (.claude/settings.json managed by org) overrides Tier 2 Project (.claude/settings.json checked into repo), which overrides Tier 3 User (~/.claude/settings.json personal preferences)." />
 
 ### Tier 1: Enterprise / Organization
 
@@ -240,7 +244,7 @@ Beyond individual allow/deny rules, agent frameworks offer global permission mod
     style Default fill:#c6f6d5,stroke:#38a169
     style Auto fill:#fef3c7,stroke:#d69e2e
     style Bypass fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Permission modes spectrum from most to least secure: Default Mode (most secure, asks for everything not allowlisted), Auto Mode (balanced, auto-approves safe actions, asks for risky ones), and Bypass Mode (no guardrails, for sandboxed environments only)." />
 
 > **Warning**: Never use bypass mode on a developer workstation with access to production credentials, git remotes, or sensitive data. It is designed exclusively for isolated, disposable environments.
 

@@ -121,7 +121,7 @@ Watch what the agent does. Without any project instructions, it will:
     Agent->>Repo: Install test framework
     Agent->>Repo: Run npm test again
     Repo-->>Agent: Tests pass (maybe)
-`} />
+`} fallback="Sequence diagram showing an agent session without context: the developer requests a task, the agent reads the directory and source files, finds no test framework configured, guesses which framework to use, writes code and tests, encounters errors when running tests, then tries to fix the configuration — a cycle of guesswork and retries." />
 
 Notice the guesswork. The agent had to decide which test framework to use, where to put the test files, and how to configure the test runner. It might choose Jest when your team uses Vitest. It might put tests in a `__tests__` folder when you prefer co-located `.test.js` files. Every guess is a potential mismatch with your team's preferences.
 
@@ -188,7 +188,7 @@ claude
     Agent->>Repo: Run npx vitest run
     Repo-->>Agent: All tests pass
     Note over Agent: Done -- matches conventions
-`} />
+`} fallback="Sequence diagram showing an agent session with context: the developer requests the same task, the agent reads CLAUDE.md first and learns the project conventions (Vitest, co-located tests, CommonJS, input validation), reads the source file, writes code and tests following conventions, runs the test command, and all tests pass on the first try." />
 
 The difference is dramatic. With a CLAUDE.md in place, the agent:
 

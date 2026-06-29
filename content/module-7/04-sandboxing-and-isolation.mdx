@@ -8,6 +8,7 @@ quiz:
   - It automatically backs up all files before the agent starts
   - It prevents the agent from reading files outside the project
   correctIndex: 0
+  explanation: "A git worktree creates a separate working directory on its own branch while sharing the same git history. The agent's changes are completely isolated from your main working directory, and you can discard the entire worktree if the changes are unwanted."
 - question: Why is container-based isolation stronger than worktree isolation?
   options:
   - Containers use less memory than worktrees
@@ -15,6 +16,7 @@ quiz:
   - Containers isolate the entire execution environment including filesystem, network, and process space
   - Containers automatically fix agent mistakes
   correctIndex: 2
+  explanation: "Containers provide system-level isolation beyond just file changes — they control filesystem access, network connectivity, and process space. An agent in a container cannot access the host filesystem, reach external services, or affect host processes."
 - question: In the review-gate workflow, when does a human reviewer get involved?
   options:
   - Before every individual tool call the agent makes
@@ -22,6 +24,7 @@ quiz:
   - Never -- the workflow is fully automated
   - After the agent completes all changes in the isolated environment, before merging
   correctIndex: 3
+  explanation: "The review-gate pattern lets the agent work with full autonomy in its sandbox, maximizing speed. Human review happens only at the integration point — when the agent's branch is ready to merge — not during every individual action."
 - question: What is the 'disposable environment' principle in agent sandboxing?
   options:
   - Agents should delete all their files after each session
@@ -29,6 +32,7 @@ quiz:
   - Developers should use temporary laptops for agent work
   - Agent sessions should be limited to five minutes
   correctIndex: 1
+  explanation: "Disposable environments mean the agent's workspace is cheap to create and destroy. If the agent makes a mistake, you simply discard the environment and start fresh rather than needing to manually undo changes."
 ---
 
 ## Overview
@@ -58,7 +62,7 @@ Isolation techniques range from lightweight to heavy, each offering a different 
     style Light fill:#c6f6d5,stroke:#38a169
     style Medium fill:#fef3c7,stroke:#d69e2e
     style Heavy fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Isolation spectrum from lightweight to heavy: Lightweight (Git Worktree, Git Branch), Medium (Virtual Environment, Namespace Isolation), and Heavy (Docker Container, VM/Sandbox). Each level provides progressively more isolation." />
 
 For most development workflows, git worktrees provide the best balance of safety and convenience. Containers add stronger isolation for CI/CD and untrusted execution scenarios.
 
@@ -80,7 +84,7 @@ A **git worktree** creates a separate working directory linked to the same repos
     style Main fill:#c6f6d5,stroke:#38a169
     style Agent fill:#ebf8ff,stroke:#3182ce
     style Git fill:#fef3c7,stroke:#d69e2e
-`} />
+`} fallback="Git worktree isolation: a Git Repository contains the Main Worktree (developer's working directory on the main branch) and an Agent Worktree (.claude/worktrees/feature-x on branch agent/feature-x), both sharing the same .git history. The developer works in the main worktree while the AI agent works in the agent worktree, with changes flowing through PR/review." />
 
 ### Why Worktrees Work Well for Agents
 
@@ -164,7 +168,7 @@ For stronger isolation, especially in CI/CD environments, **Docker containers** 
     style Container fill:#ebf8ff,stroke:#3182ce
     style Host fill:#f7fafc,stroke:#a0aec0
     style Net fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Container isolation: the host machine contains a Docker container running the AI Agent with a mounted repository (read-write). The git repository on the host is volume-mounted into the container. Network access from the container is blocked." />
 
 ### Why Containers Add Safety
 
@@ -251,7 +255,7 @@ The most robust isolation combines both approaches: the agent works in a git wor
     style Container fill:#ebf8ff,stroke:#3182ce
     style Worktree fill:#fef3c7,stroke:#d69e2e
     style PR fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Combined worktree and container isolation: the host machine has a main worktree for the developer. Inside a Docker container, a git worktree contains the AI agent working on project files on an isolated branch. Changes flow from the worktree through a git push to a Pull Request, which is reviewed before merging into the main worktree." />
 
 This double layer means:
 - **Git isolation**: Changes are on a separate branch; your main branch is untouched
@@ -274,7 +278,7 @@ Isolation is most effective when paired with a **review gate** -- a mandatory hu
     style D fill:#fef3c7,stroke:#d69e2e
     style E fill:#c6f6d5,stroke:#38a169
     style G fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Review-gate workflow: the agent works in isolation, commits to a branch, and a PR is created automatically. A human reviews the PR and either approves it (merge to main), requests changes (agent revises and recommits), or rejects it (branch deleted)." />
 
 The review gate is what makes isolation practical for teams. The agent works with full autonomy inside its sandbox, maximizing speed and throughput. But no changes reach the main branch without a human looking at them.
 

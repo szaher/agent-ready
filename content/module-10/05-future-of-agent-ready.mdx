@@ -39,7 +39,7 @@ Today's agents start each session with a blank slate, relying on the CLAUDE.md a
     style Today fill:#fed7d7,stroke:#e53e3e
     style Future fill:#c6f6d5,stroke:#38a169
     style FM fill:#bee3f8,stroke:#3182ce
-`} />
+`} fallback="Today's stateless sessions vs future persistent memory: today, each session reads CLAUDE.md and 12 files independently, repeating the same work. With persistent memory, Session 1 builds a codebase model that persists. Session 2 consults memory and reads only 2 changed files. Session 3 consults memory and reads only 1 changed file. Each subsequent session becomes cheaper because the memory accumulates understanding." />
 
 What this means for you: the CLAUDE.md you write today will likely become the seed for a richer, automatically maintained knowledge base. The conventions, constraints, and context you document now will be the foundation that persistent memory builds upon. Investing in clear, structured documentation pays even larger dividends when that documentation feeds a system that remembers.
 
@@ -63,7 +63,7 @@ Today, most agent workflows involve a single agent working on a single task. But
     Pipeline --- Coordination
     style Pipeline fill:#ebf8ff,stroke:#3182ce
     style Coordination fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Multi-agent pipeline: a Developer Agent produces code changes for a Review Agent, which provides feedback back to the Developer Agent and passes approved changes to a Test Agent. The Test Agent returns test results to the Developer Agent, which submits the final PR to the CI Pipeline. A Coordination Layer handles task handoff, context sharing, and conflict resolution across all agents." />
 
 What this means for you: the specialized agent patterns from Module 4 -- separation of concerns, focused permissions, role-specific instructions -- are the building blocks of multi-agent systems. Teams that have already defined clear agent roles will transition to multi-agent workflows more naturally than teams using a single general-purpose agent for everything.
 
@@ -108,7 +108,7 @@ Today, writing and maintaining CLAUDE.md is a manual process. You observe how ag
     style Inputs fill:#ebf8ff,stroke:#3182ce
     style Generator fill:#e9d8fd,stroke:#805ad5
     style Output fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Automated CLAUDE.md generation: codebase signals (directory structure, linter/formatter configurations, test patterns, commit history, existing documentation) feed into a generator that analyzes patterns, extracts conventions, identifies constraints, and produces a generated CLAUDE.md containing project overview, build/test commands, inferred conventions, detected structure, and suggested constraints." />
 
 What this means for you: the CLAUDE.md you write manually today may eventually become a baseline that an automated system maintains and extends. But automation does not replace human judgment about constraints and priorities. The "what matters most" and "what to never do" sections will likely remain human-authored even as the structural sections become automated.
 
@@ -160,7 +160,7 @@ Looking back across all ten modules, the journey from an agent-unaware codebase 
     style L3 fill:#fefcbf,stroke:#d69e2e
     style L4 fill:#fed7d7,stroke:#e53e3e
     style L5 fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="The agent-ready journey across ten modules: Modules 1-2 (Understanding — know why agents matter), Modules 3-4 (Foundation — know how to write CLAUDE.md and custom agents), Modules 5-6 (Structure — build right with project organization and CI integration), Modules 7-8 (Advanced Tools — automate with MCP, hooks, and context engineering), Modules 9-10 (Scaling — scale with migration, security, and team adoption)." />
 
 You started by understanding the agentic shift and what it means for a codebase to be ready. You built the foundational artifacts -- CLAUDE.md files and specialized agent configurations. You structured your projects for clarity and integrated agents into CI pipelines. You leveraged advanced tools like MCP and hooks to extend agent capabilities. And in this final module, you learned to scale these practices across teams, troubleshoot when things go wrong, secure your repositories, and optimize for performance.
 

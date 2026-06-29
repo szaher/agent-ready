@@ -8,6 +8,7 @@ quiz:
   - Project history and design rationale
   - Team member contact information
   correctIndex: 0
+  explanation: "Build, test, and lint commands are the most operationally critical instructions — the agent needs them to verify its own work. Placing them first ensures they are always visible, even if context is constrained."
 - question: What is the purpose of the 'Do NOT' section in a CLAUDE.md?
   options:
   - To list features that have not been implemented yet
@@ -15,6 +16,7 @@ quiz:
   - To prevent the agent from repeating known mistakes or violating critical rules
   - To describe deprecated APIs
   correctIndex: 2
+  explanation: "The 'Do NOT' section acts as a guardrail, preventing the agent from repeating known mistakes or violating critical rules. These prohibitions are often the most valuable instructions because they prevent specific, hard-to-catch failure modes."
 - question: Why should a CLAUDE.md include file structure hints?
   options:
   - So the agent can generate a directory listing for the README
@@ -22,6 +24,7 @@ quiz:
   - So the agent can delete unused files automatically
   - So the agent knows where to put new code and where to find existing patterns
   correctIndex: 3
+  explanation: "File structure hints help the agent know where to place new code and where to find existing patterns, reducing path hallucination and wrong-file edits. Without them, the agent must explore the filesystem, wasting tokens."
 - question: What is the recommended total length for a CLAUDE.md?
   options:
   - As long as possible to cover every edge case
@@ -29,6 +32,7 @@ quiz:
   - Exactly 100 lines, no more
   - One sentence per section maximum
   correctIndex: 1
+  explanation: "Every line in CLAUDE.md consumes context window tokens. The file should be concise enough to convey essential context without wasting tokens on information the agent does not need to act on — there is no fixed line limit."
 ---
 
 ## Overview
@@ -67,7 +71,7 @@ This gives us a design principle: **put the most operationally critical informat
 
     style SessionStart fill:#ebf8ff,stroke:#3182ce
     style CLAUDEmd fill:#f0fff4,stroke:#276749
-`} />
+`} fallback="How CLAUDE.md sections map to the agent workflow: Section 1 (Build and Test Commands) is used during verification, Section 2 (Code Style Rules) guides code writing, Section 3 (Architecture Notes) informs planning, Section 4 (Do's and Don'ts) constrains code writing, and Section 5 (File Structure) aids planning and navigation." />
 
 Each section of CLAUDE.md maps to a phase in the agent's workflow. Build commands are needed at the end (verification), but they are listed first because they are the most frequently referenced and the most operationally critical.
 
@@ -225,7 +229,7 @@ Here is how these sections compose into a complete CLAUDE.md:
     style C fill:#fefcbf,stroke:#975a16
     style D fill:#fefcbf,stroke:#975a16
     style E fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="The five CLAUDE.md sections in order: Section 1 Build and Test Commands (high frequency, high impact), Section 2 Code Style (medium frequency, high impact), Section 3 Architecture (medium frequency, high impact), Section 4 Do's and Don'ts (low frequency, high impact), Section 5 File Structure (reference only). Most operationally critical sections come first." />
 
 The ordering is intentional: **most operationally critical first, reference material last**. This matters because if the agent's context window is constrained, the most important information is processed first.
 

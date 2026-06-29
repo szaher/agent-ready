@@ -8,6 +8,7 @@ quiz:
   - TDD eliminates the need for code review
   - Agents cannot write code without tests to reference
   correctIndex: 0
+  explanation: "Tests are precise, executable, and binary — they pass or fail. Unlike natural language guidance, which the agent can interpret in multiple ways, tests provide an unambiguous definition of done that the agent can verify without human involvement."
 - question: In the TDD-with-agents workflow, who typically writes the tests?
   options:
   - The agent writes both tests and implementation
@@ -15,6 +16,7 @@ quiz:
   - The human writes the tests, the agent writes the implementation to make them pass
   - Tests are generated automatically from the type system
   correctIndex: 2
+  explanation: "This division plays to each party's strengths: humans are good at defining correctness criteria and judging requirements, while agents are good at generating code that satisfies constraints. The test runner provides objective, automated feedback."
 - question: What should you do when an agent's implementation passes your tests but uses an approach you did not intend?
   options:
   - Accept it -- if the tests pass, the implementation is correct
@@ -22,6 +24,7 @@ quiz:
   - Manually rewrite the entire implementation
   - Add more tests that constrain the approach, then let the agent try again
   correctIndex: 3
+  explanation: "Adding more constraining tests keeps the specification in code (where it is precise and executable) rather than in natural language (where it is ambiguous). The new tests make the unwanted approach fail, guiding the agent to the intended solution."
 - question: Why should tests in a TDD-with-agents workflow test behavior rather than implementation details?
   options:
   - Behavioral tests are shorter to write
@@ -29,6 +32,7 @@ quiz:
   - Agents cannot read tests that reference internal functions
   - Behavioral tests run faster in CI
   correctIndex: 1
+  explanation: "Implementation-detail tests (like 'must use a for loop' or 'must call helper exactly 3 times') prevent the agent from finding valid alternative approaches. Behavioral tests constrain what the code does while giving the agent freedom in how it does it."
 ---
 
 ## Overview
@@ -61,7 +65,7 @@ This division of labor plays to each party's strengths. Humans are good at defin
     style A fill:#c6f6d5,stroke:#38a169
     style R fill:#fed7d7,stroke:#e53e3e
     style Done fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="TDD-with-agents flowchart: the human writes a test, tests run and show RED (failing). The agent implements code, then tests are checked — if they fail, the agent reads failures and tries again. If they pass, the human reviews the implementation. If refinement is needed, the human adds more tests and the cycle restarts. If accepted, the code is committed." />
 
 > Tests are the best specification language for agents. Unlike natural language, tests are precise, executable, and binary -- they pass or they fail.
 
@@ -161,7 +165,7 @@ Here is what happens under the hood when the agent runs:
     A->>T: Run pnpm test
     T-->>A: 6 passed, 0 failed
     A-->>A: All tests pass - done
-`} />
+`} fallback="Iteration loop sequence: the agent reads the test file, analyzes expectations, writes a first implementation attempt, and runs the tests. The test runner reports 4 passed and 2 failed. The agent reads the failure messages, updates the implementation (attempt 2), and runs tests again. This time all 6 tests pass, and the agent is done." />
 
 The agent might not get it right on the first try. That is fine. The **iterative loop** is the mechanism that makes TDD with agents robust -- the agent keeps adjusting until the tests pass. This is qualitatively different from generating code in a single shot and hoping it works.
 
@@ -204,7 +208,7 @@ For larger features, break the work into test-driven slices:
     style Slice1 fill:#ebf8ff,stroke:#3182ce
     style Slice2 fill:#c6f6d5,stroke:#38a169
     style Slice3 fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="Scaling TDD with slices: three sequential slices. Slice 1 (Data Model) — human writes model tests, agent implements. Slice 2 (Business Logic) — human writes logic tests, agent implements. Slice 3 (API Layer) — human writes API tests, agent implements. Each slice builds on the previous one." />
 
 Each slice follows the same pattern: human writes tests, agent implements. The slices build on each other -- the data model tests pass before business logic tests are written, and business logic passes before API tests are added. This gives the agent a stable foundation to build on at each step.
 

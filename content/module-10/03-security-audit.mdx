@@ -8,6 +8,7 @@ quiz:
   - The .env file slows down the agent's file search
   - It violates the repository's naming conventions
   correctIndex: 0
+  explanation: "Agents read files as part of their normal operation and may inadvertently reference secrets in generated code, commit messages, error output, or API calls. A committed .env file puts secrets in the agent's context where they can leak through multiple channels."
 - question: What is the purpose of a pre-push hook in an agent-ready repository?
   options:
   - To format the agent's code before pushing
@@ -15,6 +16,7 @@ quiz:
   - To act as a final gate that prevents dangerous changes from reaching the remote, such as pushes to main or secret leaks
   - To speed up the push operation
   correctIndex: 2
+  explanation: "A pre-push hook is the last automated checkpoint before changes leave the local environment. It can block pushes to protected branches and scan for secret patterns, preventing dangerous changes from reaching the remote repository."
 - question: Which approach best secures MCP server connections?
   options:
   - Run all MCP servers on localhost without authentication
@@ -22,6 +24,7 @@ quiz:
   - Disable MCP entirely to avoid the risk
   - Authenticate each MCP connection, scope permissions per server, and audit access logs
   correctIndex: 3
+  explanation: "Each MCP server is a potential attack surface. Authenticating connections, scoping permissions per server (e.g., read-only database access), and auditing access logs implements defense in depth — rather than disabling MCP entirely or using shared credentials."
 ---
 
 ## Overview
@@ -55,7 +58,7 @@ Traditional code security focuses on what humans might do -- accidentally commit
     style HumanRisk fill:#fefcbf,stroke:#d69e2e
     style AgentRisk fill:#fed7d7,stroke:#e53e3e
     style Overlap fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Human developer risks vs additional agent risks: human risks include committing secrets accidentally, introducing vulnerabilities, and misconfiguring access. Agent risks add new dimensions: leaking secrets into generated code or logs, executing arbitrary commands at scale, bypassing review if not properly gated, and reading sensitive files whose content is included in API calls. Both share controls: secret scanning, branch protection, code review, and least privilege." />
 
 The key differences are:
 
@@ -164,7 +167,7 @@ The **principle of least privilege** is the foundation of agent security. Every 
     Broad -.->|"reduce"| Scoped
     style Broad fill:#fed7d7,stroke:#e53e3e
     style Scoped fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Overprivileged vs properly scoped agent: an overprivileged agent can read all files, write anywhere, execute any command, and has network access. A properly scoped agent is restricted to reading only src/ and tests/, writing only to src/services/, executing only npm test, and has no network access." />
 
 **Audit steps:**
 
@@ -277,7 +280,7 @@ Security is not just prevention -- it is detection. If something goes wrong, you
     style AuditTrail fill:#ebf8ff,stroke:#3182ce
     style R fill:#c6f6d5,stroke:#38a169
     style I fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="Audit trail components: Session Logs (timestamps, actions, file changes), Commit Attribution (agent co-author tags in git history), Access Logs (MCP server access, file read/write events), and Alert System (unusual patterns, policy violations). The first three feed into forensic review capability; the alert system triggers immediate response." />
 
 ## The Quick Security Checklist
 

@@ -8,6 +8,7 @@ quiz:
   - It runs too slowly
   - It costs more tokens than a custom agent
   correctIndex: 0
+  explanation: "A general-purpose agent has all permissions — including write and execute — even when the task only requires reading. This violates least privilege and increases the blast radius if the agent makes a mistake."
 - question: Which principle from security engineering directly supports creating specialized agents?
   options:
   - Defense in depth
@@ -15,6 +16,7 @@ quiz:
   - The principle of least privilege
   - Zero trust networking
   correctIndex: 2
+  explanation: "The principle of least privilege states that every component should have only the minimum permissions needed for its task. Custom agents apply this by restricting each agent's tools to exactly what its role requires."
 - question: When does creating a custom agent NOT pay off?
   options:
   - When the task is performed frequently across many repositories
@@ -22,9 +24,20 @@ quiz:
   - When the task has clear permission boundaries
   - When you need a one-off task done once and never again
   correctIndex: 3
+  explanation: "Custom agents pay off when they are reused across many sessions. A one-off task done once does not justify the setup and maintenance cost of a dedicated agent definition."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Explain why a single general-purpose agent creates permission, instruction, and context problems",
+  "Apply the principle of least privilege to agent design",
+  "Identify when specialization pays off versus when a general-purpose agent is sufficient"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 3: CLAUDE.md and Project Instructions"
+]} />
 
 In Module 3, you learned how CLAUDE.md gives every agent session a shared understanding of your project. But what happens when different tasks need fundamentally different behaviors? A code reviewer should never modify files. A test writer needs different instructions than a documentation generator. A security auditor should not have access to deployment scripts. This lesson explores why **custom agents** exist, when specialization pays off, and what you gain by moving beyond a single general-purpose agent.
 
@@ -45,7 +58,7 @@ A general-purpose agent is like a Swiss Army knife -- it can do many things, but
     style R1 fill:#fff5f5,stroke:#fc8181
     style R2 fill:#fff5f5,stroke:#fc8181
     style R3 fill:#fff5f5,stroke:#fc8181
-`} />
+`} fallback="Three problems with a single agent: Overly Broad Permissions (agent can modify files when it should only read), Conflicting Instructions (review instructions clash with writing instructions), and Context Dilution (system prompt is so long the agent loses focus)." />
 
 **Overly broad permissions** mean the agent can do things it should not. A review agent with write access might "helpfully" fix issues instead of just flagging them. A documentation agent with Bash access might run commands that alter your environment.
 
@@ -74,7 +87,7 @@ Custom agents solve these problems by applying a principle borrowed from securit
     style SB fill:#ebf8ff,stroke:#3182ce
     style SC fill:#ebf8ff,stroke:#3182ce
     style SD fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Comparison of a general-purpose agent (one agent with all permissions and all instructions) versus four specialized agents: Reviewer (read-only, review rules), Test Writer (read and write, test patterns), Refactorer (read and edit, refactoring rules), and Docs Generator (read and write, style guide)." />
 
 This is not a theoretical exercise. Consider how different these roles actually are:
 
@@ -96,7 +109,7 @@ The most compelling reason to create custom agents is the **principle of least p
     L4 --> O["Smaller blast radius\nPredictable behavior\nEasier review"]
     style Least fill:#ebf8ff,stroke:#3182ce
     style O fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="The principle of least privilege applied to agents: define the task, identify required tools, grant only those tools, deny everything else — resulting in smaller blast radius, predictable behavior, and easier review." />
 
 When a review agent has only read access, you know with certainty that invoking it will not change your codebase. When a test writer cannot run Bash commands, you know it will not accidentally execute tests in a way that modifies state. These guarantees make agents trustworthy enough to run with less human supervision.
 
@@ -135,7 +148,7 @@ Custom agents build directly on the foundation you created in Module 3. Your CLA
     style B fill:#63b3ed,stroke:#3182ce,color:#ffffff
     style C fill:#e2e8f0,stroke:#4a5568,color:#1a202c
     style D fill:#fefcbf,stroke:#d69e2e,color:#1a202c
-`} />
+`} fallback="The agent-ready stack: a developer invokes custom agents (.claude/agents/*.md), which read project instructions (CLAUDE.md), which document the codebase structure (code, tests, config). Custom agents specialize on top of project instructions." />
 
 Think of it this way: CLAUDE.md is the employee handbook that every team member reads. Custom agents are the **job descriptions** that define what each role does, what tools they have access to, and what they are responsible for. Both are necessary. The handbook without job descriptions gives everyone the same broad mandate. Job descriptions without the handbook leave each role without shared context.
 

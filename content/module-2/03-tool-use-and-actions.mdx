@@ -8,6 +8,7 @@ quiz:
   - The LLM sends code to a separate AI model that executes it
   - The LLM simulates the tool execution internally and returns the predicted result
   correctIndex: 0
+  explanation: "The LLM generates a structured tool call request (like a JSON object specifying the tool name and arguments). The agent framework receives this request, executes it against the real filesystem or shell, and returns the result. The LLM never touches files directly."
 - question: Why is the Read tool typically the most frequently used tool in an agent session?
   options:
   - Because reading is faster than writing
@@ -15,6 +16,7 @@ quiz:
   - Because agents must understand existing code before they can safely modify it
   - Because agents prefer reading over editing
   correctIndex: 2
+  explanation: "Agents spend 60-70% of tool calls reading because they must understand existing code, conventions, and dependencies before making safe modifications. Reading before editing prevents regressions and convention drift."
 - question: What is the key difference between the Edit tool and the Write tool?
   options:
   - Edit is for code files, Write is for documentation
@@ -22,12 +24,14 @@ quiz:
   - Edit works on text files, Write works on binary files
   - Edit modifies a specific part of an existing file using search-and-replace, while Write replaces the entire file contents
   correctIndex: 3
+  explanation: "Edit uses search-and-replace to modify a specific part of a file, requiring an exact string match. Write replaces the entire file contents, which is appropriate for new files or complete rewrites but dangerous for targeted changes."
 - question: Why might running a long-running Bash command be problematic for an agent?
   options:
   - Bash commands cannot be run by agents
   - The output consumes context window tokens, and timeouts may kill the process before it completes
   - Bash commands always require root permissions
   correctIndex: 1
+  explanation: "Long-running commands produce large outputs that consume context window tokens, and agent frameworks impose timeouts that may kill the process before it completes — wasting both time and tokens."
 ---
 
 ## Overview
@@ -63,7 +67,7 @@ At the LLM level, tools are **function calls**. The model does not execute anyth
     Framework->>FS: Execute command
     FS-->>Framework: Test output (stdout + stderr)
     Framework-->>LLM: Tool result: "4 passed, 0 failed"
-`} />
+`} fallback="Sequence diagram showing tool execution flow: the LLM sends a Read tool call to the framework, which reads from disk and returns file contents. The LLM reasons, then sends an Edit tool call, which the framework applies. Finally, the LLM sends a Bash tool call to run tests, and the framework returns the test results. The LLM reasons and decides, but the framework executes." />
 
 This separation is critical to understand. The LLM is a reasoning engine that decides *what* to do. The framework is the execution engine that *does* it. The LLM never touches your files directly.
 
@@ -226,7 +230,7 @@ Every tool call follows a lifecycle with multiple points where things can go rig
     style B fill:#fef3c7,stroke:#d69e2e
     style E fill:#ebf8ff,stroke:#3182ce
     style G fill:#fff5f5,stroke:#e53e3e
-`} />
+`} fallback="Tool call lifecycle: the agent decides to call a tool, which goes through a permission check (denied returns an error to the agent; allowed proceeds to execution). Execution either succeeds (result returned) or errors (error message returned). The agent processes the result and decides if more work is needed, looping back or responding to the user." />
 
 The **permission check** is an important step. Many agent frameworks ask the user to approve certain actions (especially edits and command execution). This is a safety mechanism, but it also means the agent's flow can be interrupted by permission prompts.
 

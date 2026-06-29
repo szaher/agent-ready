@@ -8,6 +8,7 @@ quiz:
       - "Hire an external consultant to write all the documentation"
       - "Wait until the entire engineering org agrees on a standard"
     correctIndex: 1
+    explanation: "A single champion who demonstrates real value on their own work produces concrete evidence — PRs, time savings, quality improvements — that is far more persuasive than mandates or theory. Evidence-driven adoption builds genuine buy-in."
   - question: "Why is measuring 'tasks completed by agents' an important adoption metric?"
     options:
       - "It proves agents are replacing developers"
@@ -15,6 +16,7 @@ quiz:
       - "It demonstrates concrete value by showing work the team would otherwise do manually"
       - "It is the only metric that matters for adoption"
     correctIndex: 2
+    explanation: "Counting discrete tasks — PRs merged, tests written, issues closed — demonstrates concrete, tangible value that leadership can understand. It shows work the team would otherwise do manually, without incentivizing output volume over quality."
   - question: "Which approach is most effective for addressing skepticism about AI agents?"
     options:
       - "Showing a live demo where the agent completes a task the skeptic finds tedious"
@@ -22,9 +24,20 @@ quiz:
       - "Requiring everyone to use agents for at least one hour per day"
       - "Sharing industry blog posts about AI productivity gains"
     correctIndex: 0
+    explanation: "Live demos on tasks the skeptic personally finds tedious create an immediate, visceral understanding of value. Abstract benefits and blog posts do not overcome skepticism — seeing the agent solve your specific problem does."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Apply the four-stage adoption model — champion, team pilot, CI integration, org-wide standard — to introduce agent-ready practices incrementally",
+  "Identify and address the three common adoption failure modes: top-down mandates, passive awareness, and perfectionist delay",
+  "Select meaningful adoption metrics that demonstrate value without incentivizing the wrong behaviors"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 9: Automation and Integration"
+]} />
 
 You have spent nine modules learning how to make a codebase agent-ready -- from writing CLAUDE.md files to designing custom agents, structuring repositories, and setting up CI integration. But the hardest challenge is not technical. It is organizational. How do you take practices that work for one developer and scale them across a team of ten, a department of fifty, or an engineering org of hundreds? This lesson presents a staged adoption strategy that avoids the two most common failure modes: mandating from the top without buy-in, and waiting forever for consensus that never arrives.
 
@@ -45,7 +58,7 @@ Before examining what works, it is worth understanding why agent-ready adoption 
     style R1 fill:#fff5f5,stroke:#fc8181
     style R2 fill:#fff5f5,stroke:#fc8181
     style R3 fill:#fff5f5,stroke:#fc8181
-`} />
+`} fallback="Three common adoption failure modes: Top-Down Mandate leads to teams resisting imposed tools with no local champions, producing compliance without conviction. Passive Awareness results in everyone knowing about agents but nobody actually using them — no process change occurs. Perfectionist Delay causes teams to wait for a perfect CLAUDE.md, debate standards endlessly, and never ship anything." />
 
 **Top-down mandates** fail because developers rightly resist being told how to work without understanding why. A CLAUDE.md written to satisfy a compliance checkbox is worse than no CLAUDE.md at all -- it gives the illusion of readiness without the substance.
 
@@ -69,7 +82,7 @@ Successful adoption follows a progression from individual experimentation to org
     style S2 fill:#bee3f8,stroke:#3182ce
     style S3 fill:#fefcbf,stroke:#d69e2e
     style S4 fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Four-stage adoption model: Stage 1 Champion — one developer uses agents on their own work. Stage 2 Team Pilot — team shares CLAUDE.md and reviews agent PRs. Stage 3 CI Integration — agents run in CI with hooks and gates. Stage 4 Org-Wide Standard — all repos have agent-ready foundations." />
 
 ### Stage 1: The Champion (Weeks 1-2)
 
@@ -128,7 +141,7 @@ The final stage scales what works across the organization. This is the only stag
     T3 --> A3["Problems get solved\nquickly"]
     T4 --> A4["Risk is managed\nwithout blocking value"]
     style OrgStandard fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Org-wide standard components: a Template Repository (CLAUDE.md starter, hook examples, CI configurations) enables new repos to start agent-ready. Internal Documentation (best practices, FAQ, success stories) lets teams self-serve. A Support Channel (Slack, office hours, shared learnings) solves problems quickly. Governance (permission policies, security review, audit requirements) manages risk without blocking value." />
 
 At this stage, the organization creates:
 

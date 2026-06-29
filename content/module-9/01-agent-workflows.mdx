@@ -8,6 +8,7 @@ quiz:
   - It eliminates the need for CLAUDE.md files
   - It guarantees the agent will never make mistakes
   correctIndex: 0
+  explanation: "Defined workflows run the same steps every time, producing consistent results that can be audited and compared across runs. Ad-hoc prompting varies by session, with no guarantee of coverage or consistency."
 - question: In a fan-out workflow, what happens after parallel tasks complete?
   options:
   - Each task is deployed independently with no further processing
@@ -15,6 +16,7 @@ quiz:
   - Results are gathered and merged in a synthesis step
   - The developer must manually review each output before continuing
   correctIndex: 2
+  explanation: "Fan-out dispatches independent tasks in parallel, and the fan-in step gathers all results and merges them into a single synthesized output. This ensures nothing is lost and duplicates are removed."
 - question: Which workflow pattern is most appropriate for a multi-dimensional code review?
   options:
   - Sequential pipeline -- each reviewer sees the previous reviewer's comments
@@ -22,6 +24,7 @@ quiz:
   - Single-pass -- one agent reviews everything at once
   - Fan-out -- parallel reviewers for security, performance, correctness, then synthesis
   correctIndex: 3
+  explanation: "Fan-out runs parallel reviewers for security, performance, and correctness simultaneously. Each reviewer focuses on one dimension, producing higher-quality findings than a single agent trying to cover everything at once."
 - question: Why should workflow scripts call the agent with specific, scoped prompts rather than broad instructions?
   options:
   - Broad instructions cost more tokens
@@ -29,9 +32,20 @@ quiz:
   - The CLI rejects prompts longer than 100 words
   - Broad instructions cause the agent to modify files outside the repository
   correctIndex: 1
+  explanation: "Specific prompts reduce ambiguity about what the agent should focus on and what format to use, leading to more consistent and actionable outputs. Broad instructions let the agent decide the scope, which varies across runs."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Distinguish between the three fundamental workflow patterns: sequential pipeline, fan-out/fan-in, and iterative loop",
+  "Build an executable workflow script that orchestrates multiple agent invocations with deterministic control flow",
+  "Identify when a task benefits from workflow orchestration versus ad-hoc prompting"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 8: Context Engineering"
+]} />
 
 Ad-hoc prompting gets you started with AI agents, but it does not scale. When a task involves multiple steps -- reviewing code across dimensions, migrating files to a new pattern, generating tests for an entire module -- you need something structured. **Agent workflows** are repeatable, multi-step orchestrations that chain agent invocations together with deterministic logic. This lesson covers why workflows matter, the patterns that make them effective, and how to build them as executable scripts.
 
@@ -77,7 +91,7 @@ Three fundamental patterns cover most agent orchestration needs. Knowing which o
     style Sequential fill:#ebf8ff,stroke:#3182ce
     style FanOut fill:#c6f6d5,stroke:#38a169
     style Iterative fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="Three workflow patterns: Sequential Pipeline shows Step 1 flowing to Step 2 then Step 3 in order. Fan-Out/Fan-In shows a Dispatch node splitting to three parallel tasks (A, B, C) that all converge into a Merge step. Iterative Loop shows an Attempt flowing to Validate, which either loops back through Fix on failure or proceeds to Done on success." />
 
 **Sequential pipeline** runs steps in order, where each step's output feeds the next. Use this when steps have dependencies -- for example, "generate types, then generate API client from types, then generate tests for the client."
 
@@ -149,7 +163,7 @@ Here is how a typical workflow executes from trigger to output:
     W->>AS: "synthesize all findings"
     AS-->>W: consolidated review
     W-->>D: review-summary.md
-`} />
+`} fallback="Workflow execution sequence: the developer triggers the workflow script, which dispatches three agents in parallel — one for correctness review, one for security review, one for performance review. Each agent returns its findings to the workflow script. The script then sends all findings to a synthesis agent, which returns a consolidated review. The workflow script delivers the final review-summary.md to the developer." />
 
 Notice how the workflow script acts as an orchestrator -- it decides what runs, when, and in what order. The agents handle the reasoning within each step.
 

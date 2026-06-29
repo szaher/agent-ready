@@ -16,24 +16,25 @@ export default function Quiz({ questions, onComplete }: QuizProps) {
   const [finished, setFinished] = useState(false);
 
   const q = questions[currentIndex];
+  const isLastQuestion = currentIndex === questions.length - 1;
 
   const handleSubmit = () => {
     if (selected === null) return;
     const isCorrect = selected === q.correctIndex;
-    const newScore = score + (isCorrect ? 1 : 0);
-    setScore(newScore);
+    setScore((s) => s + (isCorrect ? 1 : 0));
     setSubmitted(true);
-
-    if (currentIndex === questions.length - 1) {
-      setFinished(true);
-      onComplete(newScore);
-    }
   };
 
   const handleNext = () => {
     setCurrentIndex((i) => i + 1);
     setSelected(null);
     setSubmitted(false);
+  };
+
+  const handleFinish = () => {
+    const finalScore = score;
+    setFinished(true);
+    onComplete(finalScore);
   };
 
   if (finished) {
@@ -78,7 +79,7 @@ export default function Quiz({ questions, onComplete }: QuizProps) {
         })}
       </div>
 
-      {submitted && (
+      {submitted && q.explanation && (
         <p className="text-sm text-[var(--text-secondary)] mb-4 p-3 rounded-lg bg-[var(--bg-tertiary)]">
           {q.explanation}
         </p>
@@ -93,14 +94,21 @@ export default function Quiz({ questions, onComplete }: QuizProps) {
           >
             Submit
           </button>
-        ) : currentIndex < questions.length - 1 ? (
+        ) : isLastQuestion ? (
+          <button
+            onClick={handleFinish}
+            className="px-4 py-2 text-sm rounded-lg bg-[var(--accent-blue)] text-white hover:opacity-90 transition-opacity"
+          >
+            See Results
+          </button>
+        ) : (
           <button
             onClick={handleNext}
             className="px-4 py-2 text-sm rounded-lg bg-[var(--accent-blue)] text-white hover:opacity-90 transition-opacity"
           >
             Next
           </button>
-        ) : null}
+        )}
       </div>
     </div>
   );

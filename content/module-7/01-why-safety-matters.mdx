@@ -8,6 +8,7 @@ quiz:
   - They consume more memory than IDEs
   - They require an internet connection to function
   correctIndex: 0
+  explanation: "Unlike traditional tools that require human action for each step, AI agents autonomously decide and execute commands — meaning destructive actions can occur without any human review or approval."
 - question: Why is the 'blast radius' concept important when thinking about agent safety?
   options:
   - It measures how fast an agent can complete a task
@@ -15,6 +16,7 @@ quiz:
   - It describes the scope of damage a single unchecked agent action can cause
   - It refers to the number of files an agent can read simultaneously
   correctIndex: 2
+  explanation: "Blast radius measures how much damage one unchecked action can cause. With agents executing multiple actions in sequence before human review, a single destructive action early in the chain can compound into widespread damage."
 - question: Which of the following represents the correct relationship between trust and guardrails?
   options:
   - More trust means fewer guardrails are needed because agents are reliable
@@ -22,9 +24,20 @@ quiz:
   - Guardrails and trust are unrelated concepts in agent safety
   - Trust is earned incrementally and guardrails should be relaxed deliberately, never removed entirely
   correctIndex: 3
+  explanation: "Safety is not a binary switch. Teams should start with strict guardrails and relax them as confidence grows, but guardrails should never be removed entirely because even trusted agents can make mistakes that need containment."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Identify the four categories of agent risk: destructive actions, data leakage, integrity violations, and supply chain attacks",
+  "Explain the blast radius concept and why autonomous agents amplify it compared to manual coding",
+  "Describe the three pillars of agent safety: permissions, hooks, and isolation"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 6: Model Context Protocol (MCP)"
+]} />
 
 You are about to give an AI agent write access to your codebase and a shell on your machine. That sentence alone should make you pause. Unlike traditional developer tools that wait for you to press a button, an AI coding agent **autonomously decides** what to read, what to edit, and what commands to run. That autonomy is what makes agents powerful -- and it is exactly what makes safety non-negotiable.
 
@@ -65,7 +78,7 @@ The concept of **blast radius** is borrowed from security engineering: when some
     style Agent fill:#fed7d7,stroke:#e53e3e
     style R1 fill:#c6f6d5,stroke:#38a169
     style R2 fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Comparison of manual coding and autonomous agent workflows. In manual coding, the developer types a command, reviews the output, and decides the next step — blast radius is one action. In autonomous agent mode, the agent decides, executes, observes, and decides again in a loop — blast radius is N actions before human review." />
 
 In manual coding, every action is reviewed before execution. The blast radius is exactly one action. With an autonomous agent, dozens of actions can execute in sequence before a human sees the result. If action number three was destructive, actions four through twenty may compound the damage.
 
@@ -97,7 +110,7 @@ Agent risks fall into four distinct categories, each requiring different guardra
     style L fill:#fef3c7,stroke:#d69e2e
     style I fill:#e9d8fd,stroke:#805ad5
     style S fill:#feebc8,stroke:#dd6b20
-`} />
+`} fallback="Agent risk categories: Destructive Actions (deleting files, force-pushing, dropping tables), Data Leakage (committing secrets, logging sensitive data, sending code to external APIs), Integrity Violations (modifying CI/CD, changing security configs, bypassing code review), and Supply Chain Attacks (installing malicious packages, pulling untrusted images, adding unvetted dependencies)." />
 
 ### Destructive Actions
 
@@ -156,7 +169,7 @@ Not all agent tasks carry the same risk. Reading files is safe. Writing files is
     style Medium fill:#fef3c7,stroke:#d69e2e
     style High fill:#fed7d7,stroke:#e53e3e
     style Critical fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="The trust spectrum across four risk levels: Low Risk (read files, search code, list directories), Medium Risk (edit source files, run tests, run linters), High Risk (run arbitrary shell commands, install packages, modify config files), and Critical Risk (push to remote, modify CI/CD, access secrets). Each level requires proportionally higher oversight." />
 
 The goal is not to block the agent from doing anything useful. The goal is to ensure that higher-risk actions require proportionally higher levels of oversight. Reading files can be auto-approved. Running shell commands should be constrained to known-safe commands. Pushing to remote repositories should require explicit human approval.
 

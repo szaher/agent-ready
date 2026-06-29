@@ -8,6 +8,7 @@ quiz:
   - Flat structure with all files in one directory
   - Type-based structure where files are grouped by file extension
   correctIndex: 0
+  explanation: "Feature-based colocation places all related files (service, controller, model, test) in the same directory. This means the agent finds everything for a feature in one place, minimizing exploration steps."
 - question: What is a barrel file and why does it help agents?
   options:
   - A compressed archive of rarely-used source files
@@ -15,6 +16,7 @@ quiz:
   - An index file that re-exports a module's public API, giving agents a clear entry point
   - A test file that validates the entire module at once
   correctIndex: 2
+  explanation: "A barrel file (like index.ts) re-exports a module's public API. This gives agents a clear entry point — they can read one file to understand what the module provides without reading every internal file."
 - question: When is a layer-based (MVC) structure acceptable for agent-ready codebases?
   options:
   - Never — it should always be avoided
@@ -22,6 +24,7 @@ quiz:
   - Only when using a framework that enforces it at the language level
   - When the project is small enough that each layer directory contains few files, and the structure is consistent
   correctIndex: 3
+  explanation: "Layer-based structure works when the project is small enough that each layer directory has few files and the naming is consistent. At small scale, the locality cost is manageable."
 - question: What problem does deep nesting (more than 4 levels) create for AI agents?
   options:
   - It makes the code run slower at runtime
@@ -29,6 +32,7 @@ quiz:
   - It causes import paths to exceed maximum length limits
   - It prevents version control from tracking changes
   correctIndex: 1
+  explanation: "Deep nesting forces the agent to traverse multiple directory levels, consuming tokens at each step. Long paths are also harder for the agent to recall accurately, leading to path errors in generated code."
 ---
 
 ## Overview
@@ -47,7 +51,7 @@ Every codebase falls somewhere on a spectrum between four organizational strateg
     style B fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style C fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style D fill:#fefcbf,stroke:#d69e2e,color:#1a202c
-`} />
+`} fallback="Evolution of file organization patterns: Flat structure leads to layer-based when growing pains emerge, layer-based leads to feature-based as features grow, and feature-based leads to domain-driven as scale demands increase." />
 
 ## Pattern 1: Flat Structure
 
@@ -221,7 +225,7 @@ Domain-driven structure extends feature-based colocation with explicit boundarie
     style Layer fill:#fed7d7,stroke:#e53e3e
     style Feature fill:#c6f6d5,stroke:#38a169
     style Domain fill:#bee3f8,stroke:#3182ce
-`} />
+`} fallback="Pattern comparison for agents: Flat (instant discovery, perfect locality, poor scale), Layer-Based (moderate discovery, poor locality, moderate scale), Feature-Based (excellent discovery, excellent locality, good scale), Domain-Driven (good discovery with documentation, excellent locality, excellent scale)." />
 
 The asterisk on Domain-Driven discovery reflects that it depends on documentation -- without README files explaining domain concepts, agents must guess at the meaning of directory names like "identity" or "commerce."
 

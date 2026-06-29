@@ -8,6 +8,7 @@ quiz:
   - Agents can only open files that contain a hyphen in the name
   - It makes the file sort alphabetically before other files
   correctIndex: 0
+  explanation: "A descriptive file name like 'user-auth-service.ts' lets the agent determine relevance from the file tree alone, without spending tokens reading the file contents. Generic names like 'service.ts' require investigation."
 - question: What is the main problem with a function named 'process()' from an agent's perspective?
   options:
   - It is too short to be a valid function name
@@ -15,6 +16,7 @@ quiz:
   - The name does not convey what is being processed, what the inputs are, or what the output is, forcing the agent to read the implementation
   - The name conflicts with a reserved keyword in most languages
   correctIndex: 2
+  explanation: "A generic name like 'process()' tells the agent nothing about what is being processed, what inputs it expects, or what it returns. The agent must read the entire implementation to understand the function's purpose."
 - question: Which naming practice provides the MOST context to an agent navigating a codebase?
   options:
   - Using single-letter variable names for brevity
@@ -22,6 +24,7 @@ quiz:
   - Numbering files sequentially (001-file.ts, 002-file.ts)
   - Consistent suffixes that indicate the role of each file (e.g., .service.ts, .controller.ts, .test.ts)
   correctIndex: 3
+  explanation: "Consistent suffixes like .service.ts, .controller.ts, and .test.ts encode each file's role in its name. The agent can predict file roles and locate files by pattern without guessing."
 - question: How should boolean variables and functions be named for maximum agent clarity?
   options:
   - With single-word names like 'active' or 'valid'
@@ -29,6 +32,7 @@ quiz:
   - With a 'b' prefix to indicate boolean type (e.g., bActive)
   - Using all-caps to distinguish them from other variables
   correctIndex: 1
+  explanation: "Prefixes like is/has/can/should make the boolean nature of the variable explicit. The agent immediately knows isActive returns true or false without reading the implementation."
 ---
 
 ## Overview
@@ -60,7 +64,7 @@ When an agent lists a directory, every file name becomes a piece of context. The
     style Clear fill:#c6f6d5,stroke:#38a169
     style V6 fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style C6 fill:#bee3f8,stroke:#3182ce,color:#1a202c
-`} />
+`} fallback="Comparison of vague versus descriptive names: Vague names (service.ts, helper.ts, utils.ts, manager.ts) leave the agent asking 'which one handles billing?' Descriptive names (billing.service.ts, invoice-generator.ts, payment-processor.ts, billing.test.ts) let the agent immediately identify billing.service.ts as the entry point." />
 
 > A descriptive name is a free token. A vague name costs tokens to investigate.
 
@@ -286,7 +290,7 @@ Using `userService.ts` in one module and `billing-service.ts` in another and `No
     style Consistent fill:#c6f6d5,stroke:#38a169
     style Q fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style A fill:#bee3f8,stroke:#3182ce,color:#1a202c
-`} />
+`} fallback="Inconsistent versus consistent naming: Inconsistent files (userService.ts, billing-service.ts, NotificationSvc.ts, order_service.ts) leave the agent asking 'is there a pattern?' Consistent files (users.service.ts, billing.service.ts, notifications.service.ts, orders.service.ts) let the agent recognize the pattern: every service is named {feature}.service.ts." />
 
 ## A Naming Convention Template
 

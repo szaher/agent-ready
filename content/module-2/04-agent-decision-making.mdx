@@ -8,6 +8,7 @@ quiz:
   - The agent requests more files than it needs to maximize context
   - The agent tries to complete the task in the fewest possible turns
   correctIndex: 0
+  explanation: "Greedy decision making means the agent picks whatever seems best at each step without planning ahead — like immediately editing a file it just found without first reading tests or dependencies."
 - question: What is the most common cause of an agent going in circles (repeating the same actions)?
   options:
   - A bug in the agent framework software
@@ -15,6 +16,7 @@ quiz:
   - The agent lacks information to make progress but does not realize it, so it retries the same approach
   - The user gave too many instructions
   correctIndex: 2
+  explanation: "Looping occurs when the agent lacks the information to make progress but does not recognize the gap. It retries the same approach expecting different results — clear error messages and documented pitfalls help the agent break out."
 - question: How does ambiguity in a user's request affect agent decision making?
   options:
   - The agent always asks for clarification before proceeding
@@ -22,6 +24,7 @@ quiz:
   - The agent refuses to work until the request is clarified
   - The agent picks one interpretation and commits to it, which may be the wrong one
   correctIndex: 3
+  explanation: "Agents rarely ask for clarification — they pick one interpretation and commit to it. If the request is ambiguous, the chosen interpretation may be wrong, leading to wasted work on the wrong problem."
 ---
 
 ## Overview
@@ -57,7 +60,7 @@ At every step, the LLM receives the full conversation context and must produce o
     style I fill:#fef3c7,stroke:#d69e2e
     style J fill:#f0fff4,stroke:#38a169
     style K fill:#fff5f5,stroke:#e53e3e
-`} />
+`} fallback="Decision flowchart: the model considers the user's request, system prompt instructions, previous action results, and codebase understanding, then asks 'What should I do next?' Options: need more info (call Read or Search), ready to change (call Edit or Write), need to verify (call Bash to run tests), task complete (respond to user), or stuck (ask user for clarification)." />
 
 The model does not follow a rigid algorithm. It uses its training to estimate the best next action given the context. This is both a strength (flexibility) and a weakness (unpredictability).
 
@@ -111,7 +114,7 @@ Planning behavior produces better results for complex tasks but consumes more to
     note right of Exploring: Greedy agents<br/>leave this state<br/>too quickly
 
     note right of Planning: Good agents spend<br/>adequate time here<br/>before acting
-`} />
+`} fallback="State diagram of agent behavior: starts in Exploring (reading files, searching patterns), transitions to Planning when enough context is gathered. Planning may loop back to Exploring if more info is needed, or proceed to Acting. Acting transitions to Verifying after changes, which may loop back to Acting (test failed), Exploring (unexpected side effect), or finish (all checks pass). Greedy agents leave Exploring too quickly; good agents spend adequate time in Planning." />
 
 > **Key insight**: You can influence whether the agent explores or rushes to act. Detailed instructions like "Before making changes, review the test file and the type definitions" push the agent toward planning mode.
 
@@ -176,7 +179,7 @@ This means agents will:
     style D fill:#fef3c7,stroke:#d69e2e
     style G fill:#fff5f5,stroke:#e53e3e
     style F fill:#f0fff4,stroke:#38a169
-`} />
+`} fallback="Confidence problem flowchart: when an agent encounters ambiguity, it has internal confidence levels (high, medium, low). At high confidence, it proceeds. At medium confidence, it usually still proceeds and appears confident. At low confidence, it sometimes asks for clarification but often guesses and proceeds — appearing confident either way." />
 
 This is why **explicit instructions reduce errors**. When you remove ambiguity from the task, you remove the opportunity for the agent to guess wrong.
 
@@ -204,7 +207,7 @@ One of the most frustrating agent behaviors is **looping** -- repeating the same
     style A fill:#fff5f5,stroke:#e53e3e
     style F fill:#fff5f5,stroke:#e53e3e
     style G fill:#f0fff4,stroke:#38a169
-`} />
+`} fallback="Infinite loop diagram: agent tries approach X, gets error E, fixes error E which causes error F, fixes error F which reverts the fix for E, cycling back to error E. Breaking the loop requires better error messages, clearer project structure, and explicit instructions about known pitfalls." />
 
 You can help prevent loops by:
 

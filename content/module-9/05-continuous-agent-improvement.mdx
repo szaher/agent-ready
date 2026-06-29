@@ -8,6 +8,7 @@ quiz:
   - Automated benchmarks run against standardized coding problems
   - Developer satisfaction surveys collected quarterly
   correctIndex: 0
+  explanation: "Session transcripts show the agent's actual process — where it hesitated, guessed wrong, got stuck, or needed multiple attempts. This reveals exactly which documentation gaps and configuration issues need fixing."
 - question: When you notice the agent repeatedly asks about the test command, what should you update?
   options:
   - The CI pipeline to run tests automatically
@@ -15,6 +16,7 @@ quiz:
   - The CLAUDE.md file to include the exact test commands
   - The .gitignore to exclude test files
   correctIndex: 2
+  explanation: "When the agent repeatedly asks about test commands, it means the information is not available in its context. CLAUDE.md is loaded every session, so adding exact test commands there eliminates this repeated discovery cost."
 - question: What does a healthy agent improvement feedback loop look like?
   options:
   - Replace the agent tool every quarter with the newest option
@@ -22,6 +24,7 @@ quiz:
   - Run the agent once, review its output, then switch to manual coding if it fails
   - Agent struggles with a task, team analyzes the transcript, updates CLAUDE.md or hooks, agent succeeds next time
   correctIndex: 3
+  explanation: "A healthy feedback loop closes the gap between agent failure and configuration improvement. The team analyzes what went wrong, updates the configuration, and the agent succeeds on similar tasks going forward — each fix compounds across all future sessions."
 ---
 
 ## Overview
@@ -47,7 +50,7 @@ Agent improvement is not a one-time project. It is an ongoing cycle:
     style E fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style F fill:#c6f6d5,stroke:#38a169
     style G fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Improvement feedback loop: the agent performs a task, the team reviews the session transcript, and checks whether the agent struggled. If yes, the failure pattern is analyzed and the configuration is updated, then the agent performs the next task with improved context. If no, the team notes what worked well and documents the pattern for future reference." />
 
 Every agent session produces data. The session transcript shows what the agent did, what it tried, where it got stuck, and how it recovered (or failed to). This transcript is the raw material for improvement.
 
@@ -127,7 +130,7 @@ Ad-hoc improvement works, but a regular cadence works better. Here is a practica
     style B fill:#c6f6d5,stroke:#38a169
     style M fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style Q fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Improvement cadence cycle: Weekly — scan transcripts. Biweekly — update CLAUDE.md. Monthly — review workflows. Quarterly — audit permissions. The cycle repeats continuously." />
 
 ## Measuring Improvement
 

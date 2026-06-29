@@ -8,6 +8,7 @@ quiz:
   - Large codebases always have more bugs, which confuse agents
   - Agents refuse to work on repositories above a certain file count
   correctIndex: 0
+  explanation: "With 1000+ files, the context window cannot hold the entire codebase. Agents must navigate selectively, and without strong structural signals, they make wrong exploration decisions and miss relevant code."
 - question: In a monorepo, where should package-specific CLAUDE.md instructions live?
   options:
   - Only in the repository root — one file for the entire monorepo
@@ -15,6 +16,7 @@ quiz:
   - In each package directory, with the root CLAUDE.md covering cross-cutting conventions and each package CLAUDE.md covering package-specific instructions
   - Package-specific instructions should be embedded in package.json files
   correctIndex: 2
+  explanation: "The root CLAUDE.md covers cross-cutting conventions (build commands, monorepo rules), while each package's CLAUDE.md covers package-specific instructions (language, framework, testing). This prevents the root file from becoming bloated."
 - question: Why are clear package boundaries important for agent effectiveness in monorepos?
   options:
   - They prevent the agent from reading too many files and running up costs
@@ -22,6 +24,7 @@ quiz:
   - They are required by all monorepo build tools
   - They allow the agent to scope its work to a single package, reducing the surface area it needs to understand
   correctIndex: 3
+  explanation: "Clear package boundaries let the agent scope its work to a single package, reducing the surface area it needs to understand. Without boundaries, the agent must explore the entire monorepo for every task."
 - question: What is the recommended approach for shared code in an agent-ready monorepo?
   options:
   - Duplicate shared code in every package that needs it
@@ -29,6 +32,7 @@ quiz:
   - Place all shared code in a single utils/ directory at the repository root
   - Avoid shared code entirely — each package should be fully self-contained
   correctIndex: 1
+  explanation: "Explicit shared packages with their own barrel files, types, and README make shared code discoverable and importable through the workspace dependency system, avoiding duplication and ambiguous utils directories."
 ---
 
 ## Overview
@@ -50,7 +54,7 @@ When an agent opens a small repository, it can often read the entire file tree a
     end
     style Small fill:#c6f6d5,stroke:#38a169
     style Large fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="Scale comparison: in a small repo (50 files), listing all files costs about 200 tokens and reading 10 key files costs 5,000, achieving full understanding for about 5,200 tokens total. In a large repo (5,000 files), listing alone costs 20,000 tokens, and even after reading 10 key files, the agent has only partial understanding at 25,000 tokens." />
 
 In a large repository, the file listing alone can consume a significant portion of the context window. The agent must make strategic decisions about what to explore and what to skip -- and without strong structural signals, those decisions are often wrong.
 
@@ -79,7 +83,7 @@ A **monorepo** stores multiple packages, services, or applications in a single r
     end
     style Monorepo fill:#ebf8ff,stroke:#3182ce
     style Root fill:#fefcbf,stroke:#d69e2e,color:#1a202c
-`} />
+`} fallback="Monorepo structure: the root contains packages/ (shared-ui, auth-sdk, db-client) and apps/ (web, api, worker), plus root config (tsconfig, eslint, CLAUDE.md). Dependency arrows show which packages are imported by which apps." />
 
 ## Pattern 1: Hierarchical CLAUDE.md Files
 
@@ -307,7 +311,7 @@ In codebases with thousands of files, agents rely heavily on **text search** (gr
     style A fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style I fill:#c6f6d5,stroke:#38a169,color:#1a202c
     style H fill:#fed7d7,stroke:#e53e3e,color:#1a202c
-`} />
+`} fallback="Agent search flow in a large codebase: agent receives a task (fix billing webhook timeout), searches for 'webhook' in file names. If found (e.g., billing/webhook.controller.ts), reads the file directly. If not found, searches file contents. If results are manageable (under 10), reads each. If 100+ results, narrows the search to 'billing.*webhook' before reading." />
 
 Structure decisions that improve searchability:
 

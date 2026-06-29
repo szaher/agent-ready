@@ -8,6 +8,7 @@ quiz:
   - The number of files in a repository
   - The amount of RAM available to the agent process
   correctIndex: 0
+  explanation: "The context window is the agent's total working memory — the sum of all text (instructions, conversation, code, tool output) it can see and reason about simultaneously. It has a hard token limit."
 - question: Why can't an agent read an entire large codebase at once?
   options:
   - Agents are not allowed to read more than one file at a time
@@ -15,6 +16,7 @@ quiz:
   - The codebase exceeds the agent's context window, which has a hard token limit
   - Agents can read entire codebases -- there is no practical limit
   correctIndex: 2
+  explanation: "Even a medium-sized project (500 files, ~500K tokens) exceeds the ~200K token context window. The agent must selectively read only the files relevant to the current task."
 - question: What is the primary consequence of filling the context window with irrelevant information?
   options:
   - The agent crashes and the session must be restarted
@@ -22,9 +24,20 @@ quiz:
   - The agent automatically summarizes the irrelevant content into a shorter form
   - The agent loses the ability to focus on what matters, leading to worse decisions and missed details
   correctIndex: 3
+  explanation: "Irrelevant information dilutes the signal-to-noise ratio. The agent's attention spreads across too much content, causing it to miss important details and make worse decisions — the 'drowning' failure mode."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Define the context window and explain why it is the primary bottleneck for agent performance",
+  "Distinguish between the two context failure modes: starvation (too little) and drowning (too much)",
+  "Explain how codebase structure and documentation directly affect an agent's signal-to-noise ratio"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 7: Safety, Permissions, and Trust"
+]} />
 
 Every AI coding agent operates under a constraint that most developers underestimate: the **context window**. This is the total amount of text -- code, instructions, conversation history, tool output -- that the agent can see and reason about at any given moment. It is not a soft limit. It is a hard wall. When an agent hits it, information gets dropped, earlier context gets compressed, and the quality of the agent's work degrades. This lesson explains why context is the single biggest bottleneck for agent performance, how it shapes every decision the agent makes, and what it means for how you structure your codebase.
 
@@ -51,7 +64,7 @@ All of this competes for space inside one fixed-size container.
     F["Everything Outside\nthe Window"] -.->|"invisible to agent"| CW
     style CW fill:#ebf8ff,stroke:#3182ce
     style F fill:#fed7d7,stroke:#e53e3e
-`} />
+`} fallback="The context window (~200K tokens) contains five competing elements: System Instructions (CLAUDE.md, rules), Conversation History (messages so far), File Contents (code read by agent), Tool Output (test results, searches), and Agent Reasoning (plans, thoughts). Everything outside the window is invisible to the agent." />
 
 The crucial insight is that everything outside the context window is **invisible** to the agent. It does not exist from the agent's perspective. A function defined in a file the agent has not read might as well not exist. A convention you mentioned twenty messages ago that has been compressed out of the window is forgotten.
 
@@ -74,7 +87,7 @@ Here is the core problem. A modern context window is roughly 200,000 tokens -- a
     R4 -.->|"250x too large"| W1
     style Repo fill:#fefcbf,stroke:#d69e2e
     style Window fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Scale mismatch between codebases and the context window: a small project (50 files, ~50K tokens) fits, but a medium project (500 files, ~500K tokens) is 2.5x too large, a large project (5,000 files, ~5M tokens) is 25x too large, and a monorepo (50,000+ files, ~50M+ tokens) is 250x too large for the ~200K token context window." />
 
 Even a medium-sized project with 500 files exceeds the context window. A large monorepo can be 250 times larger than what the agent can hold in memory. The agent cannot "just read everything." It must be selective.
 
@@ -112,7 +125,7 @@ Given that agents cannot read everything, they use several strategies to work wi
     K -->|"Yes"| L["Deliver result"]
     style H fill:#c6f6d5,stroke:#276749
     style I fill:#fed7d7,stroke:#c53030
-`} />
+`} fallback="Agent context navigation flowchart: the developer makes a request, the agent plans an approach, then iteratively searches for files, reads specific files, or runs commands. Each result is evaluated for relevance — relevant items are kept in context and used for the task, irrelevant items are discarded. The cycle repeats until the task is complete." />
 
 Every one of these strategies is a trade-off. Selective reading risks missing important context. Summarization loses detail. Search can miss files that are relevant but do not match the search terms. The agent is constantly making judgment calls about what to keep and what to discard.
 
@@ -143,7 +156,7 @@ Context problems manifest in two opposite ways, and both are equally harmful:
     style Starved fill:#fed7d7,stroke:#e53e3e
     style Optimal fill:#c6f6d5,stroke:#38a169
     style Drowned fill:#fefcbf,stroke:#d69e2e
-`} />
+`} fallback="Three context states: Context Starvation (agent missing key info leads to wrong assumptions, incorrect code, failed builds), Optimal Context (right info at right time leads to informed decisions, correct code, passes tests), and Context Drowning (too much irrelevant info leads to diluted attention, missed details, subtle bugs)." />
 
 The goal is to hit the sweet spot: the agent has exactly the information it needs, and nothing more. This is harder than it sounds.
 

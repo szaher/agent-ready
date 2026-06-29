@@ -8,6 +8,7 @@ quiz:
   - Use a smaller AI model
   - Limit the agent to one tool call per session
   correctIndex: 0
+  explanation: "A lean CLAUDE.md directs the agent to the right files immediately, reducing token consumption on irrelevant context. Structuring the codebase with clear names and organization means the agent reads fewer files to accomplish the same task."
 - question: Why is 'search-first' file access more efficient than reading files sequentially?
   options:
   - Search tools are faster than file read tools
@@ -15,6 +16,7 @@ quiz:
   - The agent uses grep or AST search to find relevant code without loading entire files into context
   - Search-first is only useful for very large repositories
   correctIndex: 2
+  explanation: "Search tools like grep find the relevant code in ~50 tokens, then the agent reads only that file. Sequential reading loads every file into context — consuming hundreds of tokens on irrelevant content before finding the target."
 - question: When should you use a smaller, cheaper model instead of the most capable one?
   options:
   - Never -- always use the best model available
@@ -22,6 +24,7 @@ quiz:
   - Only when running out of API budget
   - For well-defined, constrained tasks like formatting, linting, or simple code generation where the CLAUDE.md provides explicit patterns
   correctIndex: 3
+  explanation: "Well-defined, constrained tasks with explicit patterns in CLAUDE.md require less reasoning capability. A smaller model can follow clear rules reliably, while complex refactoring and feature implementation genuinely need the most capable model's deeper reasoning."
 ---
 
 ## Overview
@@ -55,7 +58,7 @@ Before optimizing, understand what you are optimizing for. Agent performance has
     style Accuracy fill:#bee3f8,stroke:#3182ce
     style Cost fill:#fefcbf,stroke:#d69e2e
     style Center fill:#e9d8fd,stroke:#805ad5
-`} />
+`} fallback="Three dimensions of agent performance: Speed (fewer iterations, faster feedback loops, smaller context to process), Accuracy (higher first-attempt success rate, fewer rework cycles, better convention adherence), and Cost (fewer tokens per session, right model for the task, avoid redundant file reads). All three connect to an optimized agent at the center." />
 
 The good news: most optimizations improve all three simultaneously. A lean CLAUDE.md that gets the agent to the right files immediately is faster (less searching), more accurate (more relevant context), and cheaper (fewer tokens reading irrelevant files).
 
@@ -129,7 +132,7 @@ One of the most wasteful agent behaviors is sequential file reading -- opening f
     end
     style Sequential fill:#fed7d7,stroke:#e53e3e
     style SearchFirst fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Sequential read vs search-first comparison: sequential reading loads file 1 (200 tokens), file 2 (350 tokens), file 3 (180 tokens), and finally file 4 (500 tokens, the relevant one) — consuming 1,230 total tokens. Search-first uses a grep search (50 tokens) to find the relevant code, then reads only file 4 (500 tokens) — consuming just 550 total tokens." />
 
 In the sequential approach, the agent consumes 1,230 tokens to find the relevant code. In the search-first approach, it consumes 550 tokens. Across an entire session, this difference compounds dramatically.
 
@@ -265,7 +268,7 @@ You cannot optimize what you do not measure. Track these metrics before and afte
     Before -.->|"lean CLAUDE.md\nsearch-first\ntask batching"| After
     style Before fill:#fed7d7,stroke:#e53e3e
     style After fill:#c6f6d5,stroke:#38a169
-`} />
+`} fallback="Before vs after optimization: Before — 2,500 tokens/session average, 8 minutes average duration, 55% first-attempt success, 12 files read average. After applying lean CLAUDE.md, search-first, and task batching — 900 tokens/session, 3 minutes duration, 82% first-attempt success, 4 files read." />
 
 These numbers are illustrative, but the proportions are realistic. Teams that apply the techniques in this lesson consistently see 50-70% reductions in token consumption and 20-30 percentage point improvements in first-attempt success rate.
 

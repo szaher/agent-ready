@@ -8,12 +8,14 @@ quiz:
   - Plan, Act, Observe, Verify
   - Observe, Act, Plan, Verify
   correctIndex: 0
+  explanation: "The agent loop follows Observe, Plan, Act, Verify — the agent first gathers information, then decides what to do, executes the action, and checks the result before looping again."
 - question: Why do AI coding agents run in a loop rather than generating all changes at once?
   options:
   - Because LLMs can only produce a limited number of tokens per response
   - Because loop-based architectures are faster than single-pass generation
   - Because each action reveals new information that changes the plan
   correctIndex: 2
+  explanation: "Each action reveals new information — test results, error messages, file contents — that changes the agent's understanding. A single-pass approach would miss these signals and produce worse results."
 - question: What happens during the 'Observe' phase of the agent loop?
   options:
   - The agent writes code changes to disk
@@ -21,6 +23,7 @@ quiz:
   - The agent verifies that tests pass
   - The agent gathers information by reading files, searching code, and examining tool outputs
   correctIndex: 3
+  explanation: "The Observe phase is about information gathering — reading files, searching code, and examining tool outputs. Writing code happens in Act, deciding what to do happens in Plan, and running tests happens in Verify."
 - question: What role does the system prompt play in an AI coding agent?
   options:
   - It replaces the user's instructions entirely
@@ -28,9 +31,20 @@ quiz:
   - It contains the full source code of the project
   - It stores the agent's memory between sessions
   correctIndex: 1
+  explanation: "The system prompt defines the agent's identity, available tools, behavioral rules, and project context. It does not replace user instructions — it augments them with baseline capabilities and constraints."
 ---
 
 ## Overview
+
+<LearningObjectives items={[
+  "Understand the four-phase agent loop: observe, plan, act, verify",
+  "Distinguish between chatbot single-pass interactions and agent multi-step loops",
+  "Explain how the system prompt and project documentation shape agent behavior across sessions"
+]} />
+
+<Prerequisites items={[
+  "Completion of Module 1: Getting Started with Agent-Ready"
+]} />
 
 Every AI coding agent -- whether it is Claude Code, Cursor, Copilot Workspace, or Aider -- follows the same fundamental architecture. Understanding that architecture is the key to working effectively with agents and building codebases they can navigate.
 
@@ -58,7 +72,7 @@ The difference is **agency**: the ability to take actions in the world and respo
     end
     style Chatbot fill:#fef3c7,stroke:#d69e2e
     style Agent fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Comparison of two architectures: A chatbot takes a user prompt and produces a single LLM response. An agent takes a user task and enters a multi-step loop of Observe, Plan, Act, and Verify, cycling back until done, then produces a final result." />
 
 This loop is what gives agents their power -- and also what makes them unpredictable. Each iteration can take the agent in a new direction based on what it discovers.
 
@@ -146,7 +160,7 @@ Let us trace through a concrete example. A developer asks: "Add input validation
     Codebase-->>Agent: All tests pass
 
     Agent->>User: "Added input validation using existing validateEmail and validateName utilities"
-`} />
+`} fallback="Sequence diagram of a complete agent loop: the developer asks to add input validation. The agent runs 6 loops — searching for the function, reading the source file, checking for existing validation utilities, reading those utilities, making the edit, and running tests. After all tests pass, it reports the result to the user." />
 
 Notice how the agent did not jump straight to editing. It spent four loops gathering information before making a single change. This **observe-heavy** approach is typical of well-functioning agents. The more an agent understands before acting, the better its edits will be.
 
@@ -169,7 +183,7 @@ Zooming in further, each agent "turn" (one iteration of the loop) has a specific
     style D fill:#ebf8ff,stroke:#3182ce
     style F fill:#fef3c7,stroke:#d69e2e
     style H fill:#fff5f5,stroke:#e53e3e
-`} />
+`} fallback="Anatomy of a single agent turn: the system prompt, conversation history, and current observation feed into LLM reasoning, which decides to either call a tool (executed outside the LLM by the framework, with results fed back into the conversation) or respond to the user when the task is complete." />
 
 The key insight is that **tool execution happens outside the LLM**. The model generates a tool call (a structured request), the agent framework executes it in the real environment, and the result is fed back as a new message in the conversation. The LLM never directly touches your filesystem -- it asks the framework to do it.
 
@@ -212,7 +226,7 @@ This is why **documentation is the agent's long-term memory**. Files like CLAUDE
     style D fill:#f0fff4,stroke:#38a169
     style Session1 fill:#ebf8ff,stroke:#3182ce
     style Session2 fill:#fef3c7,stroke:#d69e2e
-`} />
+`} fallback="Two independent sessions — Session 1 and Session 2 — each start fresh by reading the same project documentation (CLAUDE.md, README, comments). The docs are the shared continuity between sessions since agents have no persistent memory." />
 
 Each session independently reads the same documentation. The docs are the continuity between sessions.
 

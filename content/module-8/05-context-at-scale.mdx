@@ -8,6 +8,7 @@ quiz:
   - A ranking system that assigns priority numbers to each documentation file
   - A version control strategy where context files are branched separately from code
   correctIndex: 0
+  explanation: "Hierarchical context distributes rules across layers — root for global rules, package-level for scoped conventions, directory-level for specific patterns. Each layer loads only when the agent works in that area, preventing context bloat."
 - question: Why do large codebases benefit from a search-first approach to context loading?
   options:
   - Because search is faster than reading files
@@ -15,6 +16,7 @@ quiz:
   - Because most tasks touch only a small fraction of the codebase, and search loads only what is relevant rather than pre-loading everything
   - Because developers prefer search interfaces over file browsing
   correctIndex: 2
+  explanation: "Most tasks touch only a small fraction of a large codebase. Search-first loads only the relevant files (~3,000 tokens), while browse-first might consume ~15,000 tokens on navigation before finding the same files."
 - question: What is the 'context boundary' problem in monorepos?
   options:
   - The firewall between monorepo packages blocks agent access
@@ -22,6 +24,7 @@ quiz:
   - Monorepo packages cannot share .ctx files due to licensing restrictions
   - Different packages in the monorepo have different conventions, dependencies, and patterns, and the agent must not mix them up
   correctIndex: 3
+  explanation: "Different packages have different conventions, dependencies, and frameworks. If the agent carries API package conventions into the frontend package, it applies the wrong patterns — like wrapping React responses in an API-style wrapper object."
 - question: When should you consider splitting a session instead of continuing a long one?
   options:
   - Every 10 messages, regardless of the task
@@ -29,6 +32,7 @@ quiz:
   - Only when the agent explicitly says it has run out of context
   - Never -- longer sessions are always more efficient
   correctIndex: 1
+  explanation: "Long sessions suffer from context compression, where early details are summarized and potentially lost. Splitting sessions when the task changes scope gives each task a clean context window with full-fidelity information."
 ---
 
 ## Overview
@@ -61,7 +65,7 @@ A project with 50 files can get away with a single CLAUDE.md and maybe a few .ct
     style Small fill:#c6f6d5,stroke:#276749
     style Medium fill:#fefcbf,stroke:#d69e2e
     style Large fill:#ebf8ff,stroke:#3182ce
-`} />
+`} fallback="Context management scaling: small projects (50 files) need a single CLAUDE.md and the agent navigates in 1-2 searches. Medium projects (500 files) need CLAUDE.md plus a few .ctx files, requiring 3-5 searches to orient. Large projects (5,000+ files) require hierarchical context and the agent needs a strategy before reading anything." />
 
 At scale, context management shifts from a content problem (what do I write?) to a systems problem (how do I organize, index, and deliver context efficiently?).
 
@@ -86,7 +90,7 @@ The most important pattern for large codebases is **hierarchical context** -- a 
     style B fill:#c6f6d5,stroke:#276749
     style C fill:#c6f6d5,stroke:#276749
     style D fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="Hierarchical context structure: Root CLAUDE.md (global rules, build commands, architecture overview) branches into three package-level CLAUDE.md files (packages/api with API conventions, packages/web with React patterns, packages/shared with shared types). Each package branches further into directory-level .ctx files (routes, middleware, validators for API; components, hooks, pages for web; types, utils for shared)." />
 
 Each layer serves a different scope:
 
@@ -160,7 +164,7 @@ In a large codebase, the agent cannot afford to read files speculatively. It nee
 
     style B fill:#ebf8ff,stroke:#3182ce
     style J fill:#c6f6d5,stroke:#276749
-`} />
+`} fallback="Search-first approach: given the task 'Add rate limiting to /users endpoint,' the agent searches for 'rate limit' in the codebase, 'users route' in src/routes/, and 'middleware' in .ctx files. This finds an existing rate limiter, users.routes.ts, and the middleware .ctx — reading just 3 targeted files (~3,000 tokens) instead of browsing the entire tree." />
 
 Compare this with a browse-first approach where the agent reads the file tree, opens several directories to understand the structure, reads a few files in each to find the right one, and eventually locates the same three files. The browse-first approach might consume 15,000 tokens of context on navigation before the agent starts working. The search-first approach consumes 3,000.
 

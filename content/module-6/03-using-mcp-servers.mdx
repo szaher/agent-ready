@@ -8,6 +8,7 @@ quiz:
       - "In a global environment variable"
       - "In the agent's system prompt"
     correctIndex: 1
+    explanation: "Project-level MCP configuration in .claude/settings.json is committed to version control, ensuring all team members automatically get the same servers configured when they clone the repository."
   - question: "What is the correct way to pass sensitive credentials to an MCP server?"
     options:
       - "Hardcode them in .claude/settings.json"
@@ -15,6 +16,7 @@ quiz:
       - "Use environment variables referenced in the server configuration"
       - "Pass them as command-line arguments in plain text"
     correctIndex: 2
+    explanation: "Environment variables keep credentials out of version control. The server configuration references the variable name, and each developer sets the actual value in their local environment."
   - question: "What happens when you add an MCP server configuration to a project?"
     options:
       - "The agent automatically installs and starts the server on every machine"
@@ -22,6 +24,7 @@ quiz:
       - "The project's source code is uploaded to the MCP server"
       - "The agent discovers the server's tools during initialization and makes them available for use"
     correctIndex: 3
+    explanation: "When an MCP server is configured, the agent discovers its tools during the initialization handshake and makes them available alongside built-in tools — no code changes or reinstallation required."
 ---
 
 ## Overview
@@ -107,7 +110,7 @@ Claude Code supports three levels of MCP configuration, each with a different sc
     style L fill:#fefcbf,stroke:#d69e2e,color:#1a202c
     style M fill:#bee3f8,stroke:#3182ce,color:#1a202c
     style A fill:#e2e8f0,stroke:#4a5568,color:#1a202c
-`} />
+`} fallback="Three MCP configuration scopes: User Settings (~/.claude/settings.json, all projects, just you), Project Settings (.claude/settings.json, this project, all team members), and Project Local Settings (.claude/settings.local.json, this project, just you). All three merge into the agent's combined server configuration." />
 
 **User settings** (`~/.claude/settings.json`) apply to every project you work on. Put personal utility servers here -- things like a web search server or a personal note-taking tool.
 
@@ -227,7 +230,7 @@ With this configuration, the agent can handle requests like "Find the Jira ticke
     Agent->>DB: run_query("SELECT COUNT(*) FROM errors WHERE type='payment_timeout'")
     DB-->>Agent: {count: 1847}
     Agent->>Human: "PROJ-423 affects 1,847 users based on the error logs..."
-`} />
+`} fallback="Cross-server workflow sequence: the human asks about a payment bug. The agent queries Jira for the issue details, GitHub for the related pull request, and the database for a count of affected users, then synthesizes a complete answer spanning all three systems." />
 
 ## Telling Agents About MCP Servers in CLAUDE.md
 
