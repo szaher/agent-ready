@@ -32,7 +32,7 @@ quiz:
 <LearningObjectives items={[
   "Understand the cold start problem that AI agents face in every session",
   "Explain why existing documentation (README, CONTRIBUTING) does not solve the agent's needs",
-  "Recognize the effort-to-impact ratio that makes CLAUDE.md the highest-leverage agent-readiness investment"
+  "Recognize the effort-to-impact ratio that makes CLAUDE.md a high-leverage agent-readiness investment"
 ]} />
 
 <Prerequisites items={[
@@ -43,7 +43,7 @@ Every developer who joins a new team goes through onboarding. They learn the bui
 
 AI coding agents face the exact same problem -- except they join your team fresh on every single session. There is no institutional memory between conversations. There is no Slack history to search. There is no teammate to ask.
 
-**CLAUDE.md** is your agent's onboarding document. It is one of the most impactful things you can add to make your codebase agent-ready, and this lesson explains why.
+**CLAUDE.md** is your agent's onboarding document. It is one of the most practical first steps you can take to make your codebase agent-ready, and this lesson explains why.
 
 ## The Cold Start Problem
 
@@ -78,7 +78,7 @@ Without answers to these questions, the agent must guess. And guessing leads to 
     L --> M[Use correct commands]
     M --> N[Follow stated conventions]
     N --> O[Generate code]
-    O --> P[Success on first attempt]
+    O --> P[Reduced trial and error]
 
     style C fill:#fed7d7,stroke:#c53030
     style D fill:#fed7d7,stroke:#c53030
@@ -89,7 +89,7 @@ Without answers to these questions, the agent must guess. And guessing leads to 
     style M fill:#c6f6d5,stroke:#276749
     style N fill:#c6f6d5,stroke:#276749
     style P fill:#c6f6d5,stroke:#276749
-`} fallback="Two paths when an agent opens a repository: Without CLAUDE.md, the agent enters a trial-and-error loop — guessing build commands, test commands, and conventions, generating code, failing builds, getting PRs rejected, and cycling back. With CLAUDE.md, the agent reads project context, uses correct commands, follows stated conventions, and succeeds on the first attempt." />
+`} fallback="Two paths when an agent opens a repository: Without CLAUDE.md, the agent enters a trial-and-error loop — guessing build commands, test commands, and conventions, generating code, failing builds, getting PRs rejected, and cycling back. With CLAUDE.md, the agent reads project context, uses correct commands, follows stated conventions, and produces results with reduced trial and error." />
 
 The flowchart above illustrates the difference starkly. Without CLAUDE.md, the agent enters a trial-and-error loop. With it, the agent often gets things right much sooner.
 
@@ -134,9 +134,9 @@ Without a CLAUDE.md, each agent session typically encounters one or more of thes
 - **Style violations** -- The agent writes valid code that violates your conventions. You either accept the inconsistency or spend time asking for revisions.
 - **Wrong test patterns** -- The agent writes tests using a different framework or runner than what your project uses.
 - **Architecture violations** -- The agent puts new code in the wrong directory or creates files that do not follow your naming conventions.
-- **Repeated mistakes** -- Because agents have no memory between sessions, the same mistakes happen every time a new session starts.
+- **Repeated mistakes** -- Without persistent memory or project documentation, the same mistakes recur across sessions.
 
-Each of these costs 1-3 extra turns of conversation. Across a team running dozens of agent sessions per week, that adds up to hours of wasted time -- and hours of wasted compute.
+Each of these costs 1-3 extra turns of conversation. Across a team running many agent sessions per week, that adds up to significant wasted time and compute.
 
 ## Why CLAUDE.md Has a Strong Effort-to-Impact Ratio
 

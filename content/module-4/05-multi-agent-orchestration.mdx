@@ -31,6 +31,8 @@ quiz:
 
 A single custom agent can accomplish focused tasks with precision. But real-world software development rarely involves just one task in isolation. A feature request might need architecture analysis, code implementation, test writing, and documentation -- each requiring different skills and different permissions. This lesson explores **multi-agent orchestration**: patterns for coordinating multiple agents to tackle complex, multi-step work. You will learn three core patterns -- teams, pipelines, and fan-out -- and when to use each.
 
+These patterns use Claude Code's subagent capability. An orchestrating agent can delegate work when its configured tools permit use of the `Agent` tool; its prompt should define when to delegate, which specialist to select, and how to combine results. Test that routing explicitly rather than assuming a prompt alone creates orchestration. Other agent frameworks may implement delegation differently.
+
 ## Why Multiple Agents?
 
 You might wonder: why not just make one powerful agent that does everything? You already know part of the answer from earlier in this module -- least privilege and separation of concerns. But orchestration adds a second reason: **cognitive specialization**.

@@ -46,9 +46,9 @@ quiz:
   "Completion of Module 1: Getting Started with Agent-Ready"
 ]} />
 
-Every AI coding agent -- whether it is Claude Code, Cursor, Copilot Workspace, or Aider -- follows the same fundamental architecture. Understanding that architecture is the key to working effectively with agents and building codebases they can navigate.
+This lesson uses a conceptual model shared by many AI coding tools: a model receives context, can use tools, and iterates on results. Specific products differ substantially in memory, permissions, orchestration, and user interaction. Understanding the common pattern is the key to working effectively with agents and building codebases they can navigate.
 
-In this lesson, you will look inside the **agent loop**: the repeating cycle of observe, plan, act, and verify that drives every interaction between an AI agent and your code. Once you see the loop, you will understand why some tasks succeed effortlessly and others spiral into confusion.
+In this lesson, you will look inside the **agent loop**: the repeating cycle of observe, plan, act, and verify that drives a typical interaction between an AI agent and your code. Once you see the loop, you will understand why some tasks succeed effortlessly and others spiral into confusion.
 
 ## What Makes an Agent Different from a Chatbot
 
@@ -196,20 +196,20 @@ The **system prompt** is the foundational instruction set that shapes how the ag
 - **Behavioral rules**: when to ask for permission, what files to avoid, how to handle errors
 - **Project context**: information from CLAUDE.md, README, or other documentation files
 
-The system prompt is injected at the start of every conversation and stays in the context window throughout. This is why project documentation files like CLAUDE.md are so powerful -- they become part of the agent's operating instructions.
+The system prompt is injected at the start of every conversation and stays in the context window throughout. This is why project documentation files like CLAUDE.md are so powerful -- they become part of the context the agent uses to guide its behavior.
 
 > **Key insight**: The system prompt plus your project documentation define the agent's "personality" for that session. A well-documented project literally makes the agent smarter by giving it better instructions to follow.
 
 ## The Role of Memory
 
-Agents have a significant limitation: they have **no persistent memory** between sessions. Each new conversation starts from scratch. The agent does not remember:
+By default, each agent session starts without the working context from previous sessions. Whether an agent retains information across sessions depends on the product and configuration -- some platforms offer memory features, project files, or connected tools that persist context. Without those features, the agent does not remember:
 
 - What it worked on yesterday
 - Decisions it made in a previous session
 - Patterns it discovered in your code before
 - Mistakes it made and corrected
 
-This is why **documentation is the agent's long-term memory**. Files like CLAUDE.md, architecture decision records, and inline code comments persist between sessions and give each new agent instance the knowledge it needs to make good decisions.
+This is why **documentation is the agent's most reliable long-term memory**. Files like CLAUDE.md, architecture decision records, and inline code comments persist between sessions and give each new agent instance the knowledge it needs to make good decisions. Treat durable project documentation as a reliable shared reference, but verify what your chosen platform loads and persists.
 
 <MermaidDiagram chart={`graph TD
     subgraph Session1["Session 1"]
@@ -226,7 +226,7 @@ This is why **documentation is the agent's long-term memory**. Files like CLAUDE
     style D fill:#f0fff4,stroke:#38a169
     style Session1 fill:#ebf8ff,stroke:#3182ce
     style Session2 fill:#fef3c7,stroke:#d69e2e
-`} fallback="Two independent sessions — Session 1 and Session 2 — each start fresh by reading the same project documentation (CLAUDE.md, README, comments). The docs are the shared continuity between sessions since agents have no persistent memory." />
+`} fallback="Two independent sessions — Session 1 and Session 2 — each start by reading the same project documentation (CLAUDE.md, README, comments). The docs provide shared continuity between sessions." />
 
 Each session independently reads the same documentation. The docs are the continuity between sessions.
 
@@ -255,7 +255,7 @@ Each of these failure modes has specific codebase-level fixes, which we will cov
 
 ## Summary
 
-The agent loop -- observe, plan, act, verify -- is the heartbeat of every AI coding agent. Understanding it reveals several practical insights:
+The agent loop -- observe, plan, act, verify -- is a useful mental model for understanding AI coding agents. It reveals several practical insights:
 
 - **Agents are information-hungry**: The more they can observe, the better they perform
 - **Each loop costs tokens**: Efficient agents minimize unnecessary loops

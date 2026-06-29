@@ -42,8 +42,8 @@
     },
     {
       "slug": "05-claude-md-patterns",
-      "title": "Real-World CLAUDE.md Patterns",
-      "description": "Annotated examples from open-source repos and production codebases",
+      "title": "Annotated CLAUDE.md Patterns",
+      "description": "Composite annotated examples showing effective CLAUDE.md patterns",
       "estimatedMinutes": 15,
       "diagramTypes": ["comparison"],
       "hasCode": true,

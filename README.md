@@ -115,4 +115,4 @@ See `content/CLAUDE.md` for content authoring guidelines. The project uses three
 
 ## License
 
-Private
+See [LICENSE](./LICENSE).

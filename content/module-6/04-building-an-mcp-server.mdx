@@ -30,6 +30,8 @@ npm install @modelcontextprotocol/sdk zod
 npm install -D typescript @types/node
 npx tsc --init`} language="bash" filename="terminal" />
 
+This lesson uses unpinned dependencies for exploration. For production work, record the exact package versions validated by your project in `package.json` and commit the lockfile. Do not rely on an unpinned install command for reproducible builds. If you encounter breaking changes in the SDK, check the [MCP SDK documentation](https://modelcontextprotocol.io) for migration guidance.
+
 The key dependencies are:
 
 - **`@modelcontextprotocol/sdk`** -- the official MCP SDK that handles protocol details, transport, and message routing

@@ -16,7 +16,7 @@ quiz:
   - Because agents must understand existing code before they can safely modify it
   - Because agents prefer reading over editing
   correctIndex: 2
-  explanation: "Agents spend 60-70% of tool calls reading because they must understand existing code, conventions, and dependencies before making safe modifications. Reading before editing prevents regressions and convention drift."
+  explanation: "Agents spend a large share of tool calls reading because they must understand existing code, conventions, and dependencies before making safe modifications. Reading before editing prevents regressions and convention drift."
 - question: What is the key difference between the Edit tool and the Write tool?
   options:
   - Edit is for code files, Write is for documentation
@@ -73,11 +73,11 @@ This separation is critical to understand. The LLM is a reasoning engine that de
 
 ## The Core Tool Set
 
-While different agent platforms name and organize tools differently, they all provide the same fundamental capabilities. Here are the core tools every coding agent uses.
+While different agent platforms name and organize tools differently, most provide the same fundamental capabilities. Here are the core tools that most coding agents share.
 
 ### Read: Loading Files into Context
 
-The **Read** tool loads a file's contents into the conversation so the agent can reason about it. This is the most frequently used tool in any agent session -- agents typically spend 60-70% of their tool calls on reading.
+The **Read** tool loads a file's contents into the conversation so the agent can reason about it. This is the most frequently used tool in a typical agent session -- in practice, a large share of tool calls are reads.
 
 <CodeBlock code={`// What the agent sends to the framework:
 {
@@ -255,7 +255,7 @@ The order and selection of tools matters enormously. Compare these two approache
 
 Approach B uses search before read (saving tokens), reads the test file (understanding expectations), and verifies with tests (catching regressions). The total token cost is lower, and the result is better.
 
-> **Key insight**: Agents that search before they read, read before they edit, and test after they edit produce the best results. This is the ideal tool sequence, and you can encourage it through good code organization and documentation.
+> **Key insight**: Agents that search before they read, read before they edit, and test after they edit tend to produce better results. This is a useful default sequence, and you can encourage it through good code organization and documentation.
 
 ## What Agents Cannot Do
 
@@ -275,7 +275,7 @@ Tools are the hands and eyes of an AI coding agent. Understanding how they work 
 - **Edit uses exact string matching**: Consistent formatting improves edit reliability
 - **Bash output fills context**: Keep test and build output concise
 - **Search is the most efficient navigator**: Consistent naming patterns make search effective
-- **The ideal sequence is search, read, edit, test**: Good code organization encourages this flow
+- **A useful default sequence is search, read, edit, test**: Good code organization encourages this flow
 - **Tools have limitations**: Design workflows with tool constraints in mind
 
 Next, we will explore how agents *decide* which tool to call and what strategy to follow -- the decision-making process that turns tool capabilities into coherent actions.
