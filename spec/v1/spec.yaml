@@ -1,0 +1,166 @@
+# Agent Ready Specification v1 — root document.
+#
+# This is the machine contract derived from the Agent Ready course. The course
+# (content/) stays human-facing; this directory is normative. See spec/README.md.
+schema_version: "1"
+name: agent-ready
+spec_version: 1.0.0
+title: Agent Ready Specification
+description: >-
+  Machine-readable requirements that determine whether a software repository is
+  ready for AI coding agents, organized by the four Agent Ready pillars and
+  graded by a requirement-based five-level maturity model.
+homepage: https://github.com/szaher/agent-ready/tree/main/spec
+
+statuses:
+  - id: pass
+    description: The rule applies and its evidence expression is satisfied.
+  - id: fail
+    description: >-
+      The rule applies, its evidence expression is not satisfied, and the rule's
+      evaluation policy treats missing evidence as a failure.
+  - id: unknown
+    description: >-
+      The rule applies but the assessor cannot establish the outcome safely,
+      either because the rule's evaluation policy is `on_missing: unknown` or
+      because the assessor does not support an evidence type the rule needs.
+      Unknown is never reported as fail.
+  - id: not-applicable
+    description: The rule's `applies_when` expression is not satisfied for this repository.
+
+severities:
+  - id: required
+    description: >-
+      Gates maturity. A repository cannot claim the rule's `required_from` level,
+      or any higher level, unless the rule passes or is not applicable.
+  - id: recommended
+    description: >-
+      Does not gate maturity. Assessors list it as a recommended improvement
+      when planning toward a level at or above `required_from`.
+  - id: advisory
+    description: >-
+      Informational guidance. It never gates maturity, and plans list it only
+      as optional follow-up.
+
+remediation_classifications:
+  - id: automatable
+    description: >-
+      Can be produced deterministically from repository facts without inventing
+      project policy, for example generating a commands section from discovered commands.
+  - id: assisted
+    description: >-
+      Tooling can scaffold a starting point, but a human must supply or confirm
+      the substantive content.
+  - id: human-required
+    description: >-
+      Requires a project or team decision. Tooling must not invent the answer.
+      The rule states the decision needed in `remediation.decision`.
+
+evidence_categories:
+  - id: file
+    description: Presence of well-known repository files.
+  - id: documentation
+    description: Human-facing documentation and its structure.
+  - id: agent
+    description: Agent-facing instructions, skills, and agent tool configuration committed to the repository.
+  - id: command
+    description: Discoverable developer commands (test, build, lint, format, typecheck).
+  - id: project
+    description: Languages, manifests, lockfiles, workspaces, and test files.
+  - id: config
+    description: Tool configuration committed to the repository.
+  - id: ci
+    description: Continuous-integration configuration and what it runs.
+  - id: security
+    description: Security-relevant repository state.
+  - id: mcp
+    description: Model Context Protocol configuration committed to the repository.
+  - id: metrics
+    description: Declared practices for measuring agent effectiveness.
+
+path_matching:
+  semantics: >-
+    Paths are POSIX-style and relative to the repository root. They are
+    case-sensitive and never absolute, and never contain `..`. In a glob, `*` matches
+    any characters within one path segment, except that a `*` at the start of a
+    segment does not match names beginning with `.`. `**` matches zero or more
+    whole segments, and while matching `**` an assessor never enters a directory
+    listed in `ignored_directories` or a directory whose name begins with `.`.
+    Literal segments (including hidden ones such as `.github`) always match
+    explicitly. Path detections default to `scope: worktree` (files present in
+    the checkout) and `type: file`. `scope: tracked` considers only files tracked
+    by version control when the repository is a Git repository, and falls back
+    to the worktree otherwise. Heading detections match Markdown ATX headings
+    (`#` to `######`). Content detections match individual lines. Every regular
+    expression is matched case-insensitively and uses a portable subset: no
+    inline flags, no lookbehind, no backreferences, no named groups.
+  ignored_directories:
+    - .git
+    - node_modules
+    - vendor
+    - dist
+    - build
+    - target
+    - .venv
+    - venv
+    - __pycache__
+
+pillars:
+  - id: context
+    title: Context
+    description: >-
+      What the project is, why it exists, how it is structured, and the key
+      decisions behind it. It lives in instruction files, architecture documentation, and READMEs.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-3/01-why-claude-md.mdx
+      - content/module-8/01-the-context-challenge.mdx
+  - id: conventions
+    title: Conventions
+    description: >-
+      The patterns a team follows, made explicit through documented style rules,
+      exemplar code, and linter or formatter configuration.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-5/03-naming-conventions.mdx
+  - id: constraints
+    title: Constraints
+    description: >-
+      What an agent must not do: off-limits areas, security boundaries, and
+      architectural rules, stated upfront and verifiable where possible.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-7/01-why-safety-matters.mdx
+  - id: feedback
+    title: Feedback Loops
+    description: >-
+      Tests, type checkers, linters, and builds that let an agent verify its own
+      work and self-correct.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-9/04-test-driven-agent-development.mdx
+
+# Dimensions are cross-cutting views, not additional pillars. Every rule belongs
+# to exactly one pillar. A rule may additionally carry one dimension.
+dimensions:
+  - id: security
+    title: Security
+    description: >-
+      Secrets hygiene, agent permission boundaries, and automated security gates.
+      These are mostly constraints, with some feedback.
+    sources:
+      - content/module-7/01-why-safety-matters.mdx
+      - content/module-10/03-security-audit.mdx
+  - id: performance
+    title: Performance
+    description: >-
+      Agent efficiency, meaning context budget and navigation cost. It is not
+      application runtime performance.
+    sources:
+      - content/module-8/04-optimizing-context-budget.mdx
+      - content/module-10/04-performance-optimization.mdx
+
+includes:
+  maturity: maturity.yaml
+  evidence: evidence.yaml
+  rules: []

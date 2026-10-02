@@ -1,0 +1,73 @@
+# Agent Ready maturity model, from content/module-1/03-agent-ready-maturity-model.mdx.
+#
+# Levels are descriptive. Requirements live in the rule files and point at a
+# level through `required_from`. The characteristics below are the course's
+# summaries, not machine rules: only `required` rules decide a level.
+kind: agent-ready.maturity
+maturity:
+  semantics: >-
+    Maturity is requirement-based and cumulative. A repository is at level N
+    (N >= 1) only when every rule with severity `required` whose `required_from`
+    rank is less than or equal to N has status `pass` or `not-applicable`.
+    A required rule with status `fail` or `unknown` blocks its level and every
+    higher level. The rank 0 level has no requirements and is the floor. The
+    current level is the highest level whose requirements are all met.
+    Recommended and advisory rules never affect the level. Diagnostic counts or
+    percentages may be reported, but they must not determine maturity.
+  levels:
+    - id: unaware
+      rank: 0
+      title: Unaware
+      summary: No preparation for AI agents. Agents guess at everything.
+      characteristics:
+        - No agent instruction file.
+        - Minimal or outdated README.
+        - Conventions exist only in team members' heads.
+        - Tests are not reliably runnable with a single command.
+      sources:
+        - content/module-1/03-agent-ready-maturity-model.mdx
+    - id: foundational
+      rank: 1
+      title: Foundational
+      summary: Agents can build and test the project but still guess at conventions.
+      characteristics:
+        - A README with accurate setup instructions.
+        - A working build command where the ecosystem has a build step.
+        - A test suite that runs with a single command.
+        - Basic linting or formatting configured.
+      sources:
+        - content/module-1/03-agent-ready-maturity-model.mdx
+    - id: structured
+      rank: 2
+      title: Structured
+      summary: The repository explicitly communicates structure, conventions, and constraints to agents.
+      characteristics:
+        - An agent instruction file covering commands, architecture, conventions, and off-limits areas.
+        - Type checking enabled where the language supports it.
+        - Tests present, with conventions enforced by hooks or CI.
+        - Basic secrets hygiene.
+      sources:
+        - content/module-1/03-agent-ready-maturity-model.mdx
+        - content/module-10/03-security-audit.mdx
+    - id: optimized
+      rank: 3
+      title: Optimized
+      summary: Agent integration is refined for complex, multi-step work.
+      characteristics:
+        - Hierarchical instruction files for complex areas.
+        - Task-specific workflows documented for agents.
+        - Important architecture boundaries are explicit and machine-checkable.
+      sources:
+        - content/module-1/03-agent-ready-maturity-model.mdx
+        - content/module-5/05-monorepo-and-large-codebases.mdx
+    - id: autonomous
+      rank: 4
+      title: Autonomous
+      summary: Agents can drive features end to end behind automated gates.
+      characteristics:
+        - End-to-end contribution workflow documentation.
+        - CI gates for correctness, conventions, and security.
+        - Agent effectiveness is tracked.
+      sources:
+        - content/module-1/03-agent-ready-maturity-model.mdx
+        - content/module-1/05-measuring-agent-effectiveness.mdx

@@ -7,6 +7,8 @@
     "preview": "next dev",
     "update:template": "bash scripts/update-template.sh",
     "validate": "node scripts/validate.mjs",
+    "spec:check": "node scripts/spec.mjs check",
+    "spec:build": "node scripts/spec.mjs build",
     "build": "next build",
     "build:static": "node scripts/build-static.mjs",
     "start": "next start",
@@ -43,11 +45,13 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "ajv": "^8.20.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "yaml": "^2.9.0"
   }
 }

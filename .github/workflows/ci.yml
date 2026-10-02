@@ -29,6 +29,9 @@ jobs:
       - name: Validate content
         run: pnpm validate
 
+      - name: Validate Agent Ready spec
+        run: pnpm spec:check
+
       - name: Lint
         run: pnpm lint
 
