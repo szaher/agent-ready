@@ -1,0 +1,124 @@
+# Conventions pillar: patterns the team follows, made explicit.
+kind: agent-ready.rules
+scope:
+  pillar: conventions
+
+rules:
+  - id: conventions.ci_enforced
+    pillar: conventions
+    title: CI enforces conventions
+    description: Continuous integration runs lint or format checks on every change.
+    rationale: >-
+      Autonomous agents need automated review gates that check convention
+      adherence, not just correctness, before a human reviews.
+    required_from: autonomous
+    severity: required
+    depends_on: [conventions.tooling]
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [ci.runs_lint]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Add the repository's existing lint and format checks to CI.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/02-ci-cd-integration.mdx
+
+  - id: conventions.documented
+    pillar: conventions
+    title: Coding conventions are documented
+    description: >-
+      Code style and conventions are written down, in the agent instruction file,
+      a style guide, or the contributing guide.
+    rationale: >-
+      Humans absorb conventions over months. Agents have none of that history, so
+      conventions must be explicit or they will be guessed.
+    required_from: structured
+    severity: required
+    evidence:
+      any:
+        - agent.instructions.conventions
+        - documentation.conventions_file
+        - documentation.contributing_conventions
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Document the team's most important coding conventions explicitly.
+      decision: Which conventions the team actually expects (naming, structure, error handling, testing patterns).
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-5/03-naming-conventions.mdx
+
+  - id: conventions.enforced
+    pillar: conventions
+    title: Conventions are enforced automatically
+    description: Git hooks or CI checks enforce linting or formatting.
+    rationale: >-
+      Documented conventions drift. Automated enforcement turns them into
+      feedback the agent receives before review.
+    required_from: structured
+    severity: required
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [config.git_hooks, ci.runs_lint]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Wire the existing lint and format commands into pre-commit hooks or CI.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: conventions.exemplars
+    pillar: conventions
+    title: Exemplar code is referenced
+    description: The agent instruction file points to examples or reference implementations to follow.
+    rationale: >-
+      Examples are the agent's primary learning mechanism. "Follow this file" beats
+      a paragraph of description.
+    required_from: optimized
+    severity: recommended
+    evidence:
+      any: [agent.instructions.examples]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Add an examples section that points at well-written files to imitate.
+      decision: Which existing files represent the patterns the team wants repeated.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: conventions.tooling
+    pillar: conventions
+    title: Linting or formatting configured
+    description: A linter or formatter is configured or discoverable.
+    rationale: >-
+      Linters and formatters enforce conventions mechanically, so the agent learns
+      about violations without a human pointing them out.
+    required_from: foundational
+    severity: required
+    applies_when:
+      any: [project.language]
+    evidence:
+      any:
+        - command.lint
+        - command.format
+        - config.linter
+        - config.linter_declared
+        - config.formatter
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Adopt the ecosystem's standard linter or formatter.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx

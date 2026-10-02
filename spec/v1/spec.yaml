@@ -163,4 +163,10 @@ dimensions:
 includes:
   maturity: maturity.yaml
   evidence: evidence.yaml
-  rules: []
+  rules:
+    - context.yaml
+    - conventions.yaml
+    - constraints.yaml
+    - feedback.yaml
+    - security.yaml
+    - performance.yaml

@@ -1,0 +1,54 @@
+# Performance dimension: agent efficiency (context budget and navigation cost),
+# not application runtime performance.
+#
+# Deliberately not machine rules in v1: test-suite latency (needs execution),
+# model right-sizing, batching, and session focus (agent usage practices, not
+# repository properties).
+kind: agent-ready.rules
+scope:
+  dimension: performance
+
+rules:
+  - id: context.agent_instructions.concise
+    pillar: context
+    dimension: performance
+    title: Root instructions are concise
+    description: Root-level agent instruction files stay within 100 non-blank lines.
+    rationale: >-
+      Every line of a root instruction file is loaded into every session. Lean
+      root files, with details in scoped files, leave context for the task.
+    required_from: optimized
+    severity: recommended
+    depends_on: [context.agent_instructions]
+    evidence:
+      any: [agent.instructions.concise]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Move low-frequency guidance into scoped instruction files or linked documents.
+    sources:
+      - content/module-3/02-anatomy-of-claude-md.mdx
+      - content/module-8/04-optimizing-context-budget.mdx
+      - content/module-10/04-performance-optimization.mdx
+
+  - id: context.agent_instructions.file_pointers
+    pillar: context
+    dimension: performance
+    title: Instructions point to concrete paths
+    description: Agent instructions reference existing repository paths to tell the agent where code lives.
+    rationale: >-
+      Explicit file pointers replace exploratory searching and reading, which is
+      one of the largest sources of wasted agent context.
+    required_from: optimized
+    severity: recommended
+    depends_on: [context.agent_instructions]
+    evidence:
+      any: [agent.instructions.file_pointers]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Reference the key directories and entry-point files by path in the instruction file.
+    sources:
+      - content/module-10/04-performance-optimization.mdx
