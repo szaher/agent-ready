@@ -187,8 +187,8 @@ The spec uses semantic versioning. The source directory is the major version
 
 | Change | Version bump |
 |---|---|
-| Anything that can lower an existing repository's maturity or change rule semantics: adding a `required` rule, raising a rule's severity, lowering its `required_from`, narrowing evidence or `applies_when`, removing or renaming an id, changing the closed vocabularies | **major** (new `vN/` directory) |
-| Changes that can only keep or raise maturity, or add information: new `recommended`/`advisory` rules, new evidence types, widening evidence (more ways to pass), new optional fields | **minor** |
+| Anything that can lower an existing repository's maturity or change rule semantics: adding a `required` rule, raising a rule's severity, lowering its `required_from`, narrowing evidence (fewer ways to pass), widening `applies_when` (the rule applies to more repositories), removing or renaming an id, changing the closed vocabularies | **major** (new `vN/` directory) |
+| Changes that can only keep or raise maturity, or add information: new `recommended`/`advisory` rules, new evidence types, widening evidence (more ways to pass), narrowing `applies_when` (more repositories become not-applicable), new optional fields | **minor** |
 | Wording, rationale, sources, documentation | **patch** |
 
 Rule and evidence ids are stable within a major version. `schema_version`
