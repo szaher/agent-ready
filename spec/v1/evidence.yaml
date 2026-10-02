@@ -66,9 +66,12 @@ evidence:
         `rspec`, `bundle`, `composer`, or `phpunit`; or `python`, `python3`, or
         `py` followed by `-m` and one of `pytest`, `unittest`, `mypy`, `ruff`,
         `black`, `build`, `tox`, `nox`, `pylint`, `flake8`, or `isort`; or a
-        repository path (it starts with `./` or contains `/`) that exists as a
-        file in the repository. A heading alone, or a command of any other
-        program (for example a workflow tool's own commands), is not evidence.
+        repository script invoked by path: it starts with `./`, exists as a file
+        in the repository, and has no file extension or one of `.sh`, `.bash`,
+        `.zsh`, `.ps1`, `.bat`, `.cmd`, `.py`, `.js`, `.mjs`, `.cjs`, `.ts`,
+        `.rb`, or `.pl`. A heading alone, a mention of a data or documentation
+        file, or a command of any other program (for example a workflow tool's
+        own commands) is not evidence.
 
   - id: agent.instructions.concise
     category: agent
