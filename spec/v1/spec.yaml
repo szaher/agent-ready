@@ -4,7 +4,7 @@
 # (content/) stays human-facing; this directory is normative. See spec/README.md.
 schema_version: "1"
 name: agent-ready
-spec_version: 1.0.0
+spec_version: 1.0.1
 title: Agent Ready Specification
 description: >-
   Machine-readable requirements that determine whether a software repository is
