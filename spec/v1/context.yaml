@@ -37,7 +37,7 @@ rules:
   - id: context.agent_instructions.commands
     pillar: context
     title: Instructions document build and test commands
-    description: The agent instruction file has a section telling the agent how to build, test, and lint.
+    description: The agent instruction file documents the project's runnable build, test, and lint commands.
     rationale: >-
       Exact, runnable commands are the most frequently needed instruction. Without
       them the agent guesses, and guessing breaks the feedback loop.

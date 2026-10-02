@@ -394,6 +394,13 @@ describe("Agent Ready Spec v1 requirements", () => {
     );
   });
 
+  it("requires a recognized project command, not a heading, for documented commands (1.0.1 erratum)", () => {
+    const evidence = (bundle.evidence as { id: string; detection: { kind: string; definition?: string } }[])
+      .find((e) => e.id === "agent.instructions.commands");
+    expect(evidence?.detection.kind).toBe("derived");
+    expect(evidence?.detection.definition).toContain("A heading alone");
+  });
+
   it("references only evidence declared in the vocabulary", () => {
     const declared = new Set(bundle.evidence.map((e: { id: string }) => e.id));
     for (const r of bundle.rules as Rule[]) {
@@ -405,6 +412,11 @@ describe("Agent Ready Spec v1 requirements", () => {
 });
 
 describe("spec/README.md", () => {
+  it("lists every patch-level erratum for the current version", () => {
+    const readme = readFileSync(path.join(DIST_DIR, "..", "README.md"), "utf8");
+    expect(readme).toContain("| 1.0.1 | `agent.instructions.commands`");
+  });
+
   it("documents every required rule in the maturity table", () => {
     const readme = readFileSync(path.join(DIST_DIR, "..", "README.md"), "utf8");
     const bundle = assemble(loadSource());

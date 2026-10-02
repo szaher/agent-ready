@@ -190,9 +190,16 @@ The spec uses semantic versioning. The source directory is the major version
 | Anything that can lower an existing repository's maturity or change rule semantics: adding a `required` rule, raising a rule's severity, lowering its `required_from`, narrowing evidence (fewer ways to pass), widening `applies_when` (the rule applies to more repositories), removing or renaming an id, changing the closed vocabularies | **major** (new `vN/` directory) |
 | Changes that can only keep or raise maturity, or add information: new `recommended`/`advisory` rules, new evidence types, widening evidence (more ways to pass), narrowing `applies_when` (more repositories become not-applicable), new optional fields | **minor** |
 | Wording, rationale, sources, documentation | **patch** |
+| **Erratum**: correcting an evidence detection that is satisfied by content contradicting the evidence's own title and description (a false positive), without otherwise changing what the rule requires. It can lower maturity only where the old detection passed in error. Every erratum is listed under [Errata](#errata) with the affected ids | **patch** |
 
 Rule and evidence ids are stable within a major version. `schema_version`
 versions the document format and changes only with incompatible structure.
+
+### Errata
+
+| Version | Ids | Correction |
+|---|---|---|
+| 1.0.1 | `agent.instructions.commands` (used by `context.agent_instructions.commands`) | 1.0.0 detected this evidence from any heading containing words such as "command", "build", or "setup", so a section like "Useful commands" listing only a workflow tool's own commands passed a rule that asks for build, test, and lint commands. The evidence is now derived: the instruction file must contain at least one recognized project command in code. Instructions that show their build, test, or lint commands in code (inline or fenced) with a listed program are unaffected; prose-only commands, or programs not on the list, no longer pass. Widening the list is a minor change. |
 
 ## The bundle and integrity
 
