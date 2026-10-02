@@ -300,6 +300,9 @@ export function validateSource(source, { repoRoot = REPO_ROOT, requireCoverage =
     } else if (rank.get(rule.required_from) === 0) {
       errors.push(`rule ${rule.id}: required_from cannot be the rank 0 level`);
     }
+    if (rule.evaluation.on_missing === "unknown" && rule.remediation.classification !== "human-required") {
+      errors.push(`rule ${rule.id}: on_missing 'unknown' requires human-required remediation`);
+    }
     for (const ref of [...expressionRefs(rule.evidence), ...expressionRefs(rule.applies_when)]) {
       if (!evidence.has(ref)) errors.push(`rule ${rule.id}: references unknown evidence ${ref}`);
     }

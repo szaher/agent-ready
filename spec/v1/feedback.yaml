@@ -1,0 +1,220 @@
+# Feedback Loops pillar: how agents verify their own work.
+#
+# Deliberately not machine rules in v1: test coverage of "critical paths", test
+# suite speed, and actionable error messages. Coverage and speed require
+# executing the project (assessment is read-only). Error quality is subjective.
+kind: agent-ready.rules
+scope:
+  pillar: feedback
+
+rules:
+  - id: feedback.agent_effectiveness
+    pillar: feedback
+    title: Agent effectiveness is tracked
+    description: >-
+      The repository documents how agent effectiveness is measured (task
+      completion, iterations, interventions), or commits an agent evaluation suite.
+    rationale: >-
+      The Autonomous level depends on measured agent performance. Without it,
+      instruction updates are guesses rather than responses to observed failures.
+    required_from: autonomous
+    severity: required
+    evidence:
+      any: [metrics.evaluation_declared, metrics.evaluation_suite]
+    evaluation:
+      on_missing: unknown
+      unknown_reason: >-
+        Teams may track agent effectiveness outside the repository (dashboards,
+        issue trackers, local metrics), so its absence here does not show that it
+        is not tracked.
+    remediation:
+      classification: human-required
+      summary: Document how agent effectiveness is measured and reviewed, or add an evaluation suite.
+      decision: Which metrics the team tracks, where they live, and how often they are reviewed.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-1/05-measuring-agent-effectiveness.mdx
+      - content/module-9/05-continuous-agent-improvement.mdx
+
+  - id: feedback.build.available
+    pillar: feedback
+    title: Build command available
+    description: >-
+      Ecosystems with a compile or build step expose a discoverable build command.
+    rationale: >-
+      A build that validates the code compiles is the cheapest structural check an
+      agent can run.
+    required_from: foundational
+    severity: required
+    applies_when:
+      any:
+        - project.language.go
+        - project.language.rust
+        - project.language.jvm
+        - project.language.cpp
+        - project.language.swift
+        - all: [project.language.javascript, config.tsconfig]
+    evidence:
+      any: [command.build]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Expose a single build command (for example a `build` script or Makefile target).
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: feedback.ci.tests
+    pillar: feedback
+    title: CI runs tests
+    description: Continuous integration runs the test suite on every change.
+    rationale: Autonomous agents need automated correctness gates on every pull request.
+    required_from: autonomous
+    severity: required
+    depends_on: [feedback.tests.available]
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [ci.runs_tests]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Run the repository's test command in CI.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/02-ci-cd-integration.mdx
+
+  - id: feedback.dependencies.locked
+    pillar: feedback
+    title: Dependencies are locked
+    description: A dependency lockfile is committed.
+    rationale: >-
+      Reproducible installs make "install, build, test from a clean clone" behave
+      the same for every agent session.
+    required_from: structured
+    severity: recommended
+    applies_when:
+      any: [project.package_manifest]
+    evidence:
+      any: [project.lockfile]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: automatable
+      summary: Generate and commit the package manager's lockfile.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: feedback.tests.available
+    pillar: feedback
+    title: Runnable test suite
+    description: The repository provides a discoverable single test command.
+    rationale: >-
+      An agent that cannot run tests cannot verify its work. A single-command test
+      suite is the core of the Foundational level.
+    required_from: foundational
+    severity: required
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [command.test]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Expose the test suite through one command (for example a `test` script or Makefile target).
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/04-test-driven-agent-development.mdx
+
+  - id: feedback.tests.present
+    pillar: feedback
+    title: Tests exist
+    description: Test sources exist in conventional locations or with conventional names.
+    rationale: >-
+      A test command with no tests gives false confidence. At Structured, new code
+      is expected to come with tests the agent can extend.
+    required_from: structured
+    severity: required
+    depends_on: [feedback.tests.available]
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [project.test_files]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Add tests for the critical paths, following the ecosystem's conventional test layout.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/04-test-driven-agent-development.mdx
+
+  - id: feedback.typecheck
+    pillar: feedback
+    title: Type checking enabled
+    description: >-
+      Languages with optional typing have a type checker configured: mypy or
+      pyright for Python, `tsconfig.json` for JavaScript/TypeScript. Statically
+      typed languages satisfy this inherently.
+    rationale: Type checkers catch structural errors immediately, which shortens the agent's iteration loop.
+    required_from: structured
+    severity: required
+    applies_when:
+      any:
+        - project.language.python
+        - project.language.javascript
+        - project.language.go
+        - project.language.rust
+        - project.language.jvm
+        - project.language.swift
+        - project.language.cpp
+    evidence:
+      all:
+        - any:
+            - none: [project.language.python]
+            - config.python_typecheck
+            - config.python_typecheck_declared
+            - command.typecheck
+        - any:
+            - none: [project.language.javascript]
+            - config.tsconfig
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Configure the ecosystem's type checker (mypy/pyright, TypeScript) and expose a typecheck command.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-5/04-documentation-as-context.mdx
+
+  - id: feedback.typecheck.strict
+    pillar: feedback
+    title: Strict type checking
+    description: Optionally typed languages run their type checker in strict mode.
+    rationale: Strict mode turns implicit types into explicit ones, which lowers the context an agent needs to infer types.
+    required_from: optimized
+    severity: advisory
+    depends_on: [feedback.typecheck]
+    applies_when:
+      any: [project.language.python, project.language.javascript]
+    evidence:
+      all:
+        - any:
+            - none: [project.language.python]
+            - config.python_typecheck_strict
+        - any:
+            - none: [project.language.javascript]
+            - config.tsconfig_strict
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Enable strict mode incrementally and fix the reported issues.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-8/04-optimizing-context-budget.mdx

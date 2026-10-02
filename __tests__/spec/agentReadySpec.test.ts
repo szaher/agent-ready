@@ -1,6 +1,9 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  DIST_DIR,
   assemble,
   bundleFileName,
   canonicalJson,
@@ -81,7 +84,7 @@ const validate = (source: Source) => validateSource(source, { requireCoverage: t
 
 describe("Agent Ready Spec v1 sources", () => {
   it("the committed spec is valid", () => {
-    expect(validateSource(loadSource(), { requireCoverage: false })).toEqual([]);
+    expect(validateSource(loadSource(), { requireCoverage: true })).toEqual([]);
   });
 
   it("declares versioned metadata", () => {
@@ -299,5 +302,114 @@ describe("bundle", () => {
 
   it("collects evidence references from nested expressions", () => {
     expect(expressionRefs({ any: ["a.b", { all: ["c.d", { none: ["e.f"] }] }] })).toEqual(["a.b", "c.d", "e.f"]);
+  });
+});
+
+describe("Agent Ready Spec v1 requirements", () => {
+  const bundle = assemble(loadSource());
+  const ruleById = new Map(bundle.rules.map((r: Rule) => [r.id, r]));
+
+  it("matches the committed canonical bundle exactly", () => {
+    const committed = readFileSync(path.join(DIST_DIR, bundleFileName(bundle)), "utf8");
+    expect(committed).toBe(canonicalJson(bundle));
+  });
+
+  it("gates each maturity level with an explicit, reviewed set of required rules", () => {
+    const matrix: Record<string, string[]> = {};
+    for (const r of bundle.rules as Rule[]) {
+      if (r.severity !== "required") continue;
+      (matrix[r.required_from as string] ??= []).push(r.id);
+    }
+    expect(matrix).toEqual({
+      foundational: [
+        "context.readme",
+        "context.readme.setup",
+        "conventions.tooling",
+        "feedback.build.available",
+        "feedback.tests.available",
+      ],
+      structured: [
+        "constraints.documented",
+        "constraints.mcp.no_inline_secrets",
+        "constraints.secrets.ignored",
+        "constraints.secrets.untracked",
+        "context.agent_instructions",
+        "context.agent_instructions.commands",
+        "context.architecture",
+        "conventions.documented",
+        "conventions.enforced",
+        "feedback.tests.present",
+        "feedback.typecheck",
+      ],
+      optimized: [
+        "constraints.architecture_boundaries",
+        "context.agent_instructions.hierarchical",
+        "context.task_workflows",
+      ],
+      autonomous: [
+        "context.contribution_workflow",
+        "conventions.ci_enforced",
+        "feedback.agent_effectiveness",
+        "feedback.ci.security",
+        "feedback.ci.tests",
+      ],
+    });
+  });
+
+  it("encodes the canonical examples from the roadmap", () => {
+    expect(ruleById.get("feedback.tests.available")).toMatchObject({
+      pillar: "feedback",
+      required_from: "foundational",
+      severity: "required",
+      evidence: { any: ["command.test"] },
+    });
+    expect(ruleById.get("context.agent_instructions")).toMatchObject({
+      pillar: "context",
+      required_from: "structured",
+      remediation: { classification: "automatable" },
+    });
+    expect(ruleById.get("constraints.architecture_boundaries")).toMatchObject({
+      required_from: "optimized",
+      evaluation: { on_missing: "unknown" },
+      remediation: { classification: "human-required" },
+    });
+  });
+
+  it("only treats missing evidence as unknown for human-required policy", () => {
+    const unknownRules = (bundle.rules as Rule[]).filter(
+      (r) => (r.evaluation as { on_missing: string }).on_missing === "unknown",
+    );
+    expect(unknownRules.map((r) => r.id)).toEqual([
+      "constraints.agent_permissions",
+      "constraints.architecture_boundaries",
+      "feedback.agent_effectiveness",
+    ]);
+  });
+
+  it("rejects an unknown evaluation policy on automatable remediation", () => {
+    const files = coveringRules();
+    files[2].data.rules[0].remediation = { classification: "assisted", summary: "x" };
+    expect(validate(sourceWith(files))).toContain(
+      "rule constraints.a: on_missing 'unknown' requires human-required remediation",
+    );
+  });
+
+  it("references only evidence declared in the vocabulary", () => {
+    const declared = new Set(bundle.evidence.map((e: { id: string }) => e.id));
+    for (const r of bundle.rules as Rule[]) {
+      for (const ref of [...expressionRefs(r.evidence), ...expressionRefs(r.applies_when)]) {
+        expect(declared.has(ref), `${r.id} -> ${ref}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe("spec/README.md", () => {
+  it("documents every required rule in the maturity table", () => {
+    const readme = readFileSync(path.join(DIST_DIR, "..", "README.md"), "utf8");
+    const bundle = assemble(loadSource());
+    for (const r of bundle.rules as Rule[]) {
+      if (r.severity === "required") expect(readme, r.id).toContain(`\`${r.id}\``);
+    }
   });
 });

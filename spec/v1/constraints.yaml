@@ -1,0 +1,61 @@
+# Constraints pillar: what agents must not do.
+# Security-specific constraints live in security.yaml.
+kind: agent-ready.rules
+scope:
+  pillar: constraints
+
+rules:
+  - id: constraints.architecture_boundaries
+    pillar: constraints
+    title: Important architecture boundaries are explicit and machine-checkable
+    description: >-
+      Module dependency boundaries are declared in a tool that enforces them
+      (import-linter, dependency-cruiser, eslint boundary rules, ArchUnit, depguard).
+    rationale: >-
+      Architectural rules such as "the frontend must not import backend modules"
+      are what agents violate most confidently. At the Optimized level they must be
+      stated upfront and be verifiable, not just described.
+    required_from: optimized
+    severity: required
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [config.architecture_boundaries, config.architecture_boundaries_declared]
+    evaluation:
+      on_missing: unknown
+      unknown_reason: >-
+        Architecture boundaries are project/team policy. The absence of an
+        enforcement configuration does not show that a repository has no
+        boundaries, and they cannot be inferred safely from code.
+    remediation:
+      classification: human-required
+      summary: Declare the boundaries in a dependency-enforcement tool so agents get feedback when they cross them.
+      decision: Which modules or layers may depend on which, and which dependencies are forbidden.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-5/05-monorepo-and-large-codebases.mdx
+
+  - id: constraints.documented
+    pillar: constraints
+    title: Off-limits areas and prohibitions are stated
+    description: >-
+      The agent instruction file states what the agent must not do: files or areas
+      not to modify, and prohibited actions or approaches.
+    rationale: >-
+      Without explicit constraints, agents will cheerfully modify files they should
+      not touch or take approaches that violate team policy.
+    required_from: structured
+    severity: required
+    depends_on: [context.agent_instructions]
+    evidence:
+      any: [agent.instructions.constraints, agent.instructions.prohibitions]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Add a "Do / Do NOT" section to the agent instruction file.
+      decision: Which files, areas, dependencies, and actions are off-limits for agents.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-3/02-anatomy-of-claude-md.mdx

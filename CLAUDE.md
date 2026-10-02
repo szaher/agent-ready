@@ -14,9 +14,11 @@ pnpm test -- --grep "theme"   # Run tests matching pattern
 
 pnpm lint                     # ESLint
 pnpm validate                 # Content quality gates (specs, MDX, links, citations, a11y)
+pnpm spec:check               # Validate the Agent Ready Spec and its generated bundle
+pnpm spec:build               # Regenerate spec/dist after editing spec/v1/*.yaml
 ```
 
-Run `pnpm validate`, `pnpm test`, `pnpm lint`, and `pnpm build` before considering any task done.
+Run `pnpm validate`, `pnpm spec:check`, `pnpm test`, `pnpm lint`, and `pnpm build` before considering any task done.
 
 ## Code Style
 
@@ -43,6 +45,9 @@ content/
 prompts/                   # Staged generation prompts (curriculum, lessons, quizzes)
   schemas/                 # JSON Schema contracts
 presentations/             # Marp slide decks
+spec/                      # Agent Ready Spec (normative machine contract; see spec/README.md)
+  v1/*.yaml                # Authored rules, evidence vocabulary, maturity model
+  dist/                    # Generated canonical JSON bundle — never edit by hand
 scripts/
   validate.mjs             # Content quality gates
   build-static.mjs         # Reversible static export builder
@@ -68,6 +73,7 @@ Data flow: Filesystem (`content/`) → `curriculum.ts` → Server Components →
 - Do NOT use `MermaidDiagram` in presentation decks — use `<div class="mermaid">`.
 - Do NOT invent citations or state versions/prices/popularity without fresh evidence.
 - Do NOT install packages without discussing first.
+- Do NOT hand-edit `spec/dist/`; edit `spec/v1/*.yaml` and run `pnpm spec:build`. Spec changes follow the versioning policy in `spec/README.md`.
 - Do NOT hardcode academy display text — it belongs in `academy.config.ts`.
 - Escape `${{ }}` as `\${{ }}` inside MDX CodeBlock template literals (GitHub Actions syntax breaks MDX).
 - Mark uncertain factual claims with `VerifyClaim` instead of presenting them as facts.

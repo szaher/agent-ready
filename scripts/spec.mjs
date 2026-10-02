@@ -15,10 +15,10 @@ import {
 } from "../spec/tools/agentReadySpec.mjs";
 
 const OPTIONS = {
-  // Coverage (every pillar has rules, every level is gated) is enforced once
-  // the initial requirements land; the model-only state has no rules yet.
-  requireCoverage: false,
-  requireBundle: false,
+  // Every pillar has rules and every maturity level above 0 is gated.
+  requireCoverage: true,
+  // The generated bundle is the downstream contract and must never drift.
+  requireBundle: true,
 };
 
 const mode = process.argv[2];
@@ -56,7 +56,7 @@ if (mode === "build") {
   process.exit(0);
 }
 
-if (OPTIONS.requireBundle || existing.length) {
+if (OPTIONS.requireBundle) {
   const stale = [];
   if (existing.length !== 1 || existing[0] !== name) {
     stale.push(`expected exactly spec/dist/${name}, found [${existing.join(", ")}]`);

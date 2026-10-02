@@ -1,0 +1,168 @@
+# Security dimension: cross-cutting rules that belong to a pillar (mostly
+# constraints) and carry `dimension: security`.
+#
+# Deliberately not machine rules in v1, because they cannot be established from
+# repository content alone: branch protection (needs the hosting API),
+# least-privilege review of agent permissions, identifiable agent commits,
+# CI parity between agent and human PRs, and transcript retention.
+kind: agent-ready.rules
+scope:
+  dimension: security
+
+rules:
+  - id: constraints.agent_permissions
+    pillar: constraints
+    dimension: security
+    title: Agent permissions are configured in the repository
+    description: The repository commits an agent permission or sandbox configuration.
+    rationale: >-
+      Prompts ask, permissions enforce. A committed project-level permission
+      configuration gives every contributor's agent the same baseline guardrails.
+    required_from: optimized
+    severity: recommended
+    evidence:
+      any: [agent.permissions]
+    evaluation:
+      on_missing: unknown
+      unknown_reason: >-
+        Agent permissions may be enforced at user or organization scope, outside
+        the repository, so their absence here does not show they are missing.
+    remediation:
+      classification: human-required
+      summary: Commit a project-level agent permission configuration with least-privilege defaults.
+      decision: Which tools, commands, and paths agents may use in this repository.
+    sources:
+      - content/module-4/03-agent-tools-and-permissions.mdx
+      - content/module-7/02-permission-models.mdx
+      - content/module-10/03-security-audit.mdx
+
+  - id: constraints.agent_secrets_policy
+    pillar: constraints
+    dimension: security
+    title: Instructions address secrets handling
+    description: The agent instruction file states how secrets and credentials must be handled.
+    rationale: The security audit checklist asks that instruction files explicitly forbid reading or referencing secrets.
+    required_from: structured
+    severity: advisory
+    depends_on: [context.agent_instructions]
+    evidence:
+      any: [agent.instructions.secrets_policy]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Add a secrets rule to the instruction file, for example never read or print `.env` files or credentials.
+    sources:
+      - content/module-10/03-security-audit.mdx
+
+  - id: constraints.mcp.no_inline_secrets
+    pillar: constraints
+    dimension: security
+    title: Committed MCP configuration has no inline secrets
+    description: >-
+      Project MCP configuration references credentials through environment
+      variables rather than embedding them.
+    rationale: >-
+      MCP configuration is committed and shared. A literal token there leaks to
+      every clone and to every agent context that reads the file.
+    required_from: structured
+    severity: required
+    applies_when:
+      any: [file.mcp_config]
+    evidence:
+      none: [mcp.inline_secrets]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Replace literal credentials with environment-variable references and rotate the exposed values.
+      decision: Which credentials were exposed and how to rotate them.
+    sources:
+      - content/module-6/05-mcp-in-production.mdx
+      - content/module-10/03-security-audit.mdx
+
+  - id: constraints.secrets.ignored
+    pillar: constraints
+    dimension: security
+    title: Environment files are ignored
+    description: The root `.gitignore` ignores `.env` files.
+    rationale: Ignoring environment files prevents the most common way secrets enter version control.
+    required_from: structured
+    severity: required
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [security.env_ignored]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: automatable
+      summary: Add `.env` and `.env.*` (keeping example templates) to `.gitignore`.
+    sources:
+      - content/module-7/05-designing-your-safety-framework.mdx
+      - content/module-10/03-security-audit.mdx
+
+  - id: constraints.secrets.scanning
+    pillar: constraints
+    dimension: security
+    title: Secret scanning is configured
+    description: A secret scanner runs as a Git hook or in CI, or has a committed configuration.
+    rationale: Agents generate and move a lot of text. Automated secret scanning catches leaks before they are pushed.
+    required_from: optimized
+    severity: recommended
+    evidence:
+      any: [config.secret_scanning, config.secret_scanning_hook, ci.runs_security]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Add a secret-scanning pre-commit hook or CI job.
+    sources:
+      - content/module-10/03-security-audit.mdx
+
+  - id: constraints.secrets.untracked
+    pillar: constraints
+    dimension: security
+    title: No secret-bearing files are tracked
+    description: >-
+      No `.env` files, private keys, or keystores are tracked by version control
+      (documented templates and test fixtures excluded).
+    rationale: >-
+      Committed secrets are readable by every agent session and every clone, and
+      they persist in history after deletion.
+    required_from: structured
+    severity: required
+    evidence:
+      none: [security.tracked_secret_files]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Stop tracking the files, rotate any exposed secrets, and consider purging them from history.
+      decision: Whether each file holds real secrets, and how exposed values are rotated.
+    sources:
+      - content/module-10/03-security-audit.mdx
+
+  - id: feedback.ci.security
+    pillar: feedback
+    dimension: security
+    title: CI runs security checks
+    description: Continuous integration runs a security scanner (SAST, dependency, or secret scanning).
+    rationale: >-
+      The Autonomous level requires automated review gates that validate security,
+      not just correctness.
+    required_from: autonomous
+    severity: required
+    applies_when:
+      any: [project.language]
+    evidence:
+      any: [ci.runs_security]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Add a security scanning job (for example CodeQL, Semgrep, Trivy, or a dependency audit) to CI.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/02-ci-cd-integration.mdx
+      - content/module-10/03-security-audit.mdx

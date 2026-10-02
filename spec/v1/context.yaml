@@ -1,0 +1,251 @@
+# Context pillar: what the project is, how it is structured, and why.
+# Rules are sorted by id. Rules that carry a dimension live in that dimension's file.
+kind: agent-ready.rules
+scope:
+  pillar: context
+
+rules:
+  - id: context.agent_instructions
+    pillar: context
+    title: Agent instructions available
+    description: >-
+      The repository has an agent instruction file that agents read first:
+      AGENTS.md, CLAUDE.md, GitHub Copilot instructions, Cursor rules, or GEMINI.md.
+    rationale: >-
+      Agents have no institutional memory. The instruction file is the single
+      highest-leverage artifact for orienting them, and its presence is the
+      defining step from Foundational to Structured.
+    required_from: structured
+    severity: required
+    evidence:
+      any:
+        - file.agents_md
+        - file.claude_md
+        - file.copilot_instructions
+        - file.cursor_rules
+        - file.gemini_md
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: automatable
+      summary: Generate a managed AGENTS.md (or equivalent) section from discovered repository facts.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-3/01-why-claude-md.mdx
+
+  - id: context.agent_instructions.commands
+    pillar: context
+    title: Instructions document build and test commands
+    description: The agent instruction file has a section telling the agent how to build, test, and lint.
+    rationale: >-
+      Exact, runnable commands are the most frequently needed instruction. Without
+      them the agent guesses, and guessing breaks the feedback loop.
+    required_from: structured
+    severity: required
+    depends_on: [context.agent_instructions]
+    evidence:
+      any: [agent.instructions.commands]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: automatable
+      summary: Generate a commands section from the repository's discovered build, test, lint, and typecheck commands.
+    sources:
+      - content/module-3/02-anatomy-of-claude-md.mdx
+      - content/module-3/03-writing-effective-instructions.mdx
+
+  - id: context.agent_instructions.hierarchical
+    pillar: context
+    title: Scoped instructions for multi-package repositories
+    description: >-
+      Repositories organized as multi-package workspaces provide instruction files
+      scoped to sub-areas in addition to the root file.
+    rationale: >-
+      A single root file cannot carry package-specific conventions without wasting
+      context on every task. Scoped files load only where they apply.
+    required_from: optimized
+    severity: required
+    depends_on: [context.agent_instructions]
+    applies_when:
+      any: [project.workspace_manifest, project.workspace_declared]
+    evidence:
+      any: [agent.instructions.nested]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Scaffold per-package instruction files. Package owners supply their package-specific guidance.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-3/04-scoping-instructions.mdx
+      - content/module-5/05-monorepo-and-large-codebases.mdx
+      - content/module-8/05-context-at-scale.mdx
+
+  - id: context.architecture
+    pillar: context
+    title: Architecture is described
+    description: >-
+      Project structure and architecture are described, either in a dedicated
+      architecture document or in a section of the agent instruction file.
+    rationale: >-
+      Agents can read code but not the intent behind it. An architecture overview
+      prevents changes that work locally but violate the system's shape.
+    required_from: structured
+    severity: required
+    evidence:
+      any: [documentation.architecture, agent.instructions.architecture]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: >-
+        Tooling can scaffold a structure map from the directory layout. A human
+        must describe components, data flow, and key decisions.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-3/02-anatomy-of-claude-md.mdx
+
+  - id: context.codeowners
+    pillar: context
+    title: Code ownership is mapped
+    description: A CODEOWNERS file maps paths to the people or teams responsible for them.
+    rationale: >-
+      Ownership tells agents (and reviewers) whose conventions apply to an area and
+      who must approve changes there. It matters most in large codebases.
+    required_from: optimized
+    severity: advisory
+    evidence:
+      any: [file.codeowners]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Add a CODEOWNERS file.
+      decision: Which people or teams own which paths.
+    sources:
+      - content/module-5/05-monorepo-and-large-codebases.mdx
+
+  - id: context.contribution_workflow
+    pillar: context
+    title: End-to-end contribution workflow is documented
+    description: >-
+      The path from change to merged pull request is documented, either in a
+      contributing guide section or in a pull request template.
+    rationale: >-
+      Autonomous agents drive features from issue to pull request. They need the
+      same documented workflow a new contributor would.
+    required_from: autonomous
+    severity: required
+    evidence:
+      any: [documentation.contributing_workflow, file.pull_request_template]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Scaffold a pull request template and a CONTRIBUTING workflow section. Maintainers confirm the actual process.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/01-agent-workflows.mdx
+
+  - id: context.decisions
+    pillar: context
+    title: Architecture decisions are recorded
+    description: Key architecture decisions are recorded as decision records (ADRs).
+    rationale: >-
+      Decision records explain why the code is the way it is, which stops agents
+      from "fixing" deliberate trade-offs.
+    required_from: optimized
+    severity: recommended
+    evidence:
+      any: [documentation.adr]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Start a docs/adr/ directory and record significant decisions.
+      decision: Which past and future decisions are significant enough to record.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-5/04-documentation-as-context.mdx
+
+  - id: context.issue_templates
+    pillar: context
+    title: Structured issue templates
+    description: Issue templates structure how requirements are written.
+    rationale: >-
+      At the Autonomous level agents read issue descriptions directly. Structured
+      templates make requirements consistent enough to act on.
+    required_from: autonomous
+    severity: recommended
+    evidence:
+      any: [file.issue_templates]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: automatable
+      summary: Add bug-report and feature-request issue templates.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: context.readme
+    pillar: context
+    title: README present
+    description: The repository has a README at its root.
+    rationale: The README is the first place both humans and agents look to learn what a project is.
+    required_from: foundational
+    severity: required
+    evidence:
+      any: [file.readme]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Scaffold a README skeleton. A human writes the project's purpose.
+    sources:
+      - content/module-1/02-what-is-agent-ready.mdx
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: context.readme.setup
+    pillar: context
+    title: README explains setup and usage
+    description: The README has a section explaining how to install, set up, build, or use the project.
+    rationale: >-
+      The course defines Foundational as "a README with accurate setup
+      instructions". Agents follow it to get a working checkout.
+    required_from: foundational
+    severity: required
+    depends_on: [context.readme]
+    evidence:
+      any: [documentation.readme_setup]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: assisted
+      summary: Add a setup section built from discovered install, build, and test commands. A human verifies it.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+
+  - id: context.task_workflows
+    pillar: context
+    title: Common tasks are documented as workflows
+    description: >-
+      Common development tasks are documented step by step, as a workflow section
+      in the instruction file or as repository agent skills or commands.
+    rationale: >-
+      Step-by-step task guidance is what moves agents from following conventions
+      to completing complex, multi-step tasks reliably.
+    required_from: optimized
+    severity: required
+    evidence:
+      any: [agent.instructions.workflows, agent.skills]
+    evaluation:
+      on_missing: fail
+    remediation:
+      classification: human-required
+      summary: Document the most common development tasks as step-by-step workflows or repository skills.
+      decision: Which tasks are common enough to document, and the steps the team actually follows.
+    sources:
+      - content/module-1/03-agent-ready-maturity-model.mdx
+      - content/module-9/01-agent-workflows.mdx
