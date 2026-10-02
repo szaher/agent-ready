@@ -1,0 +1,1073 @@
+# Agent Ready Spec v1 — evidence vocabulary.
+#
+# Evidence is a fact an assessor can establish deterministically from the
+# repository: its files, their contents, and version-control metadata. Rules
+# refer to evidence by id. Detections are declarative wherever possible
+# (path / heading / content). A `derived` detection gives a precise prose
+# definition for facts that need ecosystem knowledge, for example how a test
+# command is discovered.
+#
+# v1 evidence is repository-scoped by design. Workstation state (installed tools,
+# local metrics, credentials) is never evidence, so the same repository content
+# plus the same spec always produce the same assessment.
+#
+# Entries are sorted by id. Path globs follow `path_matching` in spec.yaml.
+kind: agent-ready.evidence
+
+x-agent-instruction-files: &agent_instruction_files
+  - file.agents_md
+  - file.claude_md
+  - file.copilot_instructions
+  - file.cursor_rules
+  - file.gemini_md
+
+evidence:
+  - id: agent.instructions.architecture
+    category: agent
+    title: Instructions describe architecture
+    description: An agent instruction file has a section describing project structure or architecture.
+    detection:
+      kind: heading
+      in: *agent_instruction_files
+      patterns:
+        - architecture
+        - structure
+        - layout
+        - overview
+        - organi[sz]ation
+        - design
+        - components
+        - modules
+        - data flow
+        - how it works
+
+  - id: agent.instructions.commands
+    category: agent
+    title: Instructions document commands
+    description: An agent instruction file has a section documenting how to build, test, lint, or run the project.
+    detection:
+      kind: heading
+      in: *agent_instruction_files
+      patterns:
+        - command
+        - build
+        - test
+        - lint
+        - develop
+        - getting started
+        - setup
+        - verif
+        - check
+        - \brun
+
+  - id: agent.instructions.concise
+    category: agent
+    title: Root instructions are concise
+    description: Root-level agent instruction files stay within a context-friendly size.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied when at least one of `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`
+        exists at the repository root and every one of those root files that
+        exists has at most 100 non-blank lines. 100 lines is the upper bound
+        the course gives for complex systems. Smaller projects should aim lower.
+
+  - id: agent.instructions.constraints
+    category: agent
+    title: Instructions state constraints
+    description: An agent instruction file has a section stating rules, prohibitions, or boundaries.
+    detection:
+      kind: heading
+      in: *agent_instruction_files
+      patterns:
+        - "don'?t"
+        - do not
+        - never
+        - must not
+        - constraint
+        - rule
+        - boundar
+        - restriction
+        - guardrail
+        - forbidden
+        - off-limits
+        - safety
+        - caution
+        - avoid
+        - permission
+
+  - id: agent.instructions.conventions
+    category: agent
+    title: Instructions document conventions
+    description: An agent instruction file has a section documenting code style or conventions.
+    detection:
+      kind: heading
+      in: *agent_instruction_files
+      patterns:
+        - convention
+        - style
+        - pattern
+        - standard
+        - guideline
+        - idiom
+        - naming
+        - best practice
+
+  - id: agent.instructions.examples
+    category: agent
+    title: Instructions point to exemplars
+    description: An agent instruction file has a section pointing to examples or reference implementations to follow.
+    detection:
+      kind: heading
+      in: *agent_instruction_files
+      patterns:
+        - example
+        - exemplar
+        - reference implementation
+        - pattern to follow
+        - follow this
+        - canonical
+        - template
+
+  - id: agent.instructions.file_pointers
+    category: agent
+    title: Instructions point to concrete paths
+    description: Agent instructions tell the agent where code lives instead of leaving it to search.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied when the agent instruction files matched by file.agents_md,
+        file.claude_md, file.copilot_instructions, file.cursor_rules, and
+        file.gemini_md together reference at least two distinct repository-relative
+        paths that exist in the worktree. A reference is the text of an inline code
+        span or a Markdown link target that contains `/` or a file extension. After
+        removing a leading `./`, a trailing `/`, and any `#fragment`, it must name an
+        existing file or directory. URLs, absolute paths, and paths containing `..`
+        are not references.
+
+  - id: agent.instructions.nested
+    category: agent
+    title: Scoped instruction files
+    description: Instruction files exist below the repository root and scope guidance to specific areas.
+    detection:
+      kind: path
+      paths:
+        - "*/**/AGENTS.md"
+        - "*/**/CLAUDE.md"
+        - "*/**/GEMINI.md"
+        - .github/instructions/*.instructions.md
+
+  - id: agent.instructions.prohibitions
+    category: agent
+    title: Instructions list prohibitions
+    description: An agent instruction file contains explicit prohibition bullets ("Do not …", "Never …").
+    detection:
+      kind: content
+      in: *agent_instruction_files
+      patterns:
+        - "^\\s*([-*+]|\\d+\\.)\\s+(\\*\\*|__)?(do not|don't|never|must not|avoid)\\b"
+
+  - id: agent.instructions.secrets_policy
+    category: agent
+    title: Instructions address secrets
+    description: An agent instruction file mentions how secrets and credentials must be handled.
+    detection:
+      kind: content
+      in: *agent_instruction_files
+      patterns:
+        - secret
+        - credential
+        - \.env\b
+        - api[ _-]?key
+        - private key
+        - password
+
+  - id: agent.instructions.workflows
+    category: agent
+    title: Instructions document task workflows
+    description: An agent instruction file documents common tasks as step-by-step workflows.
+    detection:
+      kind: heading
+      in: *agent_instruction_files
+      patterns:
+        - workflow
+        - how to
+        - common task
+        - recipe
+        - playbook
+        - procedure
+        - step[- ]by[- ]step
+        - adding a
+        - adding new
+        - checklist
+
+  - id: agent.permissions
+    category: agent
+    title: Committed agent permission configuration
+    description: The repository commits an agent permission or sandbox configuration.
+    detection:
+      kind: content
+      paths:
+        - .claude/settings.json
+        - .codex/config.toml
+      patterns:
+        - '"permissions"\s*:'
+        - ^\s*(sandbox_mode|approval_policy)\s*=
+
+  - id: agent.skills
+    category: agent
+    title: Repository agent skills or commands
+    description: The repository ships reusable agent skills, slash commands, or prompt files for common tasks.
+    detection:
+      kind: path
+      paths:
+        - .claude/skills/*/SKILL.md
+        - .agents/skills/*/SKILL.md
+        - .codex/skills/*/SKILL.md
+        - .github/skills/*/SKILL.md
+        - .claude/commands/*.md
+        - .github/prompts/*.prompt.md
+
+  - id: ci.config
+    category: ci
+    title: CI configuration
+    description: A continuous-integration configuration file exists.
+    detection:
+      kind: path
+      paths:
+        - .github/workflows/*.yml
+        - .github/workflows/*.yaml
+        - .gitlab-ci.yml
+        - .circleci/config.yml
+        - Jenkinsfile
+        - azure-pipelines.yml
+        - .buildkite/pipeline.yml
+        - bitbucket-pipelines.yml
+        - .travis.yml
+        - .woodpecker.yml
+        - .drone.yml
+
+  - id: ci.runs_lint
+    category: ci
+    title: CI runs lint or format checks
+    description: A CI configuration line references a linter, formatter check, or aggregate check target.
+    detection:
+      kind: content
+      in: [ci.config]
+      patterns:
+        - \blint
+        - eslint
+        - ruff
+        - golangci
+        - clippy
+        - flake8
+        - pylint
+        - rubocop
+        - biome
+        - prettier
+        - gofmt
+        - shellcheck
+        - stylelint
+        - pre-commit run
+        - make check
+
+  - id: ci.runs_security
+    category: ci
+    title: CI runs security checks
+    description: A CI configuration line references a security scanner (SAST, dependency, or secret scanning).
+    detection:
+      kind: content
+      in: [ci.config]
+      patterns:
+        - codeql
+        - semgrep
+        - trivy
+        - gitleaks
+        - trufflehog
+        - detect-secrets
+        - snyk
+        - osv-scanner
+        - dependency-review
+        - bandit
+        - gosec
+        - grype
+        - npm audit
+        - pnpm audit
+        - yarn audit
+        - pip-audit
+        - cargo audit
+        - cargo deny
+        - govulncheck
+        - zizmor
+
+  - id: ci.runs_tests
+    category: ci
+    title: CI runs tests
+    description: A CI configuration line references running tests.
+    detection:
+      kind: content
+      in: [ci.config]
+      patterns:
+        - \btest
+        - pytest
+        - unittest
+        - vitest
+        - jest
+        - ctest
+        - \btox\b
+        - \bnox\b
+        - make check
+
+  - id: command.build
+    category: command
+    title: Build command
+    description: A build or compile command is discoverable from repository metadata.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied by any of: a `build` script in root `package.json`; a `build`
+        target in a root `Makefile`, `makefile`, `GNUmakefile`, or `justfile`; a root
+        `go.mod` (`go build ./...`); a root `Cargo.toml` (`cargo build`); a root
+        `gradlew`, `build.gradle`, `build.gradle.kts`, `mvnw`, or `pom.xml`; a root
+        `CMakeLists.txt` (`cmake --build`); a root `Package.swift` (`swift build`);
+        a `[build-system]` table in root `pyproject.toml` (`python -m build`).
+
+  - id: command.format
+    category: command
+    title: Format command
+    description: A formatting command is discoverable from repository metadata.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied by any of: a `format` or `fmt` script in root `package.json`; a
+        `format` or `fmt` target in a root Makefile or `justfile`; a root `go.mod`
+        (`gofmt`); a root `Cargo.toml` (`cargo fmt`); `ruff` or `black` declared in
+        root `pyproject.toml`.
+
+  - id: command.lint
+    category: command
+    title: Lint command
+    description: A lint command is discoverable from repository metadata.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied by any of: a `lint` script in root `package.json`; a `lint`
+        target in a root Makefile or `justfile`; a root `Cargo.toml`
+        (`cargo clippy`); `ruff`, `flake8`, or `pylint` declared in root
+        `pyproject.toml`.
+
+  - id: command.test
+    category: command
+    title: Test command
+    description: A single test command is discoverable from repository metadata.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied by any of: a `test` script in root `package.json` or
+        `composer.json`; a `test` or `check` target in a root `Makefile`,
+        `makefile`, `GNUmakefile`, or `justfile`; a root `go.mod` (`go test ./...`);
+        a root `Cargo.toml` (`cargo test`); `pytest` declared in root
+        `pyproject.toml`, `setup.cfg`, `tox.ini`, or `requirements*.txt`, or a root
+        `pytest.ini` or `conftest.py`; a root `tox.ini` or `noxfile.py`; a root
+        `gradlew`, `build.gradle`, `build.gradle.kts`, `mvnw`, or `pom.xml`; a root
+        `CMakeLists.txt` containing `enable_testing` or `add_test`; a root
+        `Package.swift` (`swift test`); a root `Rakefile` or `.rspec`. Assessors
+        report the discovered command but never execute it.
+
+  - id: command.typecheck
+    category: command
+    title: Typecheck command
+    description: A type-checking command is discoverable from repository metadata.
+    detection:
+      kind: derived
+      definition: >-
+        Satisfied by any of: a `typecheck` or `type-check` script in root
+        `package.json`; a `typecheck` or `type-check` target in a root Makefile or
+        `justfile`; `mypy`, `pyright`, or `basedpyright` declared in root
+        `pyproject.toml`.
+
+  - id: config.architecture_boundaries
+    category: config
+    title: Architecture boundary configuration file
+    description: A dedicated dependency-boundary enforcement configuration exists.
+    detection:
+      kind: path
+      paths:
+        - .importlinter
+        - .dependency-cruiser.js
+        - .dependency-cruiser.cjs
+        - .dependency-cruiser.mjs
+        - .dependency-cruiser.json
+        - .dependency-cruiser.ts
+
+  - id: config.architecture_boundaries_declared
+    category: config
+    title: Architecture boundary rules declared in tool configuration
+    description: A build or lint configuration declares module-boundary enforcement.
+    detection:
+      kind: content
+      paths:
+        - pyproject.toml
+        - setup.cfg
+        - package.json
+        - eslint.config.*
+        - .eslintrc
+        - .eslintrc.*
+        - pom.xml
+        - build.gradle
+        - build.gradle.kts
+        - .golangci.yml
+        - .golangci.yaml
+        - .golangci.toml
+      patterns:
+        - \[tool\.importlinter
+        - \[importlinter
+        - dependency-cruiser
+        - eslint-plugin-boundaries
+        - import/no-restricted-paths
+        - enforce-module-boundaries
+        - archunit
+        - depguard
+
+  - id: config.formatter
+    category: config
+    title: Formatter configuration
+    description: A formatter configuration file exists.
+    detection:
+      kind: path
+      paths:
+        - .prettierrc
+        - .prettierrc.*
+        - prettier.config.*
+        - biome.json
+        - biome.jsonc
+        - rustfmt.toml
+        - .rustfmt.toml
+        - .clang-format
+        - dprint.json
+        - .editorconfig
+
+  - id: config.git_hooks
+    category: config
+    title: Git hook configuration
+    description: Pre-commit or pre-push hooks are configured in the repository.
+    detection:
+      kind: path
+      paths:
+        - .pre-commit-config.yaml
+        - .pre-commit-config.yml
+        - .husky/pre-commit
+        - .husky/pre-push
+        - lefthook.yml
+        - lefthook.yaml
+        - .lefthook.yml
+        - .lintstagedrc
+        - .lintstagedrc.*
+        - lint-staged.config.*
+        - .githooks/pre-commit
+
+  - id: config.linter
+    category: config
+    title: Linter configuration file
+    description: A linter configuration file exists.
+    detection:
+      kind: path
+      paths:
+        - .eslintrc
+        - .eslintrc.*
+        - eslint.config.*
+        - biome.json
+        - biome.jsonc
+        - .golangci.yml
+        - .golangci.yaml
+        - .golangci.toml
+        - ruff.toml
+        - .ruff.toml
+        - .flake8
+        - .pylintrc
+        - pylintrc
+        - clippy.toml
+        - .clippy.toml
+        - .rubocop.yml
+        - phpcs.xml
+        - phpcs.xml.dist
+        - .swiftlint.yml
+        - checkstyle.xml
+        - .shellcheckrc
+
+  - id: config.linter_declared
+    category: config
+    title: Linter declared in project configuration
+    description: A linter is configured inside a shared project configuration file.
+    detection:
+      kind: content
+      paths:
+        - pyproject.toml
+        - setup.cfg
+        - tox.ini
+        - package.json
+      patterns:
+        - \[tool\.(ruff|pylint|flake8)
+        - ^\s*\[flake8\]
+        - '"eslintConfig"\s*:'
+        - '"eslint"\s*:'
+        - '"@biomejs/biome"\s*:'
+
+  - id: config.python_typecheck
+    category: config
+    title: Python type checker configuration file
+    description: A mypy or pyright configuration file exists.
+    detection:
+      kind: path
+      paths:
+        - mypy.ini
+        - .mypy.ini
+        - pyrightconfig.json
+
+  - id: config.python_typecheck_declared
+    category: config
+    title: Python type checker declared in project configuration
+    description: mypy, pyright, or basedpyright is configured in `pyproject.toml` or `setup.cfg`.
+    detection:
+      kind: content
+      paths:
+        - pyproject.toml
+        - setup.cfg
+      patterns:
+        - ^\s*\[tool\.(mypy|pyright|basedpyright)\]
+        - ^\s*\[mypy\]
+
+  - id: config.python_typecheck_strict
+    category: config
+    title: Strict Python type checking
+    description: A Python type checker is configured in strict mode.
+    detection:
+      kind: content
+      paths:
+        - pyproject.toml
+        - setup.cfg
+        - mypy.ini
+        - .mypy.ini
+        - pyrightconfig.json
+      patterns:
+        - ^\s*strict\s*=\s*true
+        - typeCheckingMode"?\s*[:=]\s*"strict"
+
+  - id: config.secret_scanning
+    category: config
+    title: Secret scanner configuration
+    description: A secret-scanning tool configuration or baseline is committed.
+    detection:
+      kind: path
+      paths:
+        - .gitleaks.toml
+        - .secrets.baseline
+        - .ggshield.yaml
+        - .secretlintrc.json
+
+  - id: config.secret_scanning_hook
+    category: config
+    title: Secret scanning hook
+    description: A Git hook configuration runs a secret scanner.
+    detection:
+      kind: content
+      paths:
+        - .pre-commit-config.yaml
+        - .pre-commit-config.yml
+        - lefthook.yml
+        - lefthook.yaml
+        - .husky/pre-commit
+      patterns:
+        - gitleaks
+        - detect-secrets
+        - trufflehog
+        - ggshield
+        - secretlint
+
+  - id: config.tsconfig
+    category: config
+    title: TypeScript configuration
+    description: A root `tsconfig.json` enables TypeScript type checking.
+    detection:
+      kind: path
+      paths:
+        - tsconfig.json
+
+  - id: config.tsconfig_strict
+    category: config
+    title: Strict TypeScript
+    description: TypeScript strict mode is enabled.
+    detection:
+      kind: content
+      paths:
+        - tsconfig.json
+        - tsconfig.base.json
+      patterns:
+        - '"strict"\s*:\s*true'
+
+  - id: documentation.adr
+    category: documentation
+    title: Architecture decision records
+    description: Architecture decisions are recorded in a decision-record directory.
+    detection:
+      kind: path
+      paths:
+        - docs/adr/*.md
+        - docs/adrs/*.md
+        - docs/ADR/*.md
+        - docs/decisions/*.md
+        - docs/architecture/decisions/*.md
+        - doc/adr/*.md
+        - adr/*.md
+        - decisions/*.md
+
+  - id: documentation.architecture
+    category: documentation
+    title: Architecture documentation
+    description: A dedicated architecture or design document exists.
+    detection:
+      kind: path
+      paths:
+        - ARCHITECTURE.md
+        - DESIGN.md
+        - docs/ARCHITECTURE.md
+        - docs/architecture.md
+        - docs/architecture/*.md
+        - docs/DESIGN.md
+        - docs/design.md
+        - docs/design/*.md
+        - doc/architecture.md
+
+  - id: documentation.contributing_conventions
+    category: documentation
+    title: Contributing guide documents conventions
+    description: The contributing guide has a section on code style or conventions.
+    detection:
+      kind: heading
+      in: [file.contributing]
+      patterns:
+        - style
+        - convention
+        - coding standard
+        - guideline
+        - naming
+        - pattern
+
+  - id: documentation.contributing_workflow
+    category: documentation
+    title: Contributing guide documents the change workflow
+    description: The contributing guide documents how a change goes from branch to merged pull request.
+    detection:
+      kind: heading
+      in: [file.contributing]
+      patterns:
+        - pull request
+        - \bprs?\b
+        - merge request
+        - workflow
+        - submitting
+        - development process
+        - making changes
+        - how to contribute
+        - review
+        - branch
+        - commit message
+
+  - id: documentation.conventions_file
+    category: documentation
+    title: Conventions document
+    description: A dedicated style guide or conventions document exists.
+    detection:
+      kind: path
+      paths:
+        - STYLEGUIDE.md
+        - STYLE_GUIDE.md
+        - STYLE.md
+        - CONVENTIONS.md
+        - docs/STYLEGUIDE.md
+        - docs/CONVENTIONS.md
+        - docs/style-guide.md
+        - docs/styleguide.md
+        - docs/style.md
+        - docs/conventions.md
+        - docs/coding-standards.md
+
+  - id: documentation.readme_setup
+    category: documentation
+    title: README explains setup and usage
+    description: The README has a section explaining installation, setup, development, or usage.
+    detection:
+      kind: heading
+      in: [file.readme]
+      patterns:
+        - install
+        - setup
+        - set up
+        - getting started
+        - quick ?start
+        - usage
+        - develop
+        - build
+        - running
+        - how to use
+        - requirements
+        - prerequisites
+
+  - id: file.agents_md
+    category: file
+    title: AGENTS.md
+    description: A tool-agnostic `AGENTS.md` instruction file at the repository root.
+    detection:
+      kind: path
+      paths: [AGENTS.md]
+
+  - id: file.claude_md
+    category: file
+    title: CLAUDE.md
+    description: A Claude Code `CLAUDE.md` project instruction file.
+    detection:
+      kind: path
+      paths: [CLAUDE.md, .claude/CLAUDE.md]
+
+  - id: file.codeowners
+    category: file
+    title: CODEOWNERS
+    description: A code ownership file maps paths to responsible owners.
+    detection:
+      kind: path
+      paths: [CODEOWNERS, .github/CODEOWNERS, docs/CODEOWNERS, .gitlab/CODEOWNERS]
+
+  - id: file.contributing
+    category: file
+    title: Contributing guide
+    description: A contributing guide exists.
+    detection:
+      kind: path
+      paths: [CONTRIBUTING.md, CONTRIBUTING, .github/CONTRIBUTING.md, docs/CONTRIBUTING.md]
+
+  - id: file.copilot_instructions
+    category: file
+    title: GitHub Copilot instructions
+    description: A repository-wide GitHub Copilot instruction file.
+    detection:
+      kind: path
+      paths: [.github/copilot-instructions.md]
+
+  - id: file.cursor_rules
+    category: file
+    title: Cursor rules
+    description: Cursor project rules.
+    detection:
+      kind: path
+      paths: [.cursorrules, .cursor/rules/*.mdc, .cursor/rules/*.md]
+
+  - id: file.gemini_md
+    category: file
+    title: GEMINI.md
+    description: A Gemini CLI `GEMINI.md` instruction file at the repository root.
+    detection:
+      kind: path
+      paths: [GEMINI.md]
+
+  - id: file.issue_templates
+    category: file
+    title: Issue templates
+    description: Structured issue templates help agents read requirements from issues.
+    detection:
+      kind: path
+      paths:
+        - .github/ISSUE_TEMPLATE/*.md
+        - .github/ISSUE_TEMPLATE/*.yml
+        - .github/ISSUE_TEMPLATE/*.yaml
+        - .gitlab/issue_templates/*.md
+
+  - id: file.mcp_config
+    category: file
+    title: Project MCP configuration
+    description: A project-scoped MCP server configuration is committed.
+    detection:
+      kind: path
+      paths: [.mcp.json, .cursor/mcp.json, .vscode/mcp.json]
+
+  - id: file.pull_request_template
+    category: file
+    title: Pull request template
+    description: A pull or merge request template exists.
+    detection:
+      kind: path
+      paths:
+        - .github/pull_request_template.md
+        - .github/PULL_REQUEST_TEMPLATE.md
+        - .github/PULL_REQUEST_TEMPLATE/*.md
+        - docs/pull_request_template.md
+        - pull_request_template.md
+        - .gitlab/merge_request_templates/*.md
+
+  - id: file.readme
+    category: file
+    title: README
+    description: A README at the repository root.
+    detection:
+      kind: path
+      paths: [README.md, README, README.rst, README.txt, README.adoc, Readme.md, readme.md]
+
+  - id: mcp.inline_secrets
+    category: mcp
+    title: Inline secrets in MCP configuration
+    description: >-
+      A committed MCP configuration contains what looks like a literal credential
+      rather than an environment-variable reference.
+    detection:
+      kind: content
+      in: [file.mcp_config]
+      patterns:
+        - '"[^"]*(api[_-]?key|token|secret|password|authorization)[^"]*"\s*:\s*"(?![^"]*[$][{(])(?![<{$])[^"]{8,}"'
+        - ghp_[a-z0-9]{20,}
+        - github_pat_[a-z0-9_]{20,}
+        - sk-[a-z0-9_-]{20,}
+        - xox[abposr]-[a-z0-9-]{10,}
+        - akia[a-z0-9]{16}
+
+  - id: metrics.evaluation_declared
+    category: metrics
+    title: Agent effectiveness tracking declared
+    description: Agent instructions or the contributing guide document how agent effectiveness is measured.
+    detection:
+      kind: heading
+      in:
+        - file.agents_md
+        - file.claude_md
+        - file.copilot_instructions
+        - file.cursor_rules
+        - file.gemini_md
+        - file.contributing
+      patterns:
+        - metric
+        - evaluation
+        - effectiveness
+        - success rate
+        - agent performance
+        - measur
+
+  - id: metrics.evaluation_suite
+    category: metrics
+    title: Agent evaluation suite
+    description: The repository commits an evaluation suite for agent or prompt behavior.
+    detection:
+      kind: path
+      paths:
+        - evals/**/*
+        - eval/**/*
+        - agent-evals/**/*
+        - promptfooconfig.yaml
+        - promptfooconfig.yml
+
+  - id: project.language
+    category: project
+    title: Source language detected
+    description: The repository contains source code in at least one recognized language.
+    detection:
+      kind: derived
+      definition: Satisfied when any `project.language.<name>` evidence in this vocabulary is satisfied.
+
+  - id: project.language.cpp
+    category: project
+    title: C/C++
+    description: C or C++ build metadata or sources.
+    detection:
+      kind: path
+      paths: [CMakeLists.txt, "**/*.c", "**/*.cc", "**/*.cpp", "**/*.hpp"]
+
+  - id: project.language.go
+    category: project
+    title: Go
+    description: Go module metadata or sources.
+    detection:
+      kind: path
+      paths: [go.mod, "**/*.go"]
+
+  - id: project.language.javascript
+    category: project
+    title: JavaScript/TypeScript
+    description: A Node.js-style package manifest or TypeScript configuration.
+    detection:
+      kind: path
+      paths: [package.json, tsconfig.json, deno.json]
+
+  - id: project.language.jvm
+    category: project
+    title: JVM
+    description: Maven/Gradle metadata or Java/Kotlin sources.
+    detection:
+      kind: path
+      paths: [pom.xml, build.gradle, build.gradle.kts, gradlew, mvnw, "**/*.java", "**/*.kt"]
+
+  - id: project.language.php
+    category: project
+    title: PHP
+    description: Composer metadata or PHP sources.
+    detection:
+      kind: path
+      paths: [composer.json, "**/*.php"]
+
+  - id: project.language.python
+    category: project
+    title: Python
+    description: Python project metadata or sources.
+    detection:
+      kind: path
+      paths: [pyproject.toml, setup.py, setup.cfg, requirements.txt, "**/*.py"]
+
+  - id: project.language.ruby
+    category: project
+    title: Ruby
+    description: Bundler metadata or Ruby sources.
+    detection:
+      kind: path
+      paths: [Gemfile, "**/*.rb"]
+
+  - id: project.language.rust
+    category: project
+    title: Rust
+    description: Cargo metadata or Rust sources.
+    detection:
+      kind: path
+      paths: [Cargo.toml, "**/*.rs"]
+
+  - id: project.language.swift
+    category: project
+    title: Swift
+    description: Swift package metadata or sources.
+    detection:
+      kind: path
+      paths: [Package.swift, "**/*.swift"]
+
+  - id: project.lockfile
+    category: project
+    title: Committed dependency lockfile
+    description: A dependency lockfile is tracked by version control.
+    detection:
+      kind: path
+      scope: tracked
+      paths:
+        - uv.lock
+        - poetry.lock
+        - pdm.lock
+        - Pipfile.lock
+        - requirements.lock
+        - package-lock.json
+        - npm-shrinkwrap.json
+        - pnpm-lock.yaml
+        - yarn.lock
+        - bun.lock
+        - bun.lockb
+        - go.sum
+        - Cargo.lock
+        - Gemfile.lock
+        - composer.lock
+        - gradle.lockfile
+        - Package.resolved
+
+  - id: project.package_manifest
+    category: project
+    title: Dependency manifest
+    description: A root dependency or package manifest exists.
+    detection:
+      kind: path
+      paths:
+        - pyproject.toml
+        - setup.py
+        - requirements.txt
+        - Pipfile
+        - package.json
+        - go.mod
+        - Cargo.toml
+        - pom.xml
+        - build.gradle
+        - build.gradle.kts
+        - Gemfile
+        - composer.json
+        - Package.swift
+
+  - id: project.test_files
+    category: project
+    title: Test files
+    description: Test sources exist in conventional locations or with conventional names.
+    detection:
+      kind: path
+      paths:
+        - tests/**/*
+        - test/**/*
+        - src/test/**/*
+        - "**/__tests__/**/*"
+        - "**/*_test.go"
+        - "**/test_*.py"
+        - "**/*_test.py"
+        - "**/*.test.*"
+        - "**/*.spec.*"
+        - "**/*_spec.rb"
+        - "**/*Test.java"
+        - "**/*Test.kt"
+        - "**/*Tests.swift"
+
+  - id: project.workspace_declared
+    category: project
+    title: Workspace declared in a manifest
+    description: A package manifest declares a multi-package workspace.
+    detection:
+      kind: content
+      paths: [package.json, Cargo.toml]
+      patterns:
+        - '"workspaces"\s*:'
+        - ^\s*\[workspace\]
+
+  - id: project.workspace_manifest
+    category: project
+    title: Workspace manifest
+    description: A dedicated multi-package workspace manifest exists.
+    detection:
+      kind: path
+      paths: [pnpm-workspace.yaml, go.work, lerna.json, nx.json, turbo.json, rush.json]
+
+  - id: security.env_ignored
+    category: security
+    title: Environment files ignored
+    description: The root `.gitignore` ignores `.env` files.
+    detection:
+      kind: content
+      paths: [.gitignore]
+      patterns:
+        - ^\s*/?(\*\*/)?\.env(\*|\.\*)?\s*$
+        - ^\s*\*\.env\s*$
+
+  - id: security.tracked_secret_files
+    category: security
+    title: Tracked secret-bearing files
+    description: >-
+      Files that conventionally hold secrets or private keys are tracked by
+      version control. Test fixtures and documented templates are excluded.
+    detection:
+      kind: path
+      scope: tracked
+      paths:
+        - "**/.env"
+        - "**/.env.*"
+        - "**/*.pem"
+        - "**/*.p12"
+        - "**/*.pfx"
+        - "**/*.jks"
+        - "**/*.keystore"
+        - "**/id_rsa"
+        - "**/id_dsa"
+        - "**/id_ecdsa"
+        - "**/id_ed25519"
+      exclude:
+        - "**/.env.example"
+        - "**/.env.sample"
+        - "**/.env.template"
+        - "**/.env.dist"
+        - "**/.env.defaults"
+        - "**/test/**/*"
+        - "**/tests/**/*"
+        - "**/testdata/**/*"
+        - "**/fixtures/**/*"

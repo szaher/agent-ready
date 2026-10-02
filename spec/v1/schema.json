@@ -1,0 +1,817 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/szaher/agent-ready/spec/v1/schema.json",
+  "title": "Agent Ready Specification v1",
+  "description": "Schema for the assembled Agent Ready Spec v1 bundle. The $defs also describe each authored YAML source file.",
+  "$ref": "#/$defs/bundle",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "ruleId": {
+      "type": "string",
+      "pattern": "^(context|conventions|constraints|feedback)(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "evidenceId": {
+      "type": "string",
+      "pattern": "^[a-z]+(\\.[a-z0-9_]+)+$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourcePath": {
+      "type": "string",
+      "pattern": "^content/module-[0-9]+/[0-9]{2}-[a-z0-9-]+\\.mdx$"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourcePath"
+      },
+      "uniqueItems": true
+    },
+    "enumEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "pillar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "description",
+        "sources"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "context",
+            "conventions",
+            "constraints",
+            "feedback"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        },
+        "sources": {
+          "$ref": "#/$defs/sources"
+        }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "description",
+        "sources"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "security",
+            "performance"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        },
+        "sources": {
+          "$ref": "#/$defs/sources"
+        }
+      }
+    },
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rank",
+        "title",
+        "summary",
+        "characteristics",
+        "sources"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "summary": {
+          "$ref": "#/$defs/text"
+        },
+        "characteristics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "sources": {
+          "$ref": "#/$defs/sources"
+        }
+      }
+    },
+    "maturity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantics",
+        "levels"
+      ],
+      "properties": {
+        "semantics": {
+          "$ref": "#/$defs/text"
+        },
+        "levels": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/level"
+          }
+        }
+      }
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "(^/|\\.\\./|\\\\)"
+      }
+    },
+    "regex": {
+      "type": "string",
+      "minLength": 1
+    },
+    "detection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "paths"
+          ],
+          "properties": {
+            "kind": {
+              "const": "path"
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/glob"
+              }
+            },
+            "exclude": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/glob"
+              }
+            },
+            "type": {
+              "enum": [
+                "file",
+                "directory",
+                "any"
+              ]
+            },
+            "scope": {
+              "enum": [
+                "worktree",
+                "tracked"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "patterns"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "heading",
+                "content"
+              ]
+            },
+            "in": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/evidenceId"
+              }
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/glob"
+              }
+            },
+            "patterns": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/regex"
+              }
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "in"
+              ]
+            },
+            {
+              "required": [
+                "paths"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "definition"
+          ],
+          "properties": {
+            "kind": {
+              "const": "derived"
+            },
+            "definition": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "title",
+        "description",
+        "detection"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/evidenceId"
+        },
+        "category": {
+          "$ref": "#/$defs/identifier"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        },
+        "detection": {
+          "$ref": "#/$defs/detection"
+        }
+      }
+    },
+    "expression": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "any": {
+          "$ref": "#/$defs/operands"
+        },
+        "all": {
+          "$ref": "#/$defs/operands"
+        },
+        "none": {
+          "$ref": "#/$defs/operands"
+        }
+      }
+    },
+    "operands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/evidenceId"
+          },
+          {
+            "$ref": "#/$defs/expression"
+          }
+        ]
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "pillar",
+        "title",
+        "description",
+        "rationale",
+        "required_from",
+        "severity",
+        "evidence",
+        "evaluation",
+        "remediation",
+        "sources"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ruleId"
+        },
+        "pillar": {
+          "enum": [
+            "context",
+            "conventions",
+            "constraints",
+            "feedback"
+          ]
+        },
+        "dimension": {
+          "enum": [
+            "security",
+            "performance"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        },
+        "rationale": {
+          "$ref": "#/$defs/text"
+        },
+        "required_from": {
+          "$ref": "#/$defs/identifier"
+        },
+        "severity": {
+          "enum": [
+            "required",
+            "recommended",
+            "advisory"
+          ]
+        },
+        "applies_when": {
+          "$ref": "#/$defs/expression"
+        },
+        "evidence": {
+          "$ref": "#/$defs/expression"
+        },
+        "evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "on_missing"
+          ],
+          "properties": {
+            "on_missing": {
+              "enum": [
+                "fail",
+                "unknown"
+              ]
+            },
+            "unknown_reason": {
+              "$ref": "#/$defs/text"
+            }
+          },
+          "if": {
+            "properties": {
+              "on_missing": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "unknown_reason"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "unknown_reason"
+              ]
+            }
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ruleId"
+          },
+          "uniqueItems": true
+        },
+        "remediation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "classification",
+            "summary"
+          ],
+          "properties": {
+            "classification": {
+              "enum": [
+                "automatable",
+                "assisted",
+                "human-required"
+              ]
+            },
+            "summary": {
+              "$ref": "#/$defs/text"
+            },
+            "decision": {
+              "$ref": "#/$defs/text"
+            }
+          },
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "human-required"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "decision"
+            ]
+          }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sourcePath"
+          }
+        }
+      }
+    },
+    "specFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "name",
+        "spec_version",
+        "title",
+        "description",
+        "homepage",
+        "statuses",
+        "severities",
+        "remediation_classifications",
+        "evidence_categories",
+        "path_matching",
+        "pillars",
+        "dimensions",
+        "includes"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1"
+        },
+        "name": {
+          "const": "agent-ready"
+        },
+        "spec_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        },
+        "homepage": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "severities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "remediation_classifications": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "evidence_categories": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "path_matching": {
+          "$ref": "#/$defs/pathMatching"
+        },
+        "pillars": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/pillar"
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dimension"
+          }
+        },
+        "includes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maturity",
+            "evidence",
+            "rules"
+          ],
+          "properties": {
+            "maturity": {
+              "type": "string",
+              "pattern": "^[a-z-]+\\.yaml$"
+            },
+            "evidence": {
+              "type": "string",
+              "pattern": "^[a-z-]+\\.yaml$"
+            },
+            "rules": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z-]+\\.yaml$"
+              }
+            }
+          }
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      }
+    },
+    "pathMatching": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantics",
+        "ignored_directories"
+      ],
+      "properties": {
+        "semantics": {
+          "$ref": "#/$defs/text"
+        },
+        "ignored_directories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "maturityFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "maturity"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent-ready.maturity"
+        },
+        "maturity": {
+          "$ref": "#/$defs/maturity"
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      }
+    },
+    "evidenceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "evidence"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent-ready.evidence"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      }
+    },
+    "ruleFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "scope",
+        "rules"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent-ready.rules"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "pillar": {
+              "enum": [
+                "context",
+                "conventions",
+                "constraints",
+                "feedback"
+              ]
+            },
+            "dimension": {
+              "enum": [
+                "security",
+                "performance"
+              ]
+            }
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      }
+    },
+    "bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "document_type",
+        "name",
+        "spec_version",
+        "title",
+        "description",
+        "homepage",
+        "statuses",
+        "severities",
+        "remediation_classifications",
+        "evidence_categories",
+        "path_matching",
+        "pillars",
+        "dimensions",
+        "maturity",
+        "evidence",
+        "rules"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1"
+        },
+        "document_type": {
+          "const": "agent-ready.spec"
+        },
+        "name": {
+          "const": "agent-ready"
+        },
+        "spec_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "description": {
+          "$ref": "#/$defs/text"
+        },
+        "homepage": {
+          "type": "string"
+        },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "severities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "remediation_classifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "evidence_categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/enumEntry"
+          }
+        },
+        "path_matching": {
+          "$ref": "#/$defs/pathMatching"
+        },
+        "pillars": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pillar"
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dimension"
+          }
+        },
+        "maturity": {
+          "$ref": "#/$defs/maturity"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    }
+  }
+}
